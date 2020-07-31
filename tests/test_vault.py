@@ -18,8 +18,8 @@
 import pytest
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.vault import DSVault
+from pyflex import Address
+from pyflex.vault import DSVault
 
 
 class TestDSVault:

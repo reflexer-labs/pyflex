@@ -26,12 +26,12 @@ from typing import List
 
 from web3 import Web3
 
-from pymaker import Contract, Address, Transact
-from pymaker.numeric import Wad
-from pymaker.sign import eth_sign, to_vrs
-from pymaker.tightly_packed import encode_address, encode_uint256
-from pymaker.token import ERC20Token
-from pymaker.util import bytes_to_hexstring, hexstring_to_bytes
+from pyflex import Contract, Address, Transact
+from pyflex.numeric import Wad
+from pyflex.sign import eth_sign, to_vrs
+from pyflex.tightly_packed import encode_address, encode_uint256
+from pyflex.token import ERC20Token
+from pyflex.util import bytes_to_hexstring, hexstring_to_bytes
 
 
 class Order:
@@ -214,10 +214,10 @@ class EtherDelta(Contract):
         """Approve the EtherDelta contract to fully access balances of specified tokens.
 
         For available approval functions (i.e. approval modes) see `directly` and `via_tx_manager`
-        in `pymaker.approval`.
+        in `pyflex.approval`.
 
         Args:
-            tokens: List of :py:class:`pymaker.token.ERC20Token` class instances.
+            tokens: List of :py:class:`pyflex.token.ERC20Token` class instances.
             approval_function: Approval function (i.e. approval mode).
         """
         assert(isinstance(tokens, list))
@@ -286,7 +286,7 @@ class EtherDelta(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogTrade` events represented as :py:class:`pymaker.etherdelta.LogTrade` class.
+            List of past `LogTrade` events represented as :py:class:`pyflex.etherdelta.LogTrade` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -300,7 +300,7 @@ class EtherDelta(Contract):
             amount: Amount of raw ETH to be deposited on EtherDelta.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'deposit', [], {'value': amount.value})
@@ -314,7 +314,7 @@ class EtherDelta(Contract):
             amount: Amount of raw ETH to be withdrawn from EtherDelta.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'withdraw', [amount.value])
@@ -343,7 +343,7 @@ class EtherDelta(Contract):
             amount: Amount of token `token` to be deposited to EtherDelta.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(token, Address))
         assert(isinstance(amount, Wad))
@@ -360,7 +360,7 @@ class EtherDelta(Contract):
             amount: Amount of token `token` to be withdrawn from EtherDelta.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(token, Address))
         assert(isinstance(amount, Wad))
@@ -404,7 +404,7 @@ class EtherDelta(Contract):
             expires: The block number after which the order will expire.
 
         Returns:
-            Newly created order as an instance of the :py:class:`pymaker.etherdelta.Order` class.
+            Newly created order as an instance of the :py:class:`pyflex.etherdelta.Order` class.
         """
 
         assert(isinstance(pay_token, Address))
@@ -498,7 +498,7 @@ class EtherDelta(Contract):
                 in order to buy a corresponding amount of `pay_token` tokens.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(order, Order))
         assert(isinstance(amount, Wad))
@@ -554,7 +554,7 @@ class EtherDelta(Contract):
             order: The order you want to cancel.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(order, Order))
 

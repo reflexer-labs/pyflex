@@ -20,11 +20,11 @@ import pytest
 
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.auctions import Flipper, Flapper, Flopper
-from pymaker.deployment import Deployment, DssDeployment
-from pymaker.dss import Vat, Vow, Cat, Jug, Pot
-from pymaker.keys import register_keys
+from pyflex import Address
+from pyflex.auctions import Flipper, Flapper, Flopper
+from pyflex.deployment import Deployment, DssDeployment
+from pyflex.dss import Vat, Vow, Cat, Jug, Pot
+from pyflex.keys import register_keys
 
 
 @pytest.fixture(scope='session')

@@ -21,11 +21,11 @@ from typing import Optional, List
 
 from web3 import Web3
 
-from pymaker import Address, Contract, Transact
-from pymaker.approval import directly, hope_directly
-from pymaker.dss import Ilk
-from pymaker.numeric import Wad, Ray, Rad
-from pymaker.token import DSToken, ERC20Token
+from pyflex import Address, Contract, Transact
+from pyflex.approval import directly, hope_directly
+from pyflex.dss import Ilk
+from pyflex.numeric import Wad, Ray, Rad
+from pyflex.token import DSToken, ERC20Token
 
 
 logger = logging.getLogger()

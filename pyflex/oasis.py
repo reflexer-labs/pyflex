@@ -25,18 +25,18 @@ from web3._utils.events import get_event_data
 from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
-from pymaker import Contract, Address, Transact, Receipt
-from pymaker.numeric import Wad
-from pymaker.token import ERC20Token
-from pymaker.util import int_to_bytes32, bytes_to_int
-from pymaker.model import Token
+from pyflex import Contract, Address, Transact, Receipt
+from pyflex.numeric import Wad
+from pyflex.token import ERC20Token
+from pyflex.util import int_to_bytes32, bytes_to_int
+from pyflex.model import Token
 
 class Order:
     """Represents a single order on `OasisDEX`.
 
     Instances of this class shouldn't be created directly. Instead of that, new orders can be queried
-    using methods of :py:class:`pymaker.oasis.SimpleMarket`, :py:class:`pymaker.oasis.ExpiringMarket`
-    or :py:class:`pymaker.oasis.MatchingMarket`.
+    using methods of :py:class:`pyflex.oasis.SimpleMarket`, :py:class:`pyflex.oasis.ExpiringMarket`
+    or :py:class:`pyflex.oasis.MatchingMarket`.
 
     Attributes:
         order_id: Id of the order.
@@ -225,10 +225,10 @@ class SimpleMarket(Contract):
         """Approve the OasisDEX contract to fully access balances of specified tokens.
 
         For available approval functions (i.e. approval modes) see `directly` and `via_tx_manager`
-        in `pymaker.approval`.
+        in `pyflex.approval`.
 
         Args:
-            tokens: List of :py:class:`pymaker.token.ERC20Token` class instances.
+            tokens: List of :py:class:`pyflex.token.ERC20Token` class instances.
             approval_function: Approval function (i.e. approval mode).
         """
         assert(isinstance(tokens, list))
@@ -247,7 +247,7 @@ class SimpleMarket(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogMake` events represented as :py:class:`pymaker.oasis.LogMake` class.
+            List of past `LogMake` events represented as :py:class:`pyflex.oasis.LogMake` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -264,7 +264,7 @@ class SimpleMarket(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogBump` events represented as :py:class:`pymaker.oasis.LogBump` class.
+            List of past `LogBump` events represented as :py:class:`pyflex.oasis.LogBump` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -281,7 +281,7 @@ class SimpleMarket(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogTake` events represented as :py:class:`pymaker.oasis.LogTake` class.
+            List of past `LogTake` events represented as :py:class:`pyflex.oasis.LogTake` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -298,7 +298,7 @@ class SimpleMarket(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogKill` events represented as :py:class:`pymaker.oasis.LogKill` class.
+            List of past `LogKill` events represented as :py:class:`pyflex.oasis.LogKill` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -400,7 +400,7 @@ class SimpleMarket(Contract):
             buy_amount: Amount of the `buy_token` you want to receive.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(pay_token, Address))
         assert(isinstance(pay_amount, Wad))
@@ -423,7 +423,7 @@ class SimpleMarket(Contract):
             order_id: Id of the order you want to bump.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(order_id, int))
 
@@ -442,7 +442,7 @@ class SimpleMarket(Contract):
             quantity: Quantity of `pay_token` that you want to buy.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(order_id, int))
         assert(isinstance(quantity, Wad))
@@ -460,7 +460,7 @@ class SimpleMarket(Contract):
             order_id: Id of the order you want to cancel.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(order_id, int))
 
@@ -570,7 +570,7 @@ class MatchingMarket(ExpiringMarket):
             buy_enabled: Whether direct buy should be enabled or disabled.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(buy_enabled, bool))
         return Transact(self, self.web3, self.abi, self.address, self._contract,
@@ -591,7 +591,7 @@ class MatchingMarket(ExpiringMarket):
             matching_enabled: Whether order matching should be enabled or disabled.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(matching_enabled, bool))
         return Transact(self, self.web3, self.abi, self.address, self._contract,
@@ -607,7 +607,7 @@ class MatchingMarket(ExpiringMarket):
             quote_token: Address of the ERC20 token.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(base_token, Address))
         assert(isinstance(quote_token, Address))
@@ -713,7 +713,7 @@ class MatchingMarket(ExpiringMarket):
                 If `None`, the optimal position will automatically get calculated.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(p_token, Token))
         assert(isinstance(pay_amount, Wad))

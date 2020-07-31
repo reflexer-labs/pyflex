@@ -43,9 +43,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'pymaker'
-copyright = '2017, MakerDAO'
-author = 'MakerDAO'
+project = 'pyflex'
+copyright = '2020, Reflexer Labs'
+author = 'Reflexer Labs'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -97,7 +97,7 @@ html_theme = 'classic'
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'pymaker'
+htmlhelp_basename = 'pyflex'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -124,7 +124,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'pymaker.py.tex', 'pymaker Documentation',
+    (master_doc, 'pyflex.py.tex', 'pyflex Documentation',
      'MakerDAO', 'manual'),
 ]
 
@@ -134,7 +134,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'pymaker', 'pymaker Documentation',
+    (master_doc, 'pyflex', 'pyflex Documentation',
      [author], 1)
 ]
 
@@ -145,8 +145,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'pymaker', 'pymaker Documentation',
-     author, 'pymaker', 'One line description of project.',
+    (master_doc, 'pyflex', 'pyflex Documentation',
+     author, 'pyflex', 'One line description of project.',
      'Miscellaneous'),
 ]
 

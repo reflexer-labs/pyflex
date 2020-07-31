@@ -22,11 +22,11 @@ import threading
 import time
 
 import pytz
-from pymaker.sign import eth_sign
+from pyflex.sign import eth_sign
 from web3 import Web3
 
-from pymaker import register_filter_thread, any_filter_thread_present, stop_all_filter_threads, all_filter_threads_alive
-from pymaker.util import AsyncCallback
+from pyflex import register_filter_thread, any_filter_thread_present, stop_all_filter_threads, all_filter_threads_alive
+from pyflex.util import AsyncCallback
 
 
 def trigger_event(event: threading.Event):
@@ -52,7 +52,7 @@ class Lifecycle:
     Other quirk is the new block filter callback taking more time to execute that
     the time between subsequent blocks. If you do not handle it explicitly,
     the event queue will pile up and the keeper won't work as expected.
-    `Lifecycle` used :py:class:`pymaker.util.AsyncCallback` to handle it properly.
+    `Lifecycle` used :py:class:`pyflex.util.AsyncCallback` to handle it properly.
 
     It also handles:
     - waiting for the node to have at least one peer and sync before starting the keeper,
@@ -208,7 +208,7 @@ class Lifecycle:
 
     def _check_account_unlocked(self):
         try:
-            eth_sign(bytes("pymaker testing if account is unlocked", "utf-8"), self.web3)
+            eth_sign(bytes("pyflex testing if account is unlocked", "utf-8"), self.web3)
         except:
             self.logger.exception(f"Account {self.web3.eth.defaultAccount} is not unlocked and no private key supplied for it")
             self.logger.fatal(f"Unlocking the account or providing the private key is necessary for the keeper to operate")

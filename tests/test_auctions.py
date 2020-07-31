@@ -20,12 +20,12 @@ import pytest
 from datetime import datetime
 from web3 import Web3
 
-from pymaker import Address
-from pymaker.approval import directly, hope_directly
-from pymaker.auctions import AuctionContract, Flipper, Flapper, Flopper
-from pymaker.deployment import DssDeployment
-from pymaker.dss import Collateral, Urn
-from pymaker.numeric import Wad, Ray, Rad
+from pyflex import Address
+from pyflex.approval import directly, hope_directly
+from pyflex.auctions import AuctionContract, Flipper, Flapper, Flopper
+from pyflex.deployment import DssDeployment
+from pyflex.dss import Collateral, Urn
+from pyflex.numeric import Wad, Ray, Rad
 from tests.test_dss import wrap_eth, mint_mkr, set_collateral_price, wait, frob, cleanup_urn, max_dart, simulate_bite
 
 

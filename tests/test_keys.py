@@ -18,9 +18,9 @@
 import pkg_resources
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address, Wad, eth_transfer
-from pymaker.keys import register_key_file, register_key
-from pymaker.token import DSToken
+from pyflex import Address, Wad, eth_transfer
+from pyflex.keys import register_key_file, register_key
+from pyflex.token import DSToken
 
 def test_local_accounts():
     # given

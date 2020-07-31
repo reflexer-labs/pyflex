@@ -17,10 +17,10 @@
 
 import pytest
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.dsr import Dsr
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.deployment import DssDeployment
+from pyflex.dsr import Dsr
+from pyflex.numeric import Wad
 
 from tests.test_dss import wrap_eth, frob, max_dart
 

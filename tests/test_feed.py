@@ -18,8 +18,8 @@
 import pytest
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.feed import DSValue
+from pyflex import Address
+from pyflex.feed import DSValue
 
 
 class TestDSValue:

@@ -23,8 +23,8 @@ from web3._utils.events import get_event_data
 from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
-from pymaker import Address, Contract, Transact, Receipt, Calldata
-from pymaker.util import hexstring_to_bytes
+from pyflex import Address, Contract, Transact, Receipt, Calldata
+from pyflex.util import hexstring_to_bytes
 
 
 class DSProxyCache(Contract):
@@ -108,7 +108,7 @@ class DSProxy(Contract):
             address: The address of the new `authority`.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(address, Address))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'setAuthority', [address.address])
@@ -241,7 +241,7 @@ class DSProxyFactory(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogCreated` events represented as :py:class:`pymaker.proxy.LogCreated` class.
+            List of past `LogCreated` events represented as :py:class:`pyflex.proxy.LogCreated` class.
         """
         assert isinstance(number_of_past_blocks, int)
         assert isinstance(event_filter, dict) or (event_filter is None)

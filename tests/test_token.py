@@ -16,13 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-from pymaker import Address
-from pymaker.numeric import Wad
-from pymaker.util import synchronize
+from pyflex import Address
+from pyflex.numeric import Wad
+from pyflex.util import synchronize
 from web3 import HTTPProvider
 from web3 import Web3
 
-from pymaker.token import DSToken, DSEthToken, ERC20Token
+from pyflex.token import DSToken, DSEthToken, ERC20Token
 
 
 class TestERC20Token:

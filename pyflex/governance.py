@@ -20,9 +20,9 @@ from web3 import Web3
 from typing import List
 from pprint import pformat
 
-from pymaker import Contract, Address, Transact, Wad
-from pymaker.auth import DSAuth
-from pymaker.token import DSToken
+from pyflex import Contract, Address, Transact, Wad
+from pyflex.auth import DSAuth
+from pyflex.token import DSToken
 
 
 # TODO: Complete implementation and unit test
@@ -230,7 +230,7 @@ class DSChief(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `Etch` events represented as :py:class:`pymaker.governance.Etch` class.
+            List of past `Etch` events represented as :py:class:`pyflex.governance.Etch` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -248,7 +248,7 @@ class DSChief(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `Etch` events represented as :py:class:`pymaker.governance.Etch` class.
+            List of past `Etch` events represented as :py:class:`pyflex.governance.Etch` class.
         """
         assert(isinstance(from_block, int))
         assert(isinstance(to_block, int))

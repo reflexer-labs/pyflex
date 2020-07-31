@@ -26,7 +26,7 @@ class GasPrice(object):
     returning the gas price (in Wei) for a specific point in time. It is possible to build
     custom gas price strategies by implementing this method so the gas price returned
     increases over time. The piece of code responsible for sending Ethereum transactions
-    (please see :py:class:`pymaker.Transact`) will in this case overwrite the transaction
+    (please see :py:class:`pyflex.Transact`) will in this case overwrite the transaction
     with another one, using the same `nonce` but increasing gas price. If the value returned
     by `get_gas_price` does not go up, no new transaction gets submitted to the network.
 
@@ -84,7 +84,7 @@ class FixedGasPrice(GasPrice):
         """Changes the initial gas price to a higher value, preferably higher.
 
         The only reason when calling this function makes sense is when an async transaction is in progress.
-        In this case, the loop waiting for the transaction to be mined (see :py:class:`pymaker.Transact`)
+        In this case, the loop waiting for the transaction to be mined (see :py:class:`pyflex.Transact`)
         will resend the pending transaction again with the new gas price.
 
         As Parity excepts the gas price to rise by at least 10% in replacement transactions, the price

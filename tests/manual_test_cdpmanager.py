@@ -20,11 +20,11 @@ import sys
 import os
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
-from pymaker.dsr import Dsr
+from pyflex import Address
+from pyflex.deployment import DssDeployment
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
+from pyflex.dsr import Dsr
 
 endpoint_uri = f"{os.environ['SERVER_ETH_RPC_HOST']}:{os.environ['SERVER_ETH_RPC_PORT']}"
 web3 = Web3(HTTPProvider(endpoint_uri=endpoint_uri,

@@ -17,8 +17,8 @@
 
 from web3 import Web3
 
-from pymaker import Contract, Address, Transact
-from pymaker.numeric import Wad
+from pyflex import Contract, Address, Transact
+from pyflex.numeric import Wad
 
 
 # TODO: Complete implementation and unit test

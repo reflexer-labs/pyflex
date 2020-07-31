@@ -15,9 +15,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.cdpmanager import Urn
+from pyflex import Address
+from pyflex.deployment import DssDeployment
+from pyflex.cdpmanager import Urn
 
 
 class TestCdpManager:

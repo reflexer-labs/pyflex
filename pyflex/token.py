@@ -19,8 +19,8 @@ import json
 
 from web3 import Web3
 
-from pymaker import Contract, Address, Transact
-from pymaker.numeric import Wad
+from pyflex import Contract, Address, Transact
+from pyflex.numeric import Wad
 
 
 class ERC20Token(Contract):
@@ -113,7 +113,7 @@ class ERC20Token(Contract):
             value: The value of tokens to transfer.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(address, Address))
         assert(isinstance(value, Wad))
@@ -129,7 +129,7 @@ class ERC20Token(Contract):
             value: The value of tokens to transfer.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(source_address, Address))
         assert(isinstance(destination_address, Address))
@@ -153,7 +153,7 @@ class ERC20Token(Contract):
                 can spend on behalf of their owner.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(payee, Address))
         assert(isinstance(limit, Wad))
@@ -211,7 +211,7 @@ class DSToken(ERC20Token):
             address: The address of the new `authority`.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(address, Address))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'setAuthority', [address.address])
@@ -223,7 +223,7 @@ class DSToken(ERC20Token):
             amount: The amount to increase the total supply by.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mint(uint256)', [amount.value])
@@ -236,7 +236,7 @@ class DSToken(ERC20Token):
             amount: The amount to increase the total supply by.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         assert(isinstance(address, Address))
@@ -250,7 +250,7 @@ class DSToken(ERC20Token):
             amount: The amount to decrease the total supply by.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'burn(uint256)', [amount.value])
@@ -263,7 +263,7 @@ class DSToken(ERC20Token):
             amount: The amount to decrease the total supply by.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'burn(address,uint256)', [address.address,
@@ -314,7 +314,7 @@ class DSEthToken(ERC20Token):
             amount: Amount of raw ETH to be deposited to `DSEthToken`.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'deposit', [], {'value': amount.value})
@@ -328,7 +328,7 @@ class DSEthToken(ERC20Token):
             amount: Amount of raw ETH to be withdrawn from `DSEthToken`.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(amount, Wad))
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'withdraw', [amount.value])

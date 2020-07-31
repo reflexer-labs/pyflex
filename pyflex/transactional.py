@@ -21,8 +21,8 @@ from typing import List
 
 from web3 import Web3
 
-from pymaker import Contract, Address, Invocation, Transact
-from pymaker.token import ERC20Token
+from pyflex import Contract, Address, Invocation, Transact
+from pyflex.token import ERC20Token
 
 
 class TxManager(Contract):
@@ -65,10 +65,10 @@ class TxManager(Contract):
         """Approve the TxManager contract to fully access balances of specified tokens.
 
         For available approval functions (i.e. approval modes) see `directly` and `via_tx_manager`
-        in `pymaker.approval`.
+        in `pyflex.approval`.
 
         Args:
-            tokens: List of :py:class:`pymaker.token.ERC20Token` class instances.
+            tokens: List of :py:class:`pyflex.token.ERC20Token` class instances.
             approval_function: Approval function (i.e. approval mode).
         """
         assert(isinstance(tokens, list))
@@ -88,7 +88,7 @@ class TxManager(Contract):
             invocations: A list of invocations (contract methods) to be executed.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         def token_addresses() -> list:
             return list(map(lambda address: address.address, tokens))

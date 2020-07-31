@@ -19,11 +19,11 @@ import pytest
 from mock import Mock
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.approval import directly
-from pymaker.etherdelta import EtherDelta, EtherDeltaApi
-from pymaker.numeric import Wad
-from pymaker.token import DSToken
+from pyflex import Address
+from pyflex.approval import directly
+from pyflex.etherdelta import EtherDelta, EtherDeltaApi
+from pyflex.numeric import Wad
+from pyflex.token import DSToken
 from tests.helpers import is_hashable, wait_until_mock_called
 
 PAST_BLOCKS = 100

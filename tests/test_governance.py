@@ -18,11 +18,11 @@
 import pytest
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.auth import DSAuth
-from pymaker.governance import DSPause, DSChief
-from pymaker.numeric import Wad
-from pymaker.deployment import DssDeployment
+from pyflex import Address
+from pyflex.auth import DSAuth
+from pyflex.governance import DSPause, DSChief
+from pyflex.numeric import Wad
+from pyflex.deployment import DssDeployment
 from datetime import datetime, timedelta
 
 from tests.test_dss import mint_mkr

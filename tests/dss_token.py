@@ -16,9 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from web3 import Web3
 
-from pymaker import Contract, Address, Transact
-from pymaker.dss import Urn, Ilk
-from pymaker.numeric import Wad
+from pyflex import Contract, Address, Transact
+from pyflex.dss import Urn, Ilk
+from pyflex.numeric import Wad
 
 
 class GemMock(Contract):

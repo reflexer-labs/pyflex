@@ -17,8 +17,8 @@
 
 from web3 import Web3
 
-from pymaker import Contract, Address, Transact
-from pymaker.util import int_to_bytes32
+from pyflex import Contract, Address, Transact
+from pyflex.util import int_to_bytes32
 
 
 class DSGuard(Contract):
@@ -58,7 +58,7 @@ class DSGuard(Contract):
             sig: Signature of the called function, or `ANY`.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(src, Address) or isinstance(src, bytes))
         assert(isinstance(dst, Address) or isinstance(dst, bytes))

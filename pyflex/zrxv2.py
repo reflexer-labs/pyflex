@@ -32,11 +32,11 @@ from web3._utils.events import get_event_data
 from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
-from pymaker import Contract, Address, Transact
-from pymaker.numeric import Wad
-from pymaker.sign import eth_sign, to_vrs
-from pymaker.token import ERC20Token
-from pymaker.util import bytes_to_hexstring, hexstring_to_bytes, http_response_summary
+from pyflex import Contract, Address, Transact
+from pyflex.numeric import Wad
+from pyflex.sign import eth_sign, to_vrs
+from pyflex.token import ERC20Token
+from pyflex.util import bytes_to_hexstring, hexstring_to_bytes, http_response_summary
 
 
 class Asset:
@@ -373,10 +373,10 @@ class ZrxExchangeV2(Contract):
         contract wouldn't be able to charge maker and taker fees.
 
         For available approval functions (i.e. approval modes) see `directly` and `via_tx_manager`
-        in `pymaker.approval`.
+        in `pyflex.approval`.
 
         Args:
-            tokens: List of :py:class:`pymaker.token.ERC20Token` class instances.
+            tokens: List of :py:class:`pyflex.token.ERC20Token` class instances.
             approval_function: Approval function (i.e. approval mode).
         """
         assert(isinstance(tokens, list))
@@ -395,7 +395,7 @@ class ZrxExchangeV2(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogFill` events represented as :py:class:`pymaker.zrx.LogFill` class.
+            List of past `LogFill` events represented as :py:class:`pyflex.zrx.LogFill` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -412,7 +412,7 @@ class ZrxExchangeV2(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogCancel` events represented as :py:class:`pymaker.zrx.LogCancel` class.
+            List of past `LogCancel` events represented as :py:class:`pyflex.zrx.LogCancel` class.
         """
         assert(isinstance(number_of_past_blocks, int))
         assert(isinstance(event_filter, dict) or (event_filter is None))
@@ -439,7 +439,7 @@ class ZrxExchangeV2(Contract):
             expiration: Unix timestamp (in seconds) when the order will expire.
 
         Returns:
-            New order as an instance of the :py:class:`pymaker.zrx.Order` class.
+            New order as an instance of the :py:class:`pyflex.zrx.Order` class.
         """
         assert(isinstance(pay_asset, Asset))
         assert(isinstance(pay_amount, Wad))
@@ -547,7 +547,7 @@ class ZrxExchangeV2(Contract):
             fill_buy_amount: The amount (in terms of `buy_token` of the original order) to be filled.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(order, Order))
         assert(isinstance(fill_buy_amount, Wad))
@@ -569,7 +569,7 @@ class ZrxExchangeV2(Contract):
             order: Order you want to cancel.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert(isinstance(order, Order))
 
@@ -652,7 +652,7 @@ class ZrxRelayerApiV2:
                 is exposed.
 
         Returns:
-            Orders, as a list of instances of the :py:class:`pymaker.zrx.Order` class.
+            Orders, as a list of instances of the :py:class:`pyflex.zrx.Order` class.
         """
         assert(isinstance(pay_token, Address))
         assert(isinstance(buy_token, Address))
@@ -694,7 +694,7 @@ class ZrxRelayerApiV2:
                 is exposed.
 
         Returns:
-            Active orders created by `maker`, as a list of instances of the :py:class:`pymaker.zrx.Order` class.
+            Active orders created by `maker`, as a list of instances of the :py:class:`pyflex.zrx.Order` class.
         """
         assert(isinstance(maker, Address))
 

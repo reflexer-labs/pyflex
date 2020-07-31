@@ -22,12 +22,12 @@ import pytest
 from mock import Mock
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.approval import directly
-from pymaker.deployment import deploy_contract
-from pymaker.numeric import Wad
-from pymaker.token import DSToken, ERC20Token
-from pymaker.zrx import ZrxExchange, Order, ZrxRelayerApi
+from pyflex import Address
+from pyflex.approval import directly
+from pyflex.deployment import deploy_contract
+from pyflex.numeric import Wad
+from pyflex.token import DSToken, ERC20Token
+from pyflex.zrx import ZrxExchange, Order, ZrxRelayerApi
 from tests.helpers import is_hashable, wait_until_mock_called
 
 PAST_BLOCKS = 100
@@ -41,7 +41,7 @@ class TestZrx:
         self.zrx_token = ERC20Token(web3=self.web3, address=deploy_contract(self.web3, 'ZRXToken'))
         self.token_transfer_proxy_address = deploy_contract(self.web3, 'TokenTransferProxy')
         self.exchange = ZrxExchange.deploy(self.web3, self.zrx_token.address, self.token_transfer_proxy_address)
-        token_proxy_abi = json.loads(pkg_resources.resource_string('pymaker.deployment', f'abi/TokenTransferProxy.abi'))
+        token_proxy_abi = json.loads(pkg_resources.resource_string('pyflex.deployment', f'abi/TokenTransferProxy.abi'))
         self.web3.eth.contract(abi=token_proxy_abi)\
             (address=self.token_transfer_proxy_address.address).functions.addAuthorizedAddress(
             self.exchange.address.address).transact()

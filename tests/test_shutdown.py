@@ -19,12 +19,12 @@
 import pytest
 from datetime import datetime, timedelta
 
-from pymaker import Address
-from pymaker.approval import directly, hope_directly
-from pymaker.deployment import DssDeployment
-from pymaker.dss import Collateral
-from pymaker.numeric import Wad, Ray, Rad
-from pymaker.shutdown import ShutdownModule, End
+from pyflex import Address
+from pyflex.approval import directly, hope_directly
+from pyflex.deployment import DssDeployment
+from pyflex.dss import Collateral
+from pyflex.numeric import Wad, Ray, Rad
+from pyflex.shutdown import ShutdownModule, End
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus

@@ -21,14 +21,14 @@ import time
 from datetime import datetime
 from web3 import Web3
 
-from pymaker import Address
-from pymaker.approval import hope_directly
-from pymaker.deployment import DssDeployment
-from pymaker.dss import Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Urn, Vat, Vow
-from pymaker.feed import DSValue
-from pymaker.numeric import Wad, Ray, Rad
-from pymaker.oracles import OSM
-from pymaker.token import DSToken, DSEthToken, ERC20Token
+from pyflex import Address
+from pyflex.approval import hope_directly
+from pyflex.deployment import DssDeployment
+from pyflex.dss import Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Urn, Vat, Vow
+from pyflex.feed import DSValue
+from pyflex.numeric import Wad, Ray, Rad
+from pyflex.oracles import OSM
+from pyflex.token import DSToken, DSEthToken, ERC20Token
 from tests.conftest import validate_contracts_loaded
 
 

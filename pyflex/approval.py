@@ -17,11 +17,11 @@
 
 import logging
 
-from pymaker import Address, Contract
-from pymaker import Transact
-from pymaker.numeric import Wad
-from pymaker.token import ERC20Token
-from pymaker.transactional import TxManager
+from pyflex import Address, Contract
+from pyflex import Transact
+from pyflex.numeric import Wad
+from pyflex.token import ERC20Token
+from pyflex.transactional import TxManager
 
 
 def directly(**kwargs):

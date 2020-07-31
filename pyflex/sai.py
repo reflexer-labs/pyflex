@@ -19,10 +19,10 @@ from typing import Optional
 
 from web3 import Web3
 
-from pymaker import Address, Contract, Transact
-from pymaker.numeric import Wad, Ray
-from pymaker.token import ERC20Token
-from pymaker.util import int_to_bytes32
+from pyflex import Address, Contract, Transact
+from pyflex.numeric import Wad, Ray
+from pyflex.token import ERC20Token
+from pyflex.util import int_to_bytes32
 
 
 class Cup:
@@ -105,7 +105,7 @@ class Tub(Contract):
         """Approve the `Tub` to access our GEM, SKR, SAI and GOV balances.
 
         For available approval functions (i.e. approval modes) see `directly` and `via_tx_manager`
-        in `pymaker.approval`.
+        in `pyflex.approval`.
 
         Args:
             approval_function: Approval function (i.e. approval mode).
@@ -288,7 +288,7 @@ class Tub(Contract):
             new_axe: The new value of the liquidation penalty (`axe`). `1.0` means no penalty. `1.2` means 20% penalty.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(new_axe, Ray)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mold', [bytes('axe', 'utf-8'), new_axe.value])
@@ -300,7 +300,7 @@ class Tub(Contract):
             new_cap: The new value of the debt ceiling (`cap`), in SAI.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(new_cap, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mold', [bytes('cap', 'utf-8'), new_cap.value])
@@ -312,7 +312,7 @@ class Tub(Contract):
             new_mat: The new value of the liquidation ratio (`mat`). `1.5` means the liquidation ratio is 150%.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(new_mat, Ray)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mold', [bytes('mat', 'utf-8'), new_mat.value])
@@ -324,7 +324,7 @@ class Tub(Contract):
             new_tax: The new per-second value of the stability fee (`tax`). `1.0` means no stability fee.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(new_tax, Ray)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mold', [bytes('tax', 'utf-8'), new_tax.value])
@@ -336,7 +336,7 @@ class Tub(Contract):
             new_tax: The new value of the spread (`gap`). `1.0` means no spread, `1.01` means 1% spread.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(new_gap, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mold', [bytes('gap', 'utf-8'), new_gap.value])
@@ -345,7 +345,7 @@ class Tub(Contract):
         """Recalculate the internal debt price (`chi`).
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'drip', [])
 
@@ -353,7 +353,7 @@ class Tub(Contract):
         """Recalculate the accrued holder fee (`par`).
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         return Transact(self, self.web3, self.abiTip, self.tip(), self._contractTip, 'prod', [])
 
@@ -507,7 +507,7 @@ class Tub(Contract):
             amount_in_skr: The amount of SKRs to buy for GEM.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(amount_in_skr, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'join', [amount_in_skr.value])
@@ -519,7 +519,7 @@ class Tub(Contract):
             amount_in_skr: The amount of SKR to sell for GEMs.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(amount_in_skr, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'exit', [amount_in_skr.value])
@@ -529,7 +529,7 @@ class Tub(Contract):
         """Create a new cup.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'open', [])
 
@@ -543,7 +543,7 @@ class Tub(Contract):
             cup_id: Id of the cup to close.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(cup_id, int)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'shut', [int_to_bytes32(cup_id)])
@@ -556,7 +556,7 @@ class Tub(Contract):
             amount_in_skr: The amount of collateral to post, in SKR.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(cup_id, int)
         assert isinstance(amount_in_skr, Wad)
@@ -571,7 +571,7 @@ class Tub(Contract):
             amount_in_skr: The amount of collateral to remove, in SKR.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(cup_id, int)
         assert isinstance(amount_in_skr, Wad)
@@ -586,7 +586,7 @@ class Tub(Contract):
             amount_in_sai: The amount SAI to be issued.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(cup_id, int)
         assert isinstance(amount_in_sai, Wad)
@@ -601,7 +601,7 @@ class Tub(Contract):
             amount_in_sai: The amount SAI to be repaid.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(cup_id, int)
         assert isinstance(amount_in_sai, Wad)
@@ -616,7 +616,7 @@ class Tub(Contract):
             new_lad: New owner of the cup.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(cup_id, int)
         assert isinstance(new_lad, Address)
@@ -630,7 +630,7 @@ class Tub(Contract):
             cup_id: Id of the cup to liquidate.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(cup_id, int)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'bite', [int_to_bytes32(cup_id)])
@@ -675,7 +675,7 @@ class Tap(Contract):
         """Approve the `Tap` to access our SAI, SKR and GEM balances.
 
         For available approval functions (i.e. approval modes) see `directly` and `via_tx_manager`
-        in `pymaker.approval`.
+        in `pyflex.approval`.
 
         Args:
             approval_function: Approval function (i.e. approval mode).
@@ -762,7 +762,7 @@ class Tap(Contract):
             new_gap: The new value of the spread (`gap`). `1.0` means no spread, `1.01` means 1% spread.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(new_gap, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mold', [bytes('gap', 'utf-8'), new_gap.value])
@@ -800,7 +800,7 @@ class Tap(Contract):
             amount_in_skr: The amount of SKR we want to send in order to receive SAI.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(amount_in_skr, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'boom', [amount_in_skr.value])
@@ -812,7 +812,7 @@ class Tap(Contract):
             amount_in_skr: The amount of SKR we want to receive in exchange for our SAI.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         assert isinstance(amount_in_skr, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'bust', [amount_in_skr.value])
@@ -824,7 +824,7 @@ class Tap(Contract):
             amount_in_sai: The amount of SAI to exchange to GEM.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'cash', [amount_in_sai.value])
 
@@ -835,7 +835,7 @@ class Tap(Contract):
             amount_in_sai: The amount of SAI to buy for GEM.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'mock', [amount_in_sai.value])
 
@@ -888,7 +888,7 @@ class Top(Contract):
         """Force settlement of the system at a current price.
 
         Returns:
-            A :py:class:`pymaker.Transact` instance, which can be used to trigger the transaction.
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'cage', [])
 

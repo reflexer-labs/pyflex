@@ -18,8 +18,8 @@
 import pytest
 from web3 import Web3
 
-from pymaker import Address, Calldata
-from pymaker.proxy import DSProxyCache, DSProxy, DSProxyFactory, LogCreated
+from pyflex import Address, Calldata
+from pyflex.proxy import DSProxyCache, DSProxy, DSProxyFactory, LogCreated
 
 
 @pytest.fixture(scope="session")

@@ -21,7 +21,7 @@ import threading
 
 from web3 import Web3
 
-from pymaker.numeric import Wad
+from pyflex.numeric import Wad
 
 
 def chain(web3: Web3) -> str:

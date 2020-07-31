@@ -17,11 +17,11 @@
 
 import pytest
 
-from pymaker import Address
-from pymaker.deployment import Deployment
-from pymaker.feed import DSValue
-from pymaker.numeric import Wad, Ray
-from pymaker.sai import Tub, Tap, Top, Vox
+from pyflex import Address
+from pyflex.deployment import Deployment
+from pyflex.feed import DSValue
+from pyflex.numeric import Wad, Ray
+from pyflex.sai import Tub, Tap, Top, Vox
 from tests.helpers import time_travel_by
 
 

@@ -17,7 +17,7 @@
 
 import pytest
 
-from pymaker.gas import DefaultGasPrice, FixedGasPrice, GasPrice, GeometricGasPrice, IncreasingGasPrice
+from pyflex.gas import DefaultGasPrice, FixedGasPrice, GasPrice, GeometricGasPrice, IncreasingGasPrice
 
 
 class TestGasPrice:

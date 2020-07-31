@@ -18,8 +18,8 @@
 from pprint import pformat
 from typing import Optional, List
 
-from pymaker import Address
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.numeric import Wad
 
 
 class Token:

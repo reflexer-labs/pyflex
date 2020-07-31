@@ -25,10 +25,10 @@ from web3._utils.events import get_event_data
 from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
-from pymaker import Contract, Address, Transact
-from pymaker.logging import LogNote
-from pymaker.numeric import Wad, Rad, Ray
-from pymaker.token import ERC20Token
+from pyflex import Contract, Address, Transact
+from pyflex.logging import LogNote
+from pyflex.numeric import Wad, Rad, Ray
+from pyflex.token import ERC20Token
 
 
 def toBytes(string: str):
@@ -87,7 +87,7 @@ class AuctionContract(Contract):
         """Approve the auction to access our collateral, Dai, or MKR so we can participate in auctions.
 
         For available approval functions (i.e. approval modes) see `directly` and `hope_directly`
-        in `pymaker.approval`.
+        in `pyflex.approval`.
 
         Args:
             source: Address of the contract or token relevant to the auction (for Flipper and Flopper pass Vat address,

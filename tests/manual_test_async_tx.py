@@ -24,11 +24,11 @@ import time
 
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.gas import FixedGasPrice
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.deployment import DssDeployment
+from pyflex.gas import FixedGasPrice
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
 
 logging.basicConfig(format='%(asctime)-15s %(levelname)-8s %(message)s', level=logging.DEBUG)
 # reduce logspew

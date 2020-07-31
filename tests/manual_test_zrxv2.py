@@ -20,12 +20,12 @@ import time
 
 from web3 import EthereumTesterProvider, Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.approval import directly
-from pymaker.numeric import Wad
-from pymaker.token import DSToken, ERC20Token
-from pymaker.util import bytes_to_hexstring
-from pymaker.zrxv2 import ZrxExchangeV2, Order, ZrxRelayerApiV2, ERC20Asset
+from pyflex import Address
+from pyflex.approval import directly
+from pyflex.numeric import Wad
+from pyflex.token import DSToken, ERC20Token
+from pyflex.util import bytes_to_hexstring
+from pyflex.zrxv2 import ZrxExchangeV2, Order, ZrxRelayerApiV2, ERC20Asset
 from tests.helpers import is_hashable, wait_until_mock_called
 
 #EXCHANGE_ADDR = '0x4f833a24e1f95d70f028921e27040ca56e09ab0b'  # Mainnet

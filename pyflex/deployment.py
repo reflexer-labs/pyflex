@@ -21,27 +21,27 @@ import re
 from typing import Dict, List, Optional
 
 import pkg_resources
-from pymaker.auctions import Flapper, Flopper, Flipper
+from pyflex.auctions import Flapper, Flopper, Flipper
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.approval import directly, hope_directly
-from pymaker.auth import DSGuard
-from pymaker.etherdelta import EtherDelta
-from pymaker.dss import Cat, Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Jug, Pot, Spotter, Vat, Vow
-from pymaker.proxy import ProxyRegistry, DssProxyActionsDsr
-from pymaker.feed import DSValue
-from pymaker.gas import DefaultGasPrice
-from pymaker.governance import DSPause, DSChief
-from pymaker.numeric import Wad, Ray
-from pymaker.oasis import MatchingMarket
-from pymaker.oracles import OSM
-from pymaker.sai import Tub, Tap, Top, Vox
-from pymaker.shutdown import ShutdownModule, End
-from pymaker.token import DSToken, DSEthToken
-from pymaker.vault import DSVault
-from pymaker.cdpmanager import CdpManager
-from pymaker.dsrmanager import DsrManager
+from pyflex import Address
+from pyflex.approval import directly, hope_directly
+from pyflex.auth import DSGuard
+from pyflex.etherdelta import EtherDelta
+from pyflex.dss import Cat, Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Jug, Pot, Spotter, Vat, Vow
+from pyflex.proxy import ProxyRegistry, DssProxyActionsDsr
+from pyflex.feed import DSValue
+from pyflex.gas import DefaultGasPrice
+from pyflex.governance import DSPause, DSChief
+from pyflex.numeric import Wad, Ray
+from pyflex.oasis import MatchingMarket
+from pyflex.oracles import OSM
+from pyflex.sai import Tub, Tap, Top, Vox
+from pyflex.shutdown import ShutdownModule, End
+from pyflex.token import DSToken, DSEthToken
+from pyflex.vault import DSVault
+from pyflex.cdpmanager import CdpManager
+from pyflex.dsrmanager import DsrManager
 
 
 def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None) -> Address:
@@ -53,14 +53,14 @@ def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None)
         args: Optional list of contract constructor parameters.
 
     Returns:
-        Ethereum address of the newly deployed contract, as a :py:class:`pymaker.Address` instance.
+        Ethereum address of the newly deployed contract, as a :py:class:`pyflex.Address` instance.
     """
     assert(isinstance(web3, Web3))
     assert(isinstance(contract_name, str))
     assert(isinstance(args, list) or (args is None))
 
-    abi = json.loads(pkg_resources.resource_string('pymaker.deployment', f'abi/{contract_name}.abi'))
-    bytecode = str(pkg_resources.resource_string('pymaker.deployment', f'abi/{contract_name}.bin'), 'utf-8')
+    abi = json.loads(pkg_resources.resource_string('pyflex.deployment', f'abi/{contract_name}.abi'))
+    bytecode = str(pkg_resources.resource_string('pyflex.deployment', f'abi/{contract_name}.bin'), 'utf-8')
     if args is not None:
         tx_hash = web3.eth.contract(abi=abi, bytecode=bytecode).constructor(*args).transact()
     else:

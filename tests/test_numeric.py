@@ -17,7 +17,7 @@
 
 import pytest
 
-from pymaker.numeric import Wad, Ray, Rad
+from pyflex.numeric import Wad, Ray, Rad
 from tests.helpers import is_hashable
 
 

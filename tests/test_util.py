@@ -22,8 +22,8 @@ from unittest.mock import Mock, call
 import pytest
 from web3 import Web3
 
-from pymaker import Address
-from pymaker.util import synchronize, int_to_bytes32, bytes_to_int, bytes_to_hexstring, hexstring_to_bytes, \
+from pyflex import Address
+from pyflex.util import synchronize, int_to_bytes32, bytes_to_int, bytes_to_hexstring, hexstring_to_bytes, \
     AsyncCallback, chain
 
 

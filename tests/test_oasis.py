@@ -22,11 +22,11 @@ import time
 from web3 import HTTPProvider
 from web3 import Web3
 
-from pymaker import Address, Wad, Contract
-from pymaker.approval import directly
-from pymaker.oasis import SimpleMarket, ExpiringMarket, MatchingMarket, Order
-from pymaker.token import DSToken
-from pymaker.model import Token
+from pyflex import Address, Wad, Contract
+from pyflex.approval import directly
+from pyflex.oasis import SimpleMarket, ExpiringMarket, MatchingMarket, Order
+from pyflex.token import DSToken
+from pyflex.model import Token
 from tests.helpers import wait_until_mock_called, is_hashable
 
 PAST_BLOCKS = 100
@@ -602,8 +602,8 @@ class TestMatchingMarketWithSupportContract(TestMatchingMarket):
     def setup_method(self):
         GeneralMarketTest.setup_method(self)
 
-        support_abi = Contract._load_abi(__name__, '../pymaker/abi/MakerOtcSupportMethods.abi')
-        support_bin = Contract._load_bin(__name__, '../pymaker/abi/MakerOtcSupportMethods.bin')
+        support_abi = Contract._load_abi(__name__, '../pyflex/abi/MakerOtcSupportMethods.abi')
+        support_bin = Contract._load_bin(__name__, '../pyflex/abi/MakerOtcSupportMethods.bin')
         support_address = Contract._deploy(self.web3, support_abi, support_bin, [])
 
         self.otc = MatchingMarket.deploy(self.web3, 2500000000, support_address)
@@ -631,8 +631,8 @@ class TestMatchingMarketDecimal:
         self.token2_tokenclass = Token('BBB', self.token2.address, 6)
         self.token2.mint(Wad.from_number(10000)).transact()
 
-        support_abi = Contract._load_abi(__name__, '../pymaker/abi/MakerOtcSupportMethods.abi')
-        support_bin = Contract._load_bin(__name__, '../pymaker/abi/MakerOtcSupportMethods.bin')
+        support_abi = Contract._load_abi(__name__, '../pyflex/abi/MakerOtcSupportMethods.abi')
+        support_bin = Contract._load_bin(__name__, '../pyflex/abi/MakerOtcSupportMethods.bin')
         support_address = Contract._deploy(self.web3, support_abi, support_bin, [])
 
         self.otc = MatchingMarket.deploy(self.web3, 2500000000, support_address)

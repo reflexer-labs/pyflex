@@ -20,11 +20,11 @@ import os
 import sys
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.lifecycle import Lifecycle
-from pymaker.deployment import DssDeployment
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.lifecycle import Lifecycle
+from pyflex.deployment import DssDeployment
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
 
 logging.basicConfig(format='%(asctime)-15s %(levelname)-8s %(message)s', level=logging.DEBUG)
 # reduce logspew

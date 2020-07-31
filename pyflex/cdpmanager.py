@@ -18,9 +18,9 @@
 
 
 from web3 import Web3
-from pymaker import Address, Contract, Transact
-from pymaker.dss import Ilk, Urn, Vat
-from pymaker.numeric import Wad
+from pyflex import Address, Contract, Transact
+from pyflex.dss import Ilk, Urn, Vat
+from pyflex.numeric import Wad
 
 
 class CdpManager(Contract):

@@ -16,12 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-from pymaker import Address
+from pyflex import Address
 from tests.helpers import time_travel_by
-from pymaker.numeric import Wad, Rad, Ray
-from pymaker.deployment import DssDeployment
-from pymaker.dss import Pot, DaiJoin, Collateral
-from pymaker.token import DSToken
+from pyflex.numeric import Wad, Rad, Ray
+from pyflex.deployment import DssDeployment
+from pyflex.dss import Pot, DaiJoin, Collateral
+from pyflex.token import DSToken
 from tests.test_dss import wrap_eth, frob
 
 def mint_dai(mcd: DssDeployment, amount: Wad, ilkName: str, our_address: Address):

@@ -17,7 +17,7 @@
 
 from eth_abi.encoding import encode_uint_256, BytesEncoder, AddressEncoder
 
-from pymaker import Address
+from pyflex import Address
 
 
 def encode_address(address: Address) -> bytes:

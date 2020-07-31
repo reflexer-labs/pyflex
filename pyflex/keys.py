@@ -22,7 +22,7 @@ from eth_account import Account
 from web3 import Web3
 from web3.middleware import construct_sign_and_send_raw_middleware
 
-from pymaker import Address
+from pyflex import Address
 
 _registered_accounts = {}
 

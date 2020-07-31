@@ -19,11 +19,11 @@
 import sys
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
-from pymaker.dsr import Dsr
+from pyflex import Address
+from pyflex.deployment import DssDeployment
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
+from pyflex.dsr import Dsr
 
 
 web3 = Web3(HTTPProvider(endpoint_uri="http://0.0.0.0:8545",

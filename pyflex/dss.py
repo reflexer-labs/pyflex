@@ -29,13 +29,13 @@ from web3._utils.events import get_event_data
 from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
-from pymaker import Address, Contract, Transact
-from pymaker.approval import directly, hope_directly
-from pymaker.auctions import Flapper, Flipper, Flopper
-from pymaker.gas import DefaultGasPrice
-from pymaker.logging import LogNote
-from pymaker.token import DSToken, ERC20Token
-from pymaker.numeric import Wad, Ray, Rad
+from pyflex import Address, Contract, Transact
+from pyflex.approval import directly, hope_directly
+from pyflex.auctions import Flapper, Flipper, Flopper
+from pyflex.gas import DefaultGasPrice
+from pyflex.logging import LogNote
+from pyflex.token import DSToken, ERC20Token
+from pyflex.numeric import Wad, Ray, Rad
 
 
 logger = logging.getLogger()
@@ -528,7 +528,7 @@ class Vat(Contract):
             ilk: Optionally filter frobs by ilk.name
             chunk_size: Number of blocks to fetch from chain at one time, for performance tuning
          Returns:
-            List of past `LogFrob` events represented as :py:class:`pymaker.dss.Vat.LogFrob` class.
+            List of past `LogFrob` events represented as :py:class:`pyflex.dss.Vat.LogFrob` class.
         """
         current_block = self._contract.web3.eth.blockNumber
         assert isinstance(from_block, int)
@@ -880,7 +880,7 @@ class Cat(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogBite` events represented as :py:class:`pymaker.dss.Cat.LogBite` class.
+            List of past `LogBite` events represented as :py:class:`pyflex.dss.Cat.LogBite` class.
         """
         assert isinstance(number_of_past_blocks, int)
         assert isinstance(event_filter, dict) or (event_filter is None)
@@ -938,7 +938,7 @@ class Pot(Contract):
     def drip(self) -> Transact:
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'drip', [])
 
-    """ Join/Exit in Pot can be invoked through pymaker/dsrmanager.py and pymaker/dsr.py """
+    """ Join/Exit in Pot can be invoked through pyflex/dsrmanager.py and pyflex/dsr.py """
 
     def __repr__(self):
         return f"Pot('{self.address}')"

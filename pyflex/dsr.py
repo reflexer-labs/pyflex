@@ -18,10 +18,10 @@
 import logging
 
 
-from pymaker import Address, Transact, Calldata
-from pymaker.numeric import Wad, Ray
-from pymaker.proxy import DSProxy
-from pymaker.deployment import DssDeployment
+from pyflex import Address, Transact, Calldata
+from pyflex.numeric import Wad, Ray
+from pyflex.proxy import DSProxy
+from pyflex.deployment import DssDeployment
 
 
 logger = logging.getLogger()

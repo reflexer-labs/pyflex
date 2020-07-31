@@ -23,9 +23,9 @@ from eth_account.messages import defunct_hash_message
 from eth_utils import encode_hex
 from web3 import Web3
 
-from pymaker import Address
-from pymaker.keys import _registered_accounts
-from pymaker.util import bytes_to_hexstring
+from pyflex import Address
+from pyflex.keys import _registered_accounts
+from pyflex.util import bytes_to_hexstring
 
 
 def eth_sign(message: bytes, web3: Web3, key=None, in_hexbytes=False, account=None):

@@ -19,10 +19,10 @@ import os
 import sys
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.deployment import DssDeployment
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
 
 web3 = Web3(HTTPProvider(endpoint_uri=os.environ['ETH_RPC_URL'], request_kwargs={"timeout": 10}))
 web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000aBcdef123

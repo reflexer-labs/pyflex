@@ -38,9 +38,9 @@ from web3.exceptions import TransactionNotFound
 from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
-from pymaker.gas import DefaultGasPrice, GasPrice
-from pymaker.numeric import Wad
-from pymaker.util import synchronize, bytes_to_hexstring, is_contract_at
+from pyflex.gas import DefaultGasPrice, GasPrice
+from pyflex.numeric import Wad
+from pyflex.util import synchronize, bytes_to_hexstring, is_contract_at
 
 filter_threads = []
 node_is_parity = None
@@ -274,7 +274,7 @@ class Receipt:
         gas_used: Amount of gas used by the Ethereum transaction.
         transfers: A list of ERC20 token transfers resulting from the execution
             of this Ethereum transaction. Each transfer is an instance of the
-            :py:class:`pymaker.Transfer` class.
+            :py:class:`pyflex.Transfer` class.
         result: Transaction-specific return value (i.e. new order id for Oasis
             order creation transaction).
         successful: Boolean flag which is `True` if the Ethereum transaction
@@ -296,7 +296,7 @@ class Receipt:
                     # $ seth keccak $(seth --from-ascii "Transfer(address,address,uint256)")
                     # 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
                     if receipt_log['topics'][0] == HexBytes('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'):
-                        from pymaker.token import ERC20Token
+                        from pyflex.token import ERC20Token
                         transfer_abi = [abi for abi in ERC20Token.abi if abi.get('name') == 'Transfer'][0]
                         codec = ABICodec(default_registry)
                         event_data = get_event_data(codec, transfer_abi, receipt_log)
@@ -308,7 +308,7 @@ class Receipt:
                     # $ seth keccak $(seth --from-ascii "Mint(address,uint256)")
                     # 0x0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d4121396885
                     if receipt_log['topics'][0] == HexBytes('0x0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d4121396885'):
-                        from pymaker.token import DSToken
+                        from pyflex.token import DSToken
                         transfer_abi = [abi for abi in DSToken.abi if abi.get('name') == 'Mint'][0]
                         codec = ABICodec(default_registry)
                         event_data = get_event_data(codec, transfer_abi, receipt_log)
@@ -320,7 +320,7 @@ class Receipt:
                     # $ seth keccak $(seth --from-ascii "Burn(address,uint256)")
                     # 0xcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5
                     if receipt_log['topics'][0] == HexBytes('0xcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5'):
-                        from pymaker.token import DSToken
+                        from pyflex.token import DSToken
                         transfer_abi = [abi for abi in DSToken.abi if abi.get('name') == 'Burn'][0]
                         codec = ABICodec(default_registry)
                         event_data = get_event_data(codec, transfer_abi, receipt_log)
@@ -502,21 +502,21 @@ class Transact:
 
         Executes the Ethereum transaction synchronously. The method will block until the
         transaction gets mined i.e. it will return when either the transaction execution
-        succeeded or failed. In case of the former, a :py:class:`pymaker.Receipt`
+        succeeded or failed. In case of the former, a :py:class:`pyflex.Receipt`
         object will be returned.
 
         Out-of-gas exceptions are automatically recognized as transaction failures.
 
         Allowed keyword arguments are: `from_address`, `replace`, `gas`, `gas_buffer`, `gas_price`.
-        `gas_price` needs to be an instance of a class inheriting from :py:class:`pymaker.gas.GasPrice`.
-        `from_address` needs to be an instance of :py:class:`pymaker.Address`.
+        `gas_price` needs to be an instance of a class inheriting from :py:class:`pyflex.gas.GasPrice`.
+        `from_address` needs to be an instance of :py:class:`pyflex.Address`.
 
         The `gas` keyword argument is the gas limit for the transaction, whereas `gas_buffer`
         specifies how much gas should be added to the estimate. They can not be present
         at the same time. If none of them are present, a default buffer is added to the estimate.
 
         Returns:
-            A :py:class:`pymaker.Receipt` object if the transaction invocation was successful.
+            A :py:class:`pyflex.Receipt` object if the transaction invocation was successful.
             `None` otherwise.
         """
         return synchronize([self.transact_async(**kwargs)])[0]
@@ -526,20 +526,20 @@ class Transact:
         """Executes the Ethereum transaction asynchronously.
 
         Executes the Ethereum transaction asynchronously. The method will return immediately.
-        Ultimately, its future value will become either a :py:class:`pymaker.Receipt` or `None`,
+        Ultimately, its future value will become either a :py:class:`pyflex.Receipt` or `None`,
         depending on whether the transaction execution was successful or not.
 
         Out-of-gas exceptions are automatically recognized as transaction failures.
 
         Allowed keyword arguments are: `from_address`, `replace`, `gas`, `gas_buffer`, `gas_price`.
-        `gas_price` needs to be an instance of a class inheriting from :py:class:`pymaker.gas.GasPrice`.
+        `gas_price` needs to be an instance of a class inheriting from :py:class:`pyflex.gas.GasPrice`.
 
         The `gas` keyword argument is the gas limit for the transaction, whereas `gas_buffer`
         specifies how much gas should be added to the estimate. They can not be present
         at the same time. If none of them are present, a default buffer is added to the estimate.
 
         Returns:
-            A future value of either a :py:class:`pymaker.Receipt` object if the transaction
+            A future value of either a :py:class:`pyflex.Receipt` object if the transaction
             invocation was successful, or `None` if it failed.
         """
 
@@ -655,13 +655,13 @@ class Transact:
     def invocation(self) -> Invocation:
         """Returns the `Invocation` object for this pending Ethereum transaction.
 
-        The :py:class:`pymaker.Invocation` object may be used with :py:class:`pymaker.transactional.TxManager`
+        The :py:class:`pyflex.Invocation` object may be used with :py:class:`pyflex.transactional.TxManager`
         to invoke multiple contract calls in one Ethereum transaction.
 
-        Please see :py:class:`pymaker.transactional.TxManager` documentation for more details.
+        Please see :py:class:`pyflex.transactional.TxManager` documentation for more details.
 
         Returns:
-            :py:class:`pymaker.Invocation` object for this pending Ethereum transaction.
+            :py:class:`pyflex.Invocation` object for this pending Ethereum transaction.
         """
         return Invocation(self.address, Calldata(self._contract_function()._encode_transaction_data()))
 
@@ -670,7 +670,7 @@ class Transfer:
     """Represents an ERC20 token transfer.
 
     Represents an ERC20 token transfer resulting from contract method execution.
-    A list of transfers can be found in the :py:class:`pymaker.Receipt` class.
+    A list of transfers can be found in the :py:class:`pyflex.Receipt` class.
 
     Attributes:
         token_address: Address of the ERC20 token that has been transferred.
