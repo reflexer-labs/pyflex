@@ -13,8 +13,9 @@ docker-compose up -d ganache
 docker-compose up -d parity
 sleep 2
 
-# Run the tests
-py.test --cov=pyflex --cov-report=term --cov-append tests/ $@
+#Run the tests
+
+py.test --cov=pyflex --cov-report=term --cov-append tests/test_dss_tmp.py $@
 TEST_RESULT=$?
 
 # Cleanup

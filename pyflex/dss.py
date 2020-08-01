@@ -643,7 +643,7 @@ class Vow(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.vat = Vat(web3, Address(self._contract.functions.vat().call()))
+        self.vat = Vat(web3, Address(self._contract.functions.cdpEngine().call()))
 
     def rely(self, guy: Address) -> Transact:
         assert isinstance(guy, Address)

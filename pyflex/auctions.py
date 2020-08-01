@@ -39,20 +39,20 @@ def toBytes(string: str):
 class AuctionContract(Contract):
     """Abstract baseclass shared across all three auction contracts."""
 
-    class DealLog:
+    class SettleAuctionLog:
         def __init__(self, lognote: LogNote):
-            # This is whoever called `deal`, which could differ from the `guy` who won the auction
+            # This is whoever called `settleAuction`, which could differ from the `guy` who won the auction
             self.usr = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"AuctionContract.DealLog({pformat(vars(self))})"
+            return f"AuctionContract.SettleAuctionLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address, abi: list, bids: callable):
         if self.__class__ == AuctionContract:
-            raise NotImplemented('Abstract class; please call Flipper, Flapper, or Flopper ctor')
+            raise NotImplemented('Abstract class; please call CollateralAuctionHouse, SurplusAuctionHouse, or DebtAuctionHouse')
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
         assert isinstance(abi, list)
@@ -64,24 +64,24 @@ class AuctionContract(Contract):
         self._bids = bids
 
         self.log_note_abi = None
-        self.kick_abi = None
+        self.start_auction_abi = None
         for member in abi:
             if not self.log_note_abi and member.get('name') == 'LogNote':
                 self.log_note_abi = member
-            elif not self.kick_abi and member.get('name') == 'Kick':
-                self.kick_abi = member
+            elif not self.start_auction_abi and member.get('name') == 'StartAuction':
+                self.start_auction_abi = member
 
-    def wards(self, address: Address) -> bool:
+    def authorizedAccounts(self, address: Address) -> bool:
         assert isinstance(address, Address)
 
-        return bool(self._contract.functions.wards(address.address).call())
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
-    def vat(self) -> Address:
-        """Returns the `vat` address.
+    def cdpEngine(self) -> Address:
+        """Returns the `cdpEngine` address.
          Returns:
-            The address of the `vat` contract.
+            The address of the `cdpEngine` contract.
         """
-        return Address(self._contract.functions.vat().call())
+        return Address(self._contract.functions.cdpEngine().call())
 
     def approve(self, source: Address, approval_function):
         """Approve the auction to access our collateral, Dai, or MKR so we can participate in auctions.
@@ -102,7 +102,7 @@ class AuctionContract(Contract):
 
     def active_auctions(self) -> list:
         active_auctions = []
-        auction_count = self.kicks()+1
+        auction_count = self.auctionsStarted()+1
         for index in range(1, auction_count):
             bid = self._bids(index)
             if bid.guy != Address("0x0000000000000000000000000000000000000000"):
@@ -112,42 +112,42 @@ class AuctionContract(Contract):
             index += 1
         return active_auctions
 
-    def beg(self) -> Wad:
+    def bidIncrease(self) -> Wad:
         """Returns the percentage minimum bid increase.
 
         Returns:
             The percentage minimum bid increase.
         """
-        return Wad(self._contract.functions.beg().call())
+        return Wad(self._contract.functions.bidIncrease().call())
 
-    def ttl(self) -> int:
+    def bidDuration(self) -> int:
         """Returns the bid lifetime.
 
         Returns:
             The bid lifetime (in seconds).
         """
-        return int(self._contract.functions.ttl().call())
+        return int(self._contract.functions.bidDuration().call())
 
-    def tau(self) -> int:
+    def totalAuctionLength(self) -> int:
         """Returns the total auction length.
 
         Returns:
             The total auction length (in seconds).
         """
-        return int(self._contract.functions.tau().call())
+        return int(self._contract.functions.totalAuctionLength().call())
 
-    def kicks(self) -> int:
+    def auctionsStarted(self) -> int:
         """Returns the number of auctions started so far.
 
         Returns:
             The number of auctions started so far.
         """
-        return int(self._contract.functions.kicks().call())
+        return int(self._contract.functions.auctionsStarted().call())
 
-    def deal(self, id: int) -> Transact:
+    def settleAuctions(self, id: int) -> Transact:
         assert(isinstance(id, int))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'deal', [id])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
 
     def get_past_lognotes(self, number_of_past_blocks: int, abi: list) -> List[LogNote]:
         assert isinstance(number_of_past_blocks, int)
@@ -168,15 +168,15 @@ class AuctionContract(Contract):
         raise NotImplemented()
 
 
-class Flipper(AuctionContract):
-    """A client for the `Flipper` contract, used to interact with collateral auctions.
+class CollateralAuctionHouse(AuctionContract):
+    """A client for the `CollateralAuctionHouse` contract, used to interact with collateral auctions.
 
-    You can find the source code of the `Flipper` contract here:
+    You can find the source code of the `CollateralAuctionHouse` contract here:
     <https://github.com/makerdao/dss/blob/master/src/flip.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
-        address: Ethereum address of the `Flipper` contract.
+        address: Ethereum address of the `CollateralAuctionHouse` contract.
 
     Event signatures:
         0x65fae35e: (deployment-related)
@@ -188,8 +188,8 @@ class Flipper(AuctionContract):
         0xc959c42b: deal
     """
 
-    abi = Contract._load_abi(__name__, 'abi/Flipper.abi')
-    bin = Contract._load_bin(__name__, 'abi/Flipper.bin')
+    abi = Contract._load_abi(__name__, 'abi/CollateralAuctionHouse.abi')
+    bin = Contract._load_bin(__name__, 'abi/CollateralAuctionHouse.bin')
 
     class Bid:
         def __init__(self, id: int, bid: Rad, lot: Wad, guy: Address, tic: int, end: int,
@@ -215,9 +215,9 @@ class Flipper(AuctionContract):
             self.tab = tab
 
         def __repr__(self):
-            return f"Flipper.Bid({pformat(vars(self))})"
+            return f"CollateralAuctionHouse.Bid({pformat(vars(self))})"
 
-    class KickLog:
+    class StartAuctionLog:
         def __init__(self, log):
             args = log['args']
             self.id = args['id']
@@ -230,9 +230,9 @@ class Flipper(AuctionContract):
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
-            return f"Flipper.KickLog({pformat(vars(self))})"
+            return f"CollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
-    class TendLog:
+    class IncreaseBidSizeLog:
         def __init__(self, lognote: LogNote):
             self.guy = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
@@ -242,9 +242,9 @@ class Flipper(AuctionContract):
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"Flipper.TendLog({pformat(vars(self))})"
+            return f"CollateralAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
 
-    class DentLog:
+    class DecreaseSoldAmountLog:
         def __init__(self, lognote: LogNote):
             self.guy = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
@@ -254,10 +254,10 @@ class Flipper(AuctionContract):
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"Flipper.DentLog({pformat(vars(self))})"
+            return f"CollateralAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
-        super(Flipper, self).__init__(web3, address, Flipper.abi, self.bids)
+        super(CollateralAuctionHouse, self).__init__(web3, address, CollateralAuctionHouse.abi, self.bids)
 
     def bids(self, id: int) -> Bid:
         """Returns the auction details.
@@ -272,7 +272,7 @@ class Flipper(AuctionContract):
 
         array = self._contract.functions.bids(id).call()
 
-        return Flipper.Bid(id=id,
+        return CollateralAuctionHouse.Bid(id=id,
                            bid=Rad(array[0]),
                            lot=Wad(array[1]),
                            guy=Address(array[2]),
@@ -282,63 +282,63 @@ class Flipper(AuctionContract):
                            gal=Address(array[6]),
                            tab=Rad(array[7]))
 
-    def kick(self, usr: Address, gal: Address, tab: Rad, lot: Wad, bid: Rad) -> Transact:
+    def startAuction(self, usr: Address, gal: Address, tab: Rad, lot: Wad, bid: Rad) -> Transact:
         assert(isinstance(usr, Address))
         assert(isinstance(gal, Address))
         assert(isinstance(tab, Rad))
         assert(isinstance(lot, Wad))
         assert(isinstance(bid, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'kick', [usr.address,
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [usr.address,
                                                                                           gal.address,
                                                                                           tab.value,
                                                                                           lot.value,
                                                                                           bid.value])
 
-    def tend(self, id: int, lot: Wad, bid: Rad) -> Transact:
+    def increaseBidSize(self, id: int, lot: Wad, bid: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(lot, Wad))
         assert(isinstance(bid, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'tend', [id, lot.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, lot.value, bid.value])
 
-    def dent(self, id: int, lot: Wad, bid: Rad) -> Transact:
+    def decreaseSoldAmount(self, id: int, lot: Wad, bid: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(lot, Wad))
         assert(isinstance(bid, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'dent', [id, lot.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount', [id, lot.value, bid.value])
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, Flipper.abi)
+        logs = super().get_past_lognotes(number_of_past_blocks, CollateralAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
-            elif isinstance(log, Flipper.KickLog):
+            elif isinstance(log, CollateralAuctionHouse.StartAuctionLog):
                 history.append(log)
             elif log.sig == '0x4b43ed12':
-                history.append(Flipper.TendLog(log))
+                history.append(CollateralAuctionHouse.IncreaseBidSizeLog(log))
             elif log.sig == '0x5ff3a382':
-                history.append(Flipper.DentLog(log))
+                history.append(Flipper.DecreaseSoldAmountLog(log))
             elif log.sig == '0xc959c42b':
-                history.append(AuctionContract.DealLog(log))
+                history.append(AuctionContract.SettleAuctionLog(log))
         return history
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
         if signature == "0xc84ce3a1172f0dec3173f04caaa6005151a4bfe40d4c9f3ea28dba5f719b2a7a":
-            event_data = get_event_data(codec, self.kick_abi, event)
-            return Flipper.KickLog(event_data)
+            event_data = get_event_data(codec, self.start_auction_abi, event)
+            return CollateralAuctionHouse.StartAuctionLog(event_data)
         else:
             event_data = get_event_data(codec, self.log_note_abi, event)
             return LogNote(event_data)
 
     def __repr__(self):
-        return f"Flipper('{self.address}')"
+        return f"CollateralAuctionHouse('{self.address}')"
 
 
 class Flapper(AuctionContract):
@@ -478,7 +478,7 @@ class Flapper(AuctionContract):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
         if signature == "0xe6dde59cbc017becba89714a037778d234a84ce7f0a137487142a007e580d609":
-            event_data = get_event_data(codec, self.kick_abi, event)
+            event_data = get_event_data(codec, self.start_auction_abi, event)
             return Flapper.KickLog(event_data)
         else:
             event_data = get_event_data(codec, self.log_note_abi, event)
@@ -636,7 +636,7 @@ class Flopper(AuctionContract):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
         if signature == "0x7e8881001566f9f89aedb9c5dc3d856a2b81e5235a8196413ed484be91cc0df6":
-            event_data = get_event_data(codec, self.kick_abi, event)
+            event_data = get_event_data(codec, self.start_auction_abi, event)
             return Flopper.KickLog(event_data)
         else:
             event_data = get_event_data(codec, self.log_note_abi, event)

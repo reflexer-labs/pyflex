@@ -191,25 +191,25 @@ class DssDeployment:
         @staticmethod
         def from_json(web3: Web3, conf: str):
             conf = json.loads(conf)
-            pause = DSPause(web3, Address(conf['MCD_PAUSE']))
-            vat = Vat(web3, Address(conf['MCD_VAT']))
-            vow = Vow(web3, Address(conf['MCD_VOW']))
-            jug = Jug(web3, Address(conf['MCD_JUG']))
-            cat = Cat(web3, Address(conf['MCD_CAT']))
-            dai = DSToken(web3, Address(conf['MCD_DAI']))
-            dai_adapter = DaiJoin(web3, Address(conf['MCD_JOIN_DAI']))
-            flapper = Flapper(web3, Address(conf['MCD_FLAP']))
-            flopper = Flopper(web3, Address(conf['MCD_FLOP']))
+            pause = DSPause(web3, Address(conf['GEB_PAUSE']))
+            vat = Vat(web3, Address(conf['GEB_CDP_ENGINE']))
+            vow = Vow(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
+            jug = Jug(web3, Address(conf['GEB_TAX_COLLECTOR']))
+            cat = Cat(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
+            dai = DSToken(web3, Address(conf['MCD_DAI']))#
+            dai_adapter = DaiJoin(web3, Address(conf['GEB_COIN_JOIN']))#
+            flapper = Flapper(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
+            flopper = Flopper(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             pot = Pot(web3, Address(conf['MCD_POT']))
-            mkr = DSToken(web3, Address(conf['MCD_GOV']))
-            spotter = Spotter(web3, Address(conf['MCD_SPOT']))
+            mkr = DSToken(web3, Address(conf['GEB_GOV']))
+            spotter = Spotter(web3, Address(conf['GEB_ORACLE_RELAYER']))
             ds_chief = DSChief(web3, Address(conf['MCD_ADM']))
             esm = ShutdownModule(web3, Address(conf['MCD_ESM']))
-            end = End(web3, Address(conf['MCD_END']))
+            end = End(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             dss_proxy_actions = DssProxyActionsDsr(web3, Address(conf['PROXY_ACTIONS_DSR']))
             cdp_manager = CdpManager(web3, Address(conf['CDP_MANAGER']))
-            dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))
+            dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
 
             collaterals = {}
             for name in DssDeployment.Config._infer_collaterals_from_addresses(conf.keys()):
@@ -220,9 +220,9 @@ class DssDeployment:
                     gem = DSToken(web3, Address(conf[name[1]]))
 
                 if name[1] in ['USDC', 'WBTC', 'TUSD']:
-                    adapter = GemJoin5(web3, Address(conf[f'MCD_JOIN_{name[0]}']))
+                    adapter = GemJoin5(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
                 else:
-                    adapter = GemJoin(web3, Address(conf[f'MCD_JOIN_{name[0]}']))
+                    adapter = GemJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
 
                 # PIP contract may be a DSValue, OSM, or bogus address.
                 pip_address = Address(conf[f'PIP_{name[1]}'])
@@ -233,7 +233,7 @@ class DssDeployment:
                     pip = OSM(web3, pip_address)
 
                 collateral = Collateral(ilk=ilk, gem=gem, adapter=adapter,
-                                        flipper=Flipper(web3, Address(conf[f'MCD_FLIP_{name[0]}'])),
+                                        flipper=Flipper(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'])),
                                         pip=pip)
                 collaterals[ilk.name] = collateral
 
@@ -246,11 +246,11 @@ class DssDeployment:
         def _infer_collaterals_from_addresses(keys: []) -> List:
             collaterals = []
             for key in keys:
-                match = re.search(r'MCD_FLIP_((\w+)_\w+)', key)
+                match = re.search(r'GEB_COLLATERAL_AUCTION_HOUSE_((\w+)_\w+)', key)
                 if match:
                     collaterals.append((match.group(1), match.group(2)))
                     continue
-                match = re.search(r'MCD_FLIP_(\w+)', key)
+                match = re.search(r'GEB_COLLATERAL_AUCTION_HOUSE_(\w+)', key)
                 if match:
                     collaterals.append((match.group(1), match.group(1)))
 
@@ -258,21 +258,21 @@ class DssDeployment:
 
         def to_dict(self) -> dict:
             conf_dict = {
-                'MCD_PAUSE': self.pause.address.address,
-                'MCD_VAT': self.vat.address.address,
-                'MCD_VOW': self.vow.address.address,
-                'MCD_JUG': self.jug.address.address,
-                'MCD_CAT': self.cat.address.address,
-                'MCD_FLAP': self.flapper.address.address,
-                'MCD_FLOP': self.flopper.address.address,
+                'GEB_PAUSE': self.pause.address.address,
+                'GEB_CDP_ENGINE': self.vat.address.address,
+                'GEB_ACCOUNTING_ENGINE': self.vow.address.address,
+                'GEB_TAX_COLLECTOR': self.jug.address.address,
+                'GEB_LIQUIDATION_ENGINE': self.cat.address.address,
+                'GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.flapper.address.address,
+                'GEB_DEBT_AUCTION_HOUSE': self.flopper.address.address,
                 'MCD_POT': self.pot.address.address,
                 'MCD_DAI': self.dai.address.address,
                 'MCD_JOIN_DAI': self.dai_join.address.address,
-                'MCD_GOV': self.mkr.address.address,
-                'MCD_SPOT': self.spotter.address.address,
+                'GEB_GOV': self.mkr.address.address,
+                'GEB_ORACLE_RELAYER': self.spotter.address.address,
                 'MCD_ADM': self.ds_chief.address.address,
                 'MCD_ESM': self.esm.address.address,
-                'MCD_END': self.end.address.address,
+                'GEB_GLOBAL_SETTLEMENT': self.end.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
                 'PROXY_ACTIONS_DSR': self.dss_proxy_actions.address.address,
                 'CDP_MANAGER': self.cdp_manager.address.address,
@@ -286,7 +286,7 @@ class DssDeployment:
                 if collateral.pip:
                     conf_dict[f'PIP_{name[1]}'] = collateral.pip.address.address
                 conf_dict[f'MCD_JOIN_{name[0]}'] = collateral.adapter.address.address
-                conf_dict[f'MCD_FLIP_{name[0]}'] = collateral.flipper.address.address
+                conf_dict[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'] = collateral.flipper.address.address
 
             return conf_dict
 
