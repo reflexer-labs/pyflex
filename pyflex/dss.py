@@ -30,8 +30,9 @@ from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
 from pyflex import Address, Contract, Transact
-from pyflex.approval import directly, hope_directly
-from pyflex.auctions import Flapper, Flipper, Flopper
+from pyflex.approval import directly, approve_cdp_modification_directly
+#from pyflex.auctions import Flapper, Flipper, Flopper
+from pyflex.auctions import SurplusAuctionHouse, CollateralAuctionHouse, DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
 from pyflex.logging import LogNote
 from pyflex.token import DSToken, ERC20Token
@@ -41,121 +42,122 @@ from pyflex.numeric import Wad, Ray, Rad
 logger = logging.getLogger()
 
 
-class Ilk:
+class CollateralType:
     """Models one collateral type, the combination of a token and a set of risk parameters.
-    For example, ETH-A and ETH-B are different collateral types with the same underlying token (WETH) but with
-    different risk parameters.
+    For example, ETH-A and ETH-B are different collateral types with the same underlying
+    token (WETH) but with different risk parameters.
     """
 
-    def __init__(self, name: str, rate: Optional[Ray] = None,
-                 ink: Optional[Wad] = None,
-                 art: Optional[Wad] = None,
-                 spot: Optional[Ray] = None,
-                 line: Optional[Rad] = None,
-                 dust: Optional[Rad] = None):
+    def __init__(self, name: str, accumulated_rates: Optional[Ray] = None,
+                 cdp_collateral: Optional[Wad] = None,
+                 cdp_debt: Optional[Wad] = None,
+                 safety_price: Optional[Ray] = None,
+                 debt_ceiling: Optional[Rad] = None,
+                 debt_floor: Optional[Rad] = None):
         assert (isinstance(name, str))
-        assert (isinstance(rate, Ray) or (rate is None))
-        assert (isinstance(ink, Wad) or (ink is None))
-        assert (isinstance(art, Wad) or (art is None))
-        assert (isinstance(spot, Ray) or (spot is None))
-        assert (isinstance(line, Rad) or (line is None))
-        assert (isinstance(dust, Rad) or (dust is None))
+        assert (isinstance(accumulated_rates, Ray) or (accumulated_rates is None))
+        assert (isinstance(cdp_collateral, Wad) or (cdp_collateral is None))
+        assert (isinstance(cdp_debt, Wad) or (cdp_debt is None))
+        assert (isinstance(safety_price, Ray) or (safety_price is None))
+        assert (isinstance(debt_ceiling, Rad) or (debt_ceiling is None))
+        assert (isinstance(debt_floor, Rad) or (debt_floor is None))
 
         self.name = name
-        self.rate = rate
-        self.ink = ink
-        self.art = art
-        self.spot = spot
-        self.line = line
-        self.dust = dust
+        self.accumulate_rates = accumulated_rates 
+        self.cdp_collateral = cdp_collateral
+        self.cdp_debt = cdp_debt
+        self.safety_price = safety_price
+        self.debt_ceiling = debt_ceiling
+        self.debt_floor = debt_floor
 
     def toBytes(self):
         return Web3.toBytes(text=self.name).ljust(32, bytes(1))
 
     @staticmethod
-    def fromBytes(ilk: bytes):
-        assert (isinstance(ilk, bytes))
+    def fromBytes(collateral_type: bytes):
+        assert (isinstance(collateral_type, bytes))
 
-        name = Web3.toText(ilk.strip(bytes(1)))
-        return Ilk(name)
+        name = Web3.toText(collateral_type.strip(bytes(1)))
+        return CollateralType(name)
 
     def __eq__(self, other):
-        assert isinstance(other, Ilk)
+        assert isinstance(other, CollateralType)
 
         return (self.name == other.name) \
-           and (self.rate == other.rate) \
-           and (self.ink == other.ink) \
-           and (self.art == other.art) \
-           and (self.spot == other.spot) \
-           and (self.line == other.line) \
-           and (self.dust == other.dust)
+           and (self.accumulated_rates == other.accumulated_rates) \
+           and (self.cdp_collateral == other.cdp_collateral) \
+           and (self.cdp_debt == other.cdp_debt) \
+           and (self.safety_price == other.safety_price) \
+           and (self.debt_ceiling == other.debt_ceiling) \
+           and (self.debt_floor == other.debt_floor)
 
     def __repr__(self):
         repr = ''
-        if self.rate:
-            repr += f' rate={self.rate}'
-        if self.ink:
-            repr += f' Ink={self.ink}'
-        if self.art:
-            repr += f' Art={self.art}'
-        if self.spot:
-            repr += f' spot={self.spot}'
-        if self.line:
-            repr += f' line={self.line}'
-        if self.dust:
-            repr += f' dust={self.dust}'
+        if self.accumulated_rates:
+            repr += f' accumulated_rates={self.accumulated_rates}'
+        if self.cdp_collateral:
+            repr += f' cdp_collateral={self.cdp_collateral}'
+        if self.cdp_debt:
+            repr += f' cdp_debt={self.cdp_debt}'
+        if self.safety_price:
+            repr += f' safety_price={self.safety_price}'
+        if self.debt_ceiling:
+            repr += f' debt_ceiling={self.debt_ceiling}'
+        if self.debt_floor:
+            repr += f' debt_floor={self.debt_floor}'
         if repr:
             repr = f'[{repr.strip()}]'
 
-        return f"Ilk('{self.name}'){repr}"
+        return f"CollateralType('{self.name}'){repr}"
 
 
-class Urn:
-    """Models one CDP for a single collateral type and account.  Note the "address of the Urn" is merely the address
-    of the CDP holder.
+class CDP:
+    """Models one CDP for a single collateral type and account.
+    Note the "address of the CDP" is merely the address of the CDP holder.
     """
 
-    def __init__(self, address: Address, ilk: Ilk = None, ink: Wad = None, art: Wad = None):
+    def __init__(self, address: Address, collateral_type: CollateralType = None,
+                 cdp_collateral: Wad = None, cdp_debt: Wad = None):
         assert isinstance(address, Address)
-        assert isinstance(ilk, Ilk) or (ilk is None)
-        assert isinstance(ink, Wad) or (ink is None)
-        assert isinstance(art, Wad) or (art is None)
+        assert isinstance(collateral_type, CollateralType) or (collateral_type is None)
+        assert isinstance(cdp_collateral, Wad) or (cdp_collateral is None)
+        assert isinstance(cdp_debt, Wad) or (cdp_debt is None)
 
         self.address = address
-        self.ilk = ilk
-        self.ink = ink
-        self.art = art
+        self.collateral_type = collateral_type
+        self.cdp_collateral = cdp_collateral
+        self.cdp_debt = cdp_debt
 
     def toBytes(self):
         addr_str = self.address.address
         return Web3.toBytes(hexstr='0x' + addr_str[2:].zfill(64))
 
     @staticmethod
-    def fromBytes(urn: bytes):
-        assert isinstance(urn, bytes)
+    def fromBytes(cdp: bytes):
+        assert isinstance(cdp, bytes)
 
-        address = Address(Web3.toHex(urn[-20:]))
-        return Urn(address)
+        address = Address(Web3.toHex(cdp[-20:]))
+        return CDP(address)
 
     def __eq__(self, other):
-        assert isinstance(other, Urn)
+        assert isinstance(other, CDP)
 
-        return (self.address == other.address) and (self.ilk == other.ilk)
+        return (self.address == other.address) and (self.collateral_type == other.collateral_type)
 
     def __repr__(self):
         repr = ''
-        if self.ilk:
-            repr += f'[{self.ilk.name}]'
-        if self.ink:
-            repr += f' ink={self.ink}'
-        if self.art:
-            repr += f' art={self.art}'
+        if self.collateral_type:
+            repr += f'[{self.collateral_type.name}]'
+        if self.cdp_collateral:
+            repr += f' cdp_collateral={self.cdp_collateral}'
+        if self.cdp_debt:
+            repr += f' cdp_debt={self.cdp_debt}'
         if repr:
             repr = f'[{repr.strip()}]'
-        return f"Urn('{self.address}'){repr}"
+        return f"CDP('{self.address}'){repr}"
 
 
-class Join(Contract):
+class BasicTokenAdapter(Contract):
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
@@ -189,80 +191,81 @@ class Join(Contract):
                         'exit', [usr.address, value.value])
 
 
-class DaiJoin(Join):
-    """A client for the `DaiJoin` contract, which allows the CDP holder to draw Dai from their Urn and repay it.
+class CoinJoin(BasicTokenAdapter):
+    """A client for the `CoinJoin` contract, which allows the CDP holder to draw Dai from their CDP and repay it.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/join.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/DaiJoin.abi')
-    bin = Contract._load_bin(__name__, 'abi/DaiJoin.bin')
+    abi = Contract._load_abi(__name__, 'abi/CoinJoin.abi')
+    bin = Contract._load_bin(__name__, 'abi/CoinJoin.bin')
 
     def __init__(self, web3: Web3, address: Address):
-        super(DaiJoin, self).__init__(web3, address)
-        self._token = self.dai()
+        super(CoinJoin, self).__init__(web3, address)
+        self._token = self.system_coin()
 
-    def dai(self) -> DSToken:
-        address = Address(self._contract.functions.dai().call())
+    def system_coin(self) -> DSToken:
+        address = Address(self._contract.functions.systemCoin().call())
         return DSToken(self.web3, address)
 
 
-class GemJoin(Join):
-    """A client for the `GemJoin` contract, which allows the user to deposit collateral into a new or existing vault.
+class CollateralJoin(BasicTokenAdapter):
+    """A client for the `CollateralJoin` contract, which allows the user to deposit collateral into a new or existing vault.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/join.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/GemJoin.abi')
-    bin = Contract._load_bin(__name__, 'abi/GemJoin.bin')
+    abi = Contract._load_abi(__name__, 'abi/BasicCollateralJoin.abi')
+    bin = Contract._load_bin(__name__, 'abi/BasicCollateralJoin.bin')
 
     def __init__(self, web3: Web3, address: Address):
-        super(GemJoin, self).__init__(web3, address)
-        self._token = self.gem()
+        super(CollateralJoin, self).__init__(web3, address)
+        self._token = self.collateral()
 
-    def ilk(self):
-        return Ilk.fromBytes(self._contract.functions.ilk().call())
+    def collateral_type(self):
+        return CollateralType.fromBytes(self._contract.functions.collateralType().call())
 
-    def gem(self) -> DSToken:
-        address = Address(self._contract.functions.gem().call())
+    def collateral(self) -> DSToken:
+        address = Address(self._contract.functions.collateral().call())
         return DSToken(self.web3, address)
 
-    def dec(self) -> int:
+    def decimals(self) -> int:
         return 18
-
-
-class GemJoin5(GemJoin):
-    """A client for the `GemJoin5` contract, which allows the user to deposit collateral into a new or existing vault.
+'''
+class CollateralJoin5(CollateralJoin):
+    """A client for the `CollateralJoin5` contract, which allows the user to deposit collateral into a new or existing vault.
 
     Ref. <https://github.com/makerdao/dss-deploy/blob/master/src/join.sol#L274>
     """
-    abi = Contract._load_abi(__name__, 'abi/GemJoin5.abi')
-    bin = Contract._load_bin(__name__, 'abi/GemJoin5.bin')
+    abi = Contract._load_abi(__name__, 'abi/CollateralJoin5.abi')
+    bin = Contract._load_bin(__name__, 'abi/CollateralJoin5.bin')
 
     def __init__(self, web3: Web3, address: Address):
-        super(GemJoin5, self).__init__(web3, address)
-        self._token = self.gem()
+        super(CollateralJoin5, self).__init__(web3, address)
+        self._token = self.collateral()
 
     def dec(self) -> int:
         return int(self._contract.functions.dec().call())
 
+'''
 
 class Collateral:
-    """The `Collateral` object wraps accounting information in the Ilk with token-wide artifacts shared across
-    multiple collateral types for the same token.  For example, ETH-A and ETH-B are represented by different Ilks,
-    but will share the same gem (WETH token), GemJoin instance, and Flipper contract.
+    """The `Collateral` object wraps accounting information in the CollateralType with token-wide artifacts shared across
+    multiple collateral types for the same token.  For example, ETH-A and ETH-B are represented by different CollateralTypes,
+    but will share the same collateral (WETH token), CollateralJoin instance, and Flipper contract.
     """
 
-    def __init__(self, ilk: Ilk, gem: ERC20Token, adapter: GemJoin, flipper: Flipper, pip):
-        assert isinstance(ilk, Ilk)
+    def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: CollateralJoin,
+                 collateral_auction_house: CollateralAuctionHouse, pip):
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(gem, ERC20Token)
-        assert isinstance(adapter, GemJoin)
+        assert isinstance(adapter, CollateralJoin)
         assert isinstance(flipper, Flipper)
 
-        self.ilk = ilk
-        self.gem = gem
+        self.collateral_type = collateral_type
+        self.collateral = collateral
         self.adapter = adapter
-        self.flipper = flipper
+        self.collateral_auction_house = collateral_auction_house
         # Points to `median` for official deployments, `DSValue` for testing purposes.
         # Users generally have no need to interact with the pip.
         self.pip = pip
@@ -275,35 +278,35 @@ class Collateral:
             usr: User making transactions with this collateral
         """
         gas_price = kwargs['gas_price'] if 'gas_price' in kwargs else DefaultGasPrice()
-        self.adapter.approve(hope_directly(from_address=usr, gas_price=gas_price), self.flipper.vat())
+        self.adapter.approve(approve_cdp_modification_directly(from_address=usr, gas_price=gas_price), self.collateral_auction_house.cdp_engine())
         self.adapter.approve_token(directly(from_address=usr, gas_price=gas_price))
 
 
-class Vat(Contract):
-    """A client for the `Vat` contract, which manages accounting for all Urns (CDPs).
+class CDPEngine(Contract):
+    """A client for the `CDPEngine` contract, which manages accounting for all CDPs (CDPs).
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/vat.sol>
     """
 
     # Identifies CDP holders and collateral types they have frobbed
-    class LogFrob():
+    class LogModifyCDPCollateralization():
         def __init__(self, lognote: LogNote):
             assert isinstance(lognote, LogNote)
 
-            self.ilk = str(Web3.toText(lognote.arg1)).replace('\x00', '')
-            self.urn = Address(Web3.toHex(lognote.arg2)[26:])
+            self.collateral_type = str(Web3.toText(lognote.arg1)).replace('\x00', '')
+            self.cdp = Address(Web3.toHex(lognote.arg2)[26:])
             self.collateral_owner = Address(Web3.toHex(lognote.arg3)[26:])
-            self.dai_recipient = Address(Web3.toHex(lognote.get_bytes_at_index(3))[26:])
+            self.system_coin_recipient = Address(Web3.toHex(lognote.get_bytes_at_index(3))[26:])
             self.dink = Wad(int.from_bytes(lognote.get_bytes_at_index(4), byteorder="big", signed=True))
             self.dart = Wad(int.from_bytes(lognote.get_bytes_at_index(5), byteorder="big", signed=True))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"LogFrob({pformat(vars(self))})"
+            return f"LogModifyCDPCollateralization({pformat(vars(self))})"
 
-    abi = Contract._load_abi(__name__, 'abi/Vat.abi')
-    bin = Contract._load_bin(__name__, 'abi/Vat.bin')
+    abi = Contract._load_abi(__name__, 'abi/CDPEngine.abi')
+    bin = Contract._load_bin(__name__, 'abi/CDPEngine.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -313,160 +316,161 @@ class Vat(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
-    def init(self, ilk: Ilk) -> Transact:
-        assert isinstance(ilk, Ilk)
+    def init(self, collateral_type: CollateralType) -> Transact:
+        assert isinstance(collateral_type, CollateralType)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'init', [ilk.toBytes()])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'init', [collateral_type.toBytes()])
 
-    def live(self) -> bool:
-        return self._contract.functions.live().call() > 0
+    def contract_enabled(self) -> bool:
+        return self._contract.functions.contractEnabled().call() > 0
 
-    def wards(self, address: Address):
+    def authorized_accounts(self, address: Address):
         assert isinstance(address, Address)
 
-        return bool(self._contract.functions.wards(address.address).call())
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
-    def hope(self, address: Address):
+    def approve_cdp_modification(self, address: Address):
         assert isinstance(address, Address)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'hope', [address.address])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'approveCDPModification', [address.address])
 
-    def can(self, sender: Address, usr: Address):
+    def cdp_rights(self, sender: Address, usr: Address):
         assert isinstance(sender, Address)
         assert isinstance(usr, Address)
 
-        return bool(self._contract.functions.can(sender.address, usr.address).call())
+        return bool(self._contract.functions.cdpRights(sender.address, usr.address).call())
 
-    def ilk(self, name: str) -> Ilk:
+    def collateral_type(self, name: str) -> CollateralType:
         assert isinstance(name, str)
 
-        b32_ilk = Ilk(name).toBytes()
-        (art, rate, spot, line, dust) = self._contract.functions.ilks(b32_ilk).call()
+        b32_collateral_type = CollateralType(name).toBytes()
+        (cdp_debt, rate, safety_price, line, dust) = self._contract.functions.collateralTypes(b32_collateral_type).call()
 
-        # We could get "ink" from the urn, but caller must provide an address.
-        return Ilk(name, rate=Ray(rate), ink=Wad(0), art=Wad(art), spot=Ray(spot), line=Rad(line), dust=Rad(dust))
+        # We could get "cdp_collateral" from the urn, but caller must provide an address.
+        return CollateralType(name, rate=Ray(rate), cdp_collateral=Wad(0), cdp_debt=Wad(cdp_debt), safety_price=Ray(safety_price), line=Rad(line), dust=Rad(dust))
 
-    def gem(self, ilk: Ilk, urn: Address) -> Wad:
-        assert isinstance(ilk, Ilk)
+    def collateral(self, collateral_type: CollateralType, urn: Address) -> Wad:
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(urn, Address)
 
-        return Wad(self._contract.functions.gem(ilk.toBytes(), urn.address).call())
+        return Wad(self._contract.functions.collateral(collateral_type.toBytes(), urn.address).call())
 
-    def dai(self, urn: Address) -> Rad:
+    def coin_balance(self, cdp: Address) -> Rad:
+        assert isinstance(cdp, Address)
+
+        return Rad(self._contract.functions.coinBalance(cdp.address).call())
+
+    def debt_balance(self, cdp: Address) -> Rad:
         assert isinstance(urn, Address)
 
-        return Rad(self._contract.functions.dai(urn.address).call())
+        return Rad(self._contract.functions.debtBalance(cdp.address).call())
 
-    def sin(self, urn: Address) -> Rad:
-        assert isinstance(urn, Address)
-
-        return Rad(self._contract.functions.sin(urn.address).call())
-
-    def urn(self, ilk: Ilk, address: Address) -> Urn:
-        assert isinstance(ilk, Ilk)
+    def cdp(self, collateral_type: CollateralType, address: Address) -> CDP:
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
 
-        (ink, art) = self._contract.functions.urns(ilk.toBytes(), address.address).call()
-        return Urn(address, ilk, Wad(ink), Wad(art))
+        (locked_collateral, generated_debt) = self._contract.functions.cdps(collateral_type.toBytes(), address.address).call()
+        return CDP(address, collateral_type, Wad(locked_collateral), Wad(generated_debt))
 
-    def debt(self) -> Rad:
-        return Rad(self._contract.functions.debt().call())
+    def global_debt(self) -> Rad:
+        return Rad(self._contract.functions.globalDebt().call())
 
-    def vice(self) -> Rad:
-        return Rad(self._contract.functions.vice().call())
+    def global_unbacked_debt(self) -> Rad:
+        return Rad(self._contract.functions.globalUnbackedDebt().call())
 
-    def line(self) -> Rad:
+    def global_debt_ceiling(self) -> Rad:
         """ Total debt ceiling """
-        return Rad(self._contract.functions.Line().call())
+        return Rad(self._contract.functions.globalDebtCeiling().call())
 
-    def flux(self, ilk: Ilk, src: Address, dst: Address, wad: Wad) -> Transact:
-        """Move Ilk balance in Vat from source address to destiny address
+    def transfer_collateral(self, collateral_type: CollateralType, src: Address, dst: Address, wad: Wad) -> Transact:
+        """Move CollateralType balance in CDPEngine from source address to destiny address
 
         Args:
-            ilk: Identifies the type of collateral.
+            collateral_type: Identifies the type of collateral.
             src: Source of the collateral (address of the source).
             dst: Destiny of the collateral (address of the recipient).
             wad: Amount of collateral to move.
         """
-        assert isinstance(ilk, Ilk)
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(src, Address)
         assert isinstance(dst, Address)
         assert isinstance(wad, Wad)
 
-        flux_args = [ilk.toBytes(), src.address, dst.address, wad.value]
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'flux', flux_args)
+        transfer_args = [collateral_type.toBytes(), src.address, dst.address, wad.value]
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferCollateral', transfer_args)
 
-    def move(self, src: Address, dst: Address, rad: Rad) -> Transact:
-        """Move Dai balance in Vat from source address to destiny address
+    def transfer_internal_coins(self, src: Address, dst: Address, rad: Rad) -> Transact:
+        """Move system coin balance in CDPEngine from source address to destiny address
 
         Args:
-            src: Source of the dai (address of the source).
-            dst: Destiny of the dai (address of the recipient).
-            rad: Amount of dai to move.
+            src: Source of the system coin (address of the source).
+            dst: Destiny of the system coin (address of the recipient).
+            rad: Amount of system coin to move.
         """
         assert isinstance(src, Address)
         assert isinstance(dst, Address)
         assert isinstance(rad, Rad)
 
         move_args = [src.address, dst.address, rad.value]
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'move', move_args)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferInternalCoins', move_args)
 
-    def fork(self, ilk: Ilk, src: Address, dst: Address, dink: Wad, dart: Wad) -> Transact:
+    def transfer_CDP_collateral_and_debt(self, collateral_type: CollateralType, src: Address, dst: Address, dink: Wad, dart: Wad) -> Transact:
         """Split a Vault - binary approval or splitting/merging Vault's
 
         Args:
-            ilk: Identifies the type of collateral.
-            src: Address of the source Urn.
-            dst: Address of the destiny Urn.
+            collateral_type: Identifies the type of collateral.
+            src: Address of the source CDP.
+            dst: Address of the destiny CDP.
             dink: Amount of collateral to exchange.
             dart: Amount of stable coin debt to exchange.
         """
-        assert isinstance(ilk, Ilk)
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(src, Address)
         assert isinstance(dst, Address)
         assert isinstance(dink, Wad)
         assert isinstance(dart, Wad)
 
-        fork_args = [ilk.toBytes(), src.address, dst.address, dink.value, dart.value]
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'fork', fork_args)
+        transfer_args = [collateral_type.toBytes(), src.address, dst.address, dink.value, dart.value]
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferCDPCollateralAndDebt', transfer_args)
 
-    def frob(self, ilk: Ilk, urn_address: Address, dink: Wad, dart: Wad, collateral_owner=None, dai_recipient=None):
-        """Adjust amount of collateral and reserved amount of Dai for the CDP
+    def modify_CDP_collateralization(self, collateral_type: CollateralType, cdp_address: Address, dink: Wad, dart: Wad,
+                                   collateral_owner=None, system_coin_recipient=None):
+        """Adjust amount of collateral and reserved amount of system coin for the CDP
 
         Args:
-            ilk: Identifies the type of collateral.
-            urn_address: CDP holder (address of the Urn).
+            collateral_type: Identifies the type of collateral.
+            urn_address: CDP holder (address of the CDP).
             dink: Amount of collateral to add/remove.
-            dart: Adjust CDP debt (amount of Dai available for borrowing).
+            dart: Adjust CDP debt (amount of system coin available for borrowing).
             collateral_owner: Holder of the collateral used to fund the CDP.
-            dai_recipient: Party receiving the Dai.
+            dai_recipient: Party receiving the system coin 
         """
-        assert isinstance(ilk, Ilk)
-        assert isinstance(urn_address, Address)
+        assert isinstance(collateral_type, CollateralType)
+        assert isinstance(cdp_address, Address)
         assert isinstance(dink, Wad)
         assert isinstance(dart, Wad)
         assert isinstance(collateral_owner, Address) or (collateral_owner is None)
-        assert isinstance(dai_recipient, Address) or (dai_recipient is None)
+        assert isinstance(system_coin_recipient, Address) or (system_coin_recipient is None)
 
         # Usually these addresses are the same as the account holding the urn
-        v = collateral_owner or urn_address
-        w = dai_recipient or urn_address
+        v = collateral_owner or cdp_address
+        w = system_coin_recipient or cdp_address
         assert isinstance(v, Address)
         assert isinstance(w, Address)
 
-        self.validate_frob(ilk, urn_address, dink, dart)
+        self.validate_frob(collateral_type, cdp_address, dink, dart)
 
-        if v == urn_address and w == urn_address:
-            logger.info(f"frobbing {ilk.name} urn {urn_address.address} with dink={dink}, dart={dart}")
+        if v == cdp_address and w == cdp_address:
+            logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} with dink={dink}, dart={dart}")
         else:
-            logger.info(f"frobbing {ilk.name} urn {urn_address.address} "
+            logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} "
                         f"with dink={dink} from {v.address}, "
                         f"dart={dart} for {w.address}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'frob', [ilk.toBytes(), urn_address.address, v.address, w.address, dink.value, dart.value])
+                        'modifyCDPCollateralization', [collateral_type.toBytes(), cdp_address.address, v.address, w.address, dink.value, dart.value])
 
-    def validate_frob(self, ilk: Ilk, address: Address, dink: Wad, dart: Wad):
+    def validate_cdp_modification(self, collateral_type: CollateralType, address: Address, dink: Wad, dart: Wad):
         """Helps diagnose `frob` transaction failures by asserting on `require` conditions in the contract"""
 
         def r(value, decimals=1):  # rounding function
@@ -475,60 +479,62 @@ class Vat(Contract):
         def f(value, decimals=1):  # formatting function
             return f"{r(value):16,.{decimals}f}"
 
-        assert isinstance(ilk, Ilk)
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
         assert isinstance(dink, Wad)
         assert isinstance(dart, Wad)
 
-        assert self.live()  # system is live
+        assert self.contract_enabled()  # system is live
 
-        urn = self.urn(ilk, address)
-        ilk = self.ilk(ilk.name)
-        assert ilk.rate != Ray(0)  # ilk has been initialised
+        cdp = self.cdp(collateral_type, address)
+        collateral_type = self.collateral_type(collateral_type.name)
+        assert collateral_type.accumulated_rates != Ray(0)  # collateral_type has been initialised
 
-        ink = urn.ink + dink
-        art = urn.art + dart
-        ilk_art = ilk.art + dart
+        cdp_collateral = cdp.cdp_collateral + dink
+        cdp_debt = cdp.cdp_debt + dart
+        collateral_type_cdp_debt = collateral_type.cdp_debt + dart
 
-        logger.debug(f"System     | debt {f(self.debt())} | ceiling {f(self.line())}")
-        logger.debug(f"Collateral | debt {f(Ray(ilk_art) * ilk.rate)} | ceiling {f(ilk.line)}")
+        logger.debug(f"System     | debt {f(self.global_debt())} | ceiling {f(self.global_debt_ceiling())}")
+        logger.debug(f"Collateral | debt {f(Ray(collateral_type_cdp_debt) * collateral_type.accumulated_rates)} | ceiling {f(collateral_type.debt_ceiling)}")
 
-        dtab = Rad(ilk.rate * Ray(dart))
-        tab = ilk.rate * art
-        debt = self.debt() + dtab
-        logger.debug(f"Frobbing     debt={r(ilk_art)}, ink={r(ink)}, dink={r(dink)}, dart={r(dart)}, "
-                     f"ilk.rate={r(ilk.rate,8)}, tab={r(tab)}, spot={r(ilk.spot, 4)}, debt={r(debt)}")
+        dtab = Rad(collateral_type.accumulated_rates * Ray(dart))
+        tab = collateral_type.accumulated_rates * cdp_debt
+        debt = self.global_debt() + dtab
+        logger.debug(f"Modifying CDP collateralization debt={r(collateral_type_cdp_debt)}, cdp_collateral={r(cdp_collateral)}, dink={r(dink)}, dart={r(dart)}, "
+                     f"collateral_type.rate={r(collateral_type.accumulated_rates,8)}, tab={r(tab)}, safety_price={r(collateral_type.safety_price, 4)}, debt={r(debt)}")
 
         # either debt has decreased, or debt ceilings are not exceeded
-        under_collateral_debt_ceiling = Rad(Ray(ilk_art) * ilk.rate) <= ilk.line
-        under_system_debt_ceiling = debt < self.line()
+        under_collateral_debt_ceiling = Rad(Ray(collateral_type_cdp_debt) * collateral_type.accumulated_rates) <= collateral_type.debt_ceiling
+        under_system_debt_ceiling = debt < self.global_debt_ceiling()
         calm = dart <= Wad(0) or (under_collateral_debt_ceiling and under_system_debt_ceiling)
 
         # urn is either less risky than before, or it is safe
-        safe = (dart <= Wad(0) and dink >= Wad(0)) or tab <= Ray(ink) * ilk.spot
+        safe = (dart <= Wad(0) and dink >= Wad(0)) or tab <= Ray(cdp_collateral) * collateral_type.safety_price
 
         # urn has no debt, or a non-dusty amount
-        neat = art == Wad(0) or Rad(tab) >= ilk.dust
+        neat = cdp_debt == Wad(0) or Rad(tab) >= collateral_type.debt_floor
 
         if not under_collateral_debt_ceiling:
             logger.warning("collateral debt ceiling would be exceeded")
         if not under_system_debt_ceiling:
             logger.warning("system debt ceiling would be exceeded")
         if not safe:
-            logger.warning("urn would be unsafe")
+            logger.warning("cdp would be unsafe")
         if not neat:
-            logger.warning("debt would not exceed dust cutoff")
+            logger.warning("debt would not exceed debt_floor cutoff")
         assert calm and safe and neat
 
-    def past_frobs(self, from_block: int, to_block: int = None, ilk: Ilk = None, chunk_size=20000) -> List[LogFrob]:
-        """Synchronously retrieve a list showing which ilks and urns have been frobbed.
+    def past_cdp_modifications(self, from_block: int, to_block: int = None, collateral_type: CollateralType = None,
+                               chunk_size=20000) -> List[LogModifyCDPCollateralization]:
+        """Synchronously retrieve a list showing which collateral types and cdps have been modified.
          Args:
             from_block: Oldest Ethereum block to retrieve the events from.
             to_block: Optional newest Ethereum block to retrieve the events from, defaults to current block
-            ilk: Optionally filter frobs by ilk.name
+            collateral_type: Optionally filter cdp modification by collateral_type.name
             chunk_size: Number of blocks to fetch from chain at one time, for performance tuning
          Returns:
-            List of past `LogFrob` events represented as :py:class:`pyflex.dss.Vat.LogFrob` class.
+            List of past `LogModifyCDPCollateralization` events represented as 
+            :py:class:`pyflex.dss.CDPEngine.LogModifyCDPCollateralization` class.
         """
         current_block = self._contract.web3.eth.blockNumber
         assert isinstance(from_block, int)
@@ -539,10 +545,10 @@ class Vat(Contract):
             assert isinstance(to_block, int)
             assert to_block >= from_block
             assert to_block <= current_block
-        assert isinstance(ilk, Ilk) or ilk is None
+        assert isinstance(collateral_type, CollateralType) or collateral_type is None
         assert chunk_size > 0
 
-        logger.debug(f"Consumer requested frob data from block {from_block} to {to_block}")
+        logger.debug(f"Consumer requested cdp modification data from block {from_block} to {to_block}")
         start = from_block
         end = None
         chunks_queried = 0
@@ -556,46 +562,47 @@ class Vat(Contract):
                 'fromBlock': start,
                 'toBlock': end
             }
-            logger.debug(f"Querying frobs from block {start} to {end} ({end-start} blocks); "
-                         f"accumulated {len(retval)} frobs in {chunks_queried-1} requests")
+            logger.debug(f"Querying cdp modifications from block {start} to {end} ({end-start} blocks); "
+                         f"accumulated {len(retval)} cdp modification in {chunks_queried-1} requests")
 
             logs = self.web3.eth.getLogs(filter_params)
 
-            lognotes = list(map(lambda l: LogNote.from_event(l, Vat.abi), logs))
-            # '0x7cdd3fde' is Vat.slip (from GemJoin.join) and '0x76088703' is Vat.frob
-            logfrobs = list(filter(lambda l: l.sig == '0x76088703', lognotes))
-            logfrobs = list(map(lambda l: Vat.LogFrob(l), logfrobs))
-            if ilk is not None:
-                logfrobs = list(filter(lambda l: l.ilk == ilk.name, logfrobs))
+            lognotes = list(map(lambda l: LogNote.from_event(l, CDPEngine.abi), logs))
+            # TODO fix this
+            # '0x7cdd3fde' is Vat.slip (from CollateralJoin.join) and '0x76088703' is Vat.frob
+            log_modifications = list(filter(lambda l: l.sig == '0x76088703', lognotes))
+            log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization(l), log_modifications))
+            if collateral_type is not None:
+                log_modifications = list(filter(lambda l: l.collateral_type == collateral_type.name, log_modifications))
 
-            retval.extend(logfrobs)
+            retval.extend(log_modifications)
             start += chunk_size
 
-        logger.debug(f"Found {len(retval)} frobs in {chunks_queried} requests")
+        logger.debug(f"Found {len(retval)} cdp modifications in {chunks_queried} requests")
         return retval
 
-    def heal(self, vice: Rad) -> Transact:
+    def settle_debt(self, vice: Rad) -> Transact:
         assert isinstance(vice, Rad)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'heal', [vice.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [vice.value])
 
     def __eq__(self, other):
-        assert isinstance(other, Vat)
+        assert isinstance(other, CDPEngine)
         return self.address == other.address
 
     def __repr__(self):
-        return f"Vat('{self.address}')"
+        return f"CDPEngine('{self.address}')"
 
 
-class Spotter(Contract):
-    """A client for the `Spotter` contract, which interacts with Vat for the purpose of managing collateral prices.
+class OracleRelayer(Contract):
+    """A client for the `Spotter` contract, which interacts with CDPEngine for the purpose of managing collateral prices.
     Users generally have no need to interact with this contract; it is included for unit testing purposes.
 
     Ref. <https://github.com/makerdao/dss-deploy/blob/master/src/poke.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/Spotter.abi')
-    bin = Contract._load_bin(__name__, 'abi/Spotter.bin')
+    abi = Contract._load_abi(__name__, 'abi/OracleRelayer.abi')
+    bin = Contract._load_bin(__name__, 'abi/OracleRelayer.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -605,36 +612,36 @@ class Spotter(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
-    def poke(self, ilk: Ilk) -> Transact:
-        assert isinstance(ilk, Ilk)
+    def update_collateral_price(self, collateral_type: CollateralType) -> Transact:
+        assert isinstance(collateral_type, CollateralType)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'poke', [ilk.toBytes()])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateCollateralPrice', [collateral_type.toBytes()])
 
-    def vat(self) -> Address:
-        return Address(self._contract.functions.vat().call())
+    def cdp_engine(self) -> Address:
+        return Address(self._contract.functions.cdpEngine().call())
 
-    def par(self) -> Ray:
-        return Ray(self._contract.functions.par().call())
+    def redemption_price(self) -> Ray:
+        return Ray(self._contract.functions.redemptionPrice().call())
 
-    def mat(self, ilk: Ilk) -> Ray:
-        assert isinstance(ilk, Ilk)
-        (pip, mat) = self._contract.functions.ilks(ilk.toBytes()).call()
+    def safety_c_ratio(self, collateral_type: CollateralType) -> Ray:
+        assert isinstance(collateral_type, CollateralType)
+        (orcl, safety_c_ratio) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
 
-        return Ray(mat)
+        return Ray(safety_c_ratio)
 
     def __repr__(self):
-        return f"Spotter('{self.address}')"
+        return f"OracleRelayer('{self.address}')"
 
 
-class Vow(Contract):
-    """A client for the `Vow` contract, which manages liquidation of surplus Dai and settlement of collateral debt.
-    Specifically, this contract is useful for Flap and Flop auctions.
+class AccountingEngine(Contract):
+    """A client for the `AccountingEngine` contract, which manages liquidation of surplus systemc coin and settlement of collateral debt.
+    Specifically, this contract is useful for SurplusAuctionHouse and DebtAuctionHouse auctions.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/heal.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/Vow.abi')
-    bin = Contract._load_bin(__name__, 'abi/Vow.bin')
+    abi = Contract._load_abi(__name__, 'abi/AccountingEngine.abi')
+    bin = Contract._load_bin(__name__, 'abi/AccountingEngine.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -643,89 +650,89 @@ class Vow(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.vat = Vat(web3, Address(self._contract.functions.cdpEngine().call()))
+        self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
 
-    def rely(self, guy: Address) -> Transact:
+    def add_authorization(self, guy: Address) -> Transact:
         assert isinstance(guy, Address)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'rely', [guy.address])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'addAuthorization', [guy.address])
 
-    def live(self) -> bool:
-        return self._contract.functions.live().call() > 0
+    def contract_enabled(self) -> bool:
+        return self._contract.functions.contractEnabled().call() > 0
 
-    def flapper(self) -> Address:
-        return Address(self._contract.functions.flapper().call())
+    def surplus_auction_house(self) -> Address:
+        return Address(self._contract.functions.surplusAuctionHouse().call())
 
-    def flopper(self) -> Address:
-        return Address(self._contract.functions.flopper().call())
+    def debt_auction_house(self) -> Address:
+        return Address(self._contract.functions.debtAuctionHouse().call())
 
-    def sin(self) -> Rad:
-        return Rad(self._contract.functions.Sin().call())
+    def debt_queue(self) -> Rad:
+        return Rad(self._contract.functions.totalQueuedDebt().call())
 
     def sin_of(self, era: int) -> Rad:
-        return Rad(self._contract.functions.sin(era).call())
+        return Rad(self._contract.functions.debtQueue(era).call())
 
-    def ash(self) -> Rad:
-        return Rad(self._contract.functions.Ash().call())
+    def total_on_auction_debt(self) -> Rad:
+        return Rad(self._contract.functions.totalOnAuctionDebt().call())
 
     def woe(self) -> Rad:
-        return (self.vat.sin(self.address) - self.sin()) - self.ash()
+        return (self.cdp_engine.debtBalance(self.address) - self.debt_queue()) - self.total_on_auction_debt()
 
-    def wait(self) -> int:
-        return int(self._contract.functions.wait().call())
+    def pop_debt_delay(self) -> int:
+        return int(self._contract.functions.popDebtDelay().call())
 
-    def dump(self) -> Wad:
-        return Wad(self._contract.functions.dump().call())
+    def initial_debt_auction_minted_tokens(self) -> Wad:
+        return Wad(self._contract.functions.initialDebtAuctionMintedTokens().call())
 
-    def sump(self) -> Rad:
-        return Rad(self._contract.functions.sump().call())
+    def debt_auction_bid_size(self) -> Rad:
+        return Rad(self._contract.functions.debtAuctionBidSize().call())
 
-    def bump(self) -> Rad:
-        return Rad(self._contract.functions.bump().call())
+    def surplus_auction_amount_to_sell(self) -> Rad:
+        return Rad(self._contract.functions.surplusAuctionAmountToSell().call())
 
-    def hump(self) -> Rad:
-        return Rad(self._contract.functions.hump().call())
+    def surplus_buffer(self) -> Rad:
+        return Rad(self._contract.functions.surplusBuffer().call())
 
-    def flog(self, era: int) -> Transact:
+    def pop_debt_from_queue(self, era: int) -> Transact:
         assert isinstance(era, int)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'flog', [era])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'popDebtFromQueue', [era])
 
-    def heal(self, rad: Rad) -> Transact:
+    def settle_debt(self, rad: Rad) -> Transact:
         assert isinstance(rad, Rad)
-        logger.info(f"Healing joy={self.vat.dai(self.address)} woe={self.woe()}")
+        logger.info(f"Settling debt joy={self.cdp_engine.coinBalance(self.address)} woe={self.woe()}")
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'heal', [rad.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [rad.value])
 
-    def kiss(self, rad: Rad) -> Transact:
+    def cancel_auctioned_debt_with_surplus(self, rad: Rad) -> Transact:
         assert isinstance(rad, Rad)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'kiss', [rad.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'cancelAuctionedDebtWithSurplus', [rad.value])
 
-    def flop(self) -> Transact:
+    def auction_debt(self) -> Transact:
         """Initiate a debt auction"""
-        logger.info(f"Initiating a flop auction with woe={self.woe()}")
+        logger.info(f"Initiating a debt auction with woe={self.woe()}")
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'flop', [])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionDebt', [])
 
-    def flap(self) -> Transact:
+    def auction_surplus(self) -> Transact:
         """Initiate a surplus auction"""
-        logger.info(f"Initiating a flap auction with joy={self.vat.dai(self.address)}")
+        logger.info(f"Initiating a surplus auction with joy={self.cdp_engine.coinBalance(self.address)}")
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'flap', [])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionSurplus', [])
 
     def __repr__(self):
-        return f"Vow('{self.address}')"
+        return f"AccountingEngine('{self.address}')"
 
 
-class Jug(Contract):
-    """A client for the `Jug` contract, which manages stability fees.
+class TaxCollector(Contract):
+    """A client for the `TaxCollector` contract, which manages stability fees.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/jug.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/Jug.abi')
-    bin = Contract._load_bin(__name__, 'abi/Jug.bin')
+    abi = Contract._load_abi(__name__, 'abi/TaxCollector.abi')
+    bin = Contract._load_bin(__name__, 'abi/TaxCollector.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -734,57 +741,57 @@ class Jug(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.vat = Vat(web3, Address(self._contract.functions.vat().call()))
-        self.vow = Vow(web3, Address(self._contract.functions.vow().call()))
+        self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
+        self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.accountingEngine().call()))
 
-    def init(self, ilk: Ilk) -> Transact:
-        assert isinstance(ilk, Ilk)
+    def initialize_collateral_type(self, collateral_type: CollateralType) -> Transact:
+        assert isinstance(collateral_type, CollateralType)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'init', [ilk.toBytes()])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'initializeCollateralType', [collateral_type.toBytes()])
 
-    def wards(self, address: Address):
+    def authorized_accounts(self, address: Address):
         assert isinstance(address, Address)
 
-        return bool(self._contract.functions.wards(address.address).call())
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
-    def drip(self, ilk: Ilk) -> Transact:
-        assert isinstance(ilk, Ilk)
+    def tax_single(self, collateral_type: CollateralType) -> Transact:
+        assert isinstance(collateral_type, CollateralType)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'drip', [ilk.toBytes()])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'taxSingle', [collateral_type.toBytes()])
 
-    def base(self) -> Ray:
-        return Ray(self._contract.functions.base().call())
+    def global_stability_fee(self) -> Ray:
+        return Ray(self._contract.functions.globalStabilityFee().call())
 
-    def duty(self, ilk: Ilk) -> Ray:
-        assert isinstance(ilk, Ilk)
+    def stability_fee(self, collateral_type: CollateralType) -> Ray:
+        assert isinstance(collateral_type, CollateralType)
 
-        return Ray(self._contract.functions.ilks(ilk.toBytes()).call()[0])
+        return Ray(self._contract.functions.collateralTypes(collateral_type.toBytes()).call()[0])
 
-    def rho(self, ilk: Ilk) -> int:
-        assert isinstance(ilk, Ilk)
+    def update_time(self, collateral_type: CollateralType) -> int:
+        assert isinstance(collateral_type, CollateralType)
 
-        return Web3.toInt(self._contract.functions.ilks(ilk.toBytes()).call()[1])
+        return Web3.toInt(self._contract.functions.collateralTypes(collateral_type.toBytes()).call()[1])
 
     def __repr__(self):
-        return f"Jug('{self.address}')"
+        return f"TaxCollector('{self.address}')"
 
 
-class Cat(Contract):
-    """A client for the `Cat` contract, used to liquidate unsafe Urns (CDPs).
-    Specifically, this contract is useful for Flip auctions.
+class LiquidationEngine(Contract):
+    """A client for the `LiquidationEngine` contract, used to liquidate unsafe CDPs (CDPs).
+    Specifically, this contract is useful for CollateralAuctionHouse auctions.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/cat.sol>
     """
 
-    # This information is read from the `Bite` event emitted from `Cat.bite`
-    class LogBite:
+    # This information is read from the `Liquidate` event emitted from `LiquidationEngine.liquidateCDP`
+    class LogLiquidate:
         def __init__(self, log):
-            self.ilk = Ilk.fromBytes(log['args']['ilk'])
-            self.urn = Urn(Address(log['args']['urn']))
-            self.ink = Wad(log['args']['ink'])
-            self.art = Wad(log['args']['art'])
-            self.tab = Rad(log['args']['tab'])
-            self.flip = Address(log['args']['flip'])
+            self.collateral_type = CollateralType.fromBytes(log['args']['collateralType'])
+            self.urn = CDP(Address(log['args']['CDP']))
+            self.cdp_collateral = Wad(log['args']['cdpCollateral'])
+            self.cdp_debt = Wad(log['args']['cdpDebt'])
+            self.tab = Rad(log['args']['amountToRaise'])
+            self.flip = Address(log['args']['collateralAuctionHouse'])
             self.raw = log
 
         @classmethod
@@ -792,12 +799,13 @@ class Cat(Contract):
             assert isinstance(event, dict)
 
             topics = event.get('topics')
+            # TO DO Fix
             if topics and topics[0] == HexBytes('0x99b5620489b6ef926d4518936cfec15d305452712b88bd59da2d9c10fb0953e8'):
-                log_bite_abi = [abi for abi in Cat.abi if abi.get('name') == 'Bite'][0]
+                log_liquidate_abi = [abi for abi in LiquidationEngine.abi if abi.get('name') == 'Liquidate'][0]
                 codec = ABICodec(default_registry)
-                event_data = get_event_data(codec, log_bite_abi, event)
+                event_data = get_event_data(codec, log_liquidate_abi, event)
 
-                return Cat.LogBite(event_data)
+                return LiquidationEngine.LogLiquidate(event_data)
             else:
                 logging.warning(f'[from_event] Invalid topic in {event}')
 
@@ -805,14 +813,14 @@ class Cat(Contract):
             return web3.eth.getBlock(self.raw['blockNumber'])['timestamp']
 
         def __eq__(self, other):
-            assert isinstance(other, Cat.LogBite)
+            assert isinstance(other, LiquidationEngine.LogLiquidate)
             return self.__dict__ == other.__dict__
 
         def __repr__(self):
             return pformat(vars(self))
 
-    abi = Contract._load_abi(__name__, 'abi/Cat.abi')
-    bin = Contract._load_bin(__name__, 'abi/Cat.bin')
+    abi = Contract._load_abi(__name__, 'abi/LiquidationEngine.abi')
+    bin = Contract._load_bin(__name__, 'abi/LiquidationEngine.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -821,84 +829,86 @@ class Cat(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.vat = Vat(web3, Address(self._contract.functions.vat().call()))
-        self.vow = Vow(web3, Address(self._contract.functions.vow().call()))
+        self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
+        self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.accountingEngine().call()))
 
-    def live(self) -> bool:
-        return self._contract.functions.live().call() > 0
+    def contract_enabled(self) -> bool:
+        return self._contract.functions.contractEnabled().call() > 0
 
-    def bite(self, ilk: Ilk, urn: Urn) -> Transact:
-        """ Initiate liquidation of a CDP, kicking off a flip auction
+    def liquidate_CDP(self, collateral_type: CollateralType, cdp: CDP) -> Transact:
+        """ Initiate liquidation of a CDP, kicking off a collateral auction
 
         Args:
-            ilk: Identifies the type of collateral.
-            urn: Address of the CDP holder.
+            collateral_type: Identifies the type of collateral.
+            cdp: CDP
         """
-        assert isinstance(ilk, Ilk)
-        assert isinstance(urn, Urn)
+        assert isinstance(collateral_type, CollateralType)
+        assert isinstance(cdp, CDP)
 
-        ilk = self.vat.ilk(ilk.name)
-        urn = self.vat.urn(ilk, urn.address)
-        rate = self.vat.ilk(ilk.name).rate
-        logger.info(f'Biting {ilk.name} CDP {urn.address.address} with ink={urn.ink} spot={ilk.spot} '
-                    f'art={urn.art} rate={rate}')
-
-        return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'bite', [ilk.toBytes(), urn.address.address])
-
-    def lump(self, ilk: Ilk) -> Wad:
-        assert isinstance(ilk, Ilk)
-
-        (flip, chop, lump) = self._contract.functions.ilks(ilk.toBytes()).call()
-        return Wad(lump)
-
-    def chop(self, ilk: Ilk) -> Ray:
-        assert isinstance(ilk, Ilk)
-
-        (flip, chop, lump) = self._contract.functions.ilks(ilk.toBytes()).call()
-        return Ray(chop)
-
-    def file_vow(self, vow: Vow) -> Transact:
-        assert isinstance(vow, Vow)
+        collateral_type = self.cdp_engine.collateral_type(collateral_type.name)
+        cdp = self.cdp_engine.cdp(collateral_type, cdp.address)
+        rate = self.cdp_engine.collateral_type(collateral_type.name).accumulated_rates
+        logger.info(f'Liquidating {collateral_type.name} CDP {cdp.address.address} with cdp_collateral={cdp.cdp_collateral} safety_price={collateral_type.safety_price} '
+                    f'generated_debt={cdp.cdp_debt} accumulatedRates={rate}')
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'file(bytes32,address)', [Web3.toBytes(text="vow"), vow.address.address])
+                        'liquidateCDP', [collateral_type.toBytes(), cdp.address.address])
 
-    def flipper(self, ilk: Ilk) -> Address:
-        assert isinstance(ilk, Ilk)
+    def collateral_auction_house(self, collateral_type: CollateralType) -> Address:
+        assert isinstance(collateral_type, CollateralType)
 
-        (flip, chop, lump) = self._contract.functions.ilks(ilk.toBytes()).call()
-        return Address(flip)
+        (collateral_auction_house, _, _) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
 
-    def past_bites(self, number_of_past_blocks: int, event_filter: dict = None) -> List[LogBite]:
-        """Synchronously retrieve past LogBite events.
+        return Address(collateral_auction_house)
 
-        `LogBite` events are emitted every time someone bites a CDP.
+    def liquidation_penalty(self, collateral_type: CollateralType) -> Ray:
+        assert isinstance(collateral_type, CollateralType)
+
+        (_, liquidation_penalty, _) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
+        return Ray(liquidation_penalty)
+
+    def collateral_to_sell(self, collateral_type: CollateralType) -> Wad:
+        assert isinstance(collateral_type, CollateralType)
+
+        (_, _, collateral_to_sell) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
+        return Wad(collateral_to_sell)
+
+    def modify_parameters_accountingEngine(self, acctEngine: AccountingEngine) -> Transact:
+        assert isinstance(acctEngine, AccountingEngine)
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract,
+                        'modifyParameters(bytes32,address)', [Web3.toBytes(text="accountingEngine"), acctEngine.address.address])
+
+
+    def past_liquidations(self, number_of_past_blocks: int, event_filter: dict = None) -> List[LogLiquidate]:
+        """Synchronously retrieve past LogLiquidate events.
+
+        `LogLiquidate` events are emitted every time someone liquidates a CDP.
 
         Args:
             number_of_past_blocks: Number of past Ethereum blocks to retrieve the events from.
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogBite` events represented as :py:class:`pyflex.dss.Cat.LogBite` class.
+            List of past `LogLiquidate` events represented as :py:class:`pyflex.dss.LiquidationEngine.LogLiquidate` class.
         """
         assert isinstance(number_of_past_blocks, int)
         assert isinstance(event_filter, dict) or (event_filter is None)
 
-        return self._past_events(self._contract, 'Bite', Cat.LogBite, number_of_past_blocks, event_filter)
+        return self._past_events(self._contract, 'Liquidate', LiquidationEngine.LogLiquidate, number_of_past_blocks, event_filter)
 
     def __repr__(self):
-        return f"Cat('{self.address}')"
+        return f"LiquidationEngine('{self.address}')"
 
 
-class Pot(Contract):
-    """A client for the `Pot` contract, which implements the DSR.
+class CoinSavingsAccount(Contract):
+    """A client for the `CoinSavingsAccount` contract, which implements the DSR.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/pot.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/Pot.abi')
-    bin = Contract._load_bin(__name__, 'abi/Pot.bin')
+    abi = Contract._load_abi(__name__, 'abi/CoinSavingsAccount.abi')
+    bin = Contract._load_bin(__name__, 'abi/CoinSavingsAccount.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -909,36 +919,36 @@ class Pot(Contract):
         self._contract = self._get_contract(web3, self.abi, address)
 
     def approve(self, source: Address, approval_function, **kwargs):
-        """Approve the pot to access Dai from our Urns"""
+        """Approve the CoinSavingsAccount to access systemCoin from our CDPs"""
         assert isinstance(source, Address)
         assert(callable(approval_function))
 
         approval_function(ERC20Token(web3=self.web3, address=source), self.address, self.__class__.__name__, **kwargs)
 
-    def pie_of(self, address: Address) -> Wad:
+    def savings_of(self, address: Address) -> Wad:
         assert isinstance(address, Address)
-        return Wad(self._contract.functions.pie(address.address).call())
+        return Wad(self._contract.functions.savings(address.address).call())
 
-    def pie(self) -> Wad:
-        pie = self._contract.functions.Pie().call()
+    def total_savings(self) -> Wad:
+        pie = self._contract.functions.totalSavings().call()
         return Wad(pie)
 
-    def dsr(self) -> Ray:
-        dsr = self._contract.functions.dsr().call()
+    def savings_rate(self) -> Ray:
+        dsr = self._contract.functions.savingsRate().call()
         return Ray(dsr)
 
-    def chi(self) -> Ray:
-        chi = self._contract.functions.chi().call()
+    def accumulated_rates(self) -> Ray:
+        chi = self._contract.functions.accumulatedRates().call()
         return Ray(chi)
 
-    def rho(self) -> datetime:
-        rho = self._contract.functions.rho().call()
+    def update_time(self) -> datetime:
+        rho = self._contract.functions.updateTime().call()
         return datetime.fromtimestamp(rho)
 
-    def drip(self) -> Transact:
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'drip', [])
+    def update_accumulated_rate(self) -> Transact:
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateAccumulatedRate', [])
 
-    """ Join/Exit in Pot can be invoked through pyflex/dsrmanager.py and pyflex/dsr.py """
+    """ Join/Exit in CoinSavingsAccount can be invoked through pyflex/dsrmanager.py and pyflex/dsr.py """
 
     def __repr__(self):
-        return f"Pot('{self.address}')"
+        return f"CoinSavingsAccount('{self.address}')"

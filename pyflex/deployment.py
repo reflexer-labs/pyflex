@@ -21,14 +21,17 @@ import re
 from typing import Dict, List, Optional
 
 import pkg_resources
-from pyflex.auctions import Flapper, Flopper, Flipper
+#from pyflex.auctions import Flapper, Flopper, Flipper
+from pyflex.auctions import SurplusAuctionHouse, DebtAuctionHouse, CollateralAuctionHouse
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
-from pyflex.approval import directly, hope_directly
+from pyflex.approval import directly, approve_cdp_modification_directly
 from pyflex.auth import DSGuard
 from pyflex.etherdelta import EtherDelta
-from pyflex.dss import Cat, Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Jug, Pot, Spotter, Vat, Vow
+#from pyflex.dss import Cat, Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Jug, Pot, Spotter, Vat, Vow
+# removed CollateralJoin5
+from pyflex.dss import LiquidationEngine, Collateral, CoinJoin, CollateralJoin, CollateralType, TaxCollector, CoinSavingsAccount, OracleRelayer, CDPEngine, AccountingEngine
 from pyflex.proxy import ProxyRegistry, DssProxyActionsDsr
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
@@ -41,7 +44,7 @@ from pyflex.shutdown import ShutdownModule, End
 from pyflex.token import DSToken, DSEthToken
 from pyflex.vault import DSVault
 from pyflex.cdpmanager import CdpManager
-from pyflex.dsrmanager import DsrManager
+#from pyflex.dsrmanager import DsrManager
 
 
 def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None) -> Address:
@@ -68,87 +71,6 @@ def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None)
     receipt = web3.eth.getTransactionReceipt(tx_hash)
     return Address(receipt['contractAddress'])
 
-
-class Deployment:
-    """Represents a test deployment of the Maker smart contract ecosystem for single collateral Dai (SCD).
-
-    Creating an instance of this class creates a testrpc web3 provider with the entire set
-    of Maker smart contracts deployed to it. It is used in unit tests of PyMaker, and also in
-    unit tests for individual keepers.
-    """
-    def __init__(self):
-        web3 = Web3(HTTPProvider("http://localhost:8555"))
-        web3.eth.defaultAccount = web3.eth.accounts[0]
-        our_address = Address(web3.eth.defaultAccount)
-        sai = DSToken.deploy(web3, 'DAI')
-        sin = DSToken.deploy(web3, 'SIN')
-        skr = DSToken.deploy(web3, 'PETH')
-        gem = DSToken.deploy(web3, 'WETH')
-        gov = DSToken.deploy(web3, 'MKR')
-        pip = DSValue.deploy(web3)
-        pep = DSValue.deploy(web3)
-        pit = DSVault.deploy(web3)
-
-        vox = Vox.deploy(web3, per=Ray.from_number(1))
-        tub = Tub.deploy(web3, sai=sai.address, sin=sin.address, skr=skr.address, gem=gem.address, gov=gov.address,
-                         pip=pip.address, pep=pep.address, vox=vox.address, pit=pit.address)
-        tap = Tap.deploy(web3, tub.address)
-        top = Top.deploy(web3, tub.address, tap.address)
-
-        tub._contract.functions.turn(tap.address.address).transact()
-
-        otc = MatchingMarket.deploy(web3, 2600000000)
-        etherdelta = EtherDelta.deploy(web3,
-                                       admin=Address('0x1111100000999998888877777666665555544444'),
-                                       fee_account=Address('0x8888877777666665555544444111110000099999'),
-                                       account_levels_addr=Address('0x0000000000000000000000000000000000000000'),
-                                       fee_make=Wad.from_number(0.01),
-                                       fee_take=Wad.from_number(0.02),
-                                       fee_rebate=Wad.from_number(0.03))
-
-        # set permissions
-        dad = DSGuard.deploy(web3)
-        dad.permit(DSGuard.ANY, DSGuard.ANY, DSGuard.ANY).transact()
-        tub.set_authority(dad.address).transact()
-        for auth in [sai, sin, skr, gem, gov, pit, tap, top]:
-            auth.set_authority(dad.address).transact()
-
-        # whitelist pairs
-        otc.add_token_pair_whitelist(sai.address, gem.address).transact()
-
-        # approve
-        tub.approve(directly())
-        tap.approve(directly())
-
-        # mint some GEMs
-        gem.mint(Wad.from_number(1000000)).transact()
-
-        self.snapshot_id = web3.manager.request_blocking("evm_snapshot", [])
-
-        self.web3 = web3
-        self.our_address = our_address
-        self.sai = sai
-        self.sin = sin
-        self.skr = skr
-        self.gem = gem
-        self.gov = gov
-        self.vox = vox
-        self.tub = tub
-        self.tap = tap
-        self.top = top
-        self.otc = otc
-        self.etherdelta = etherdelta
-
-    def reset(self):
-        """Rollbacks all changes made since the initial deployment."""
-        self.web3.manager.request_blocking("evm_revert", [self.snapshot_id])
-        self.snapshot_id = self.web3.manager.request_blocking("evm_snapshot", [])
-
-    def time_travel_by(self, seconds: int):
-        assert(isinstance(seconds, int))
-        self.web3.manager.request_blocking("evm_increaseTime", [seconds])
-
-
 class DssDeployment:
     """Represents a Dai Stablecoin System deployment for multi-collateral Dai (MCD).
 
@@ -162,67 +84,68 @@ class DssDeployment:
     }
 
     class Config:
-        def __init__(self, pause: DSPause, vat: Vat, vow: Vow, jug: Jug, cat: Cat, flapper: Flapper,
-                     flopper: Flopper, pot: Pot, dai: DSToken, dai_join: DaiJoin, mkr: DSToken,
-                     spotter: Spotter, ds_chief: DSChief, esm: ShutdownModule, end: End,
+        def __init__(self, pause: DSPause, cdp_engine: CDPEngine, acct_engine: AccountingEngine, tax_collector: TaxCollector,
+                     liquidation_engine: LiquidationEngine, surplus_auction_house: DebtAuctionHouse,
+                     debt_auction_house: DebtAuctionHouse, coin_savings_acct: CoinSavingsAccount, dai: DSToken, coin_join: CoinJoin,
+                     gov: DSToken, oracle_relayer: OracleRelayer, ds_chief: DSChief, esm: ShutdownModule, end: End,
                      proxy_registry: ProxyRegistry, dss_proxy_actions: DssProxyActionsDsr, cdp_manager: CdpManager,
-                     dsr_manager: DsrManager, collaterals: Optional[Dict[str, Collateral]] = None):
+                     collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
-            self.vat = vat
-            self.vow = vow
-            self.jug = jug
-            self.cat = cat
-            self.flapper = flapper
-            self.flopper = flopper
-            self.pot = pot
+            self.cdp_engine = cdp_engine
+            self.acct_engine = acct_engine
+            self.tax_collector = tax_collector
+            self.liquidation_engine = liquidation_engine
+            self.surplus_auction_house = surplus_auction_house
+            self.debt_auction_house = debt_auction_house
+            self.coin_savings_acct = coin_savings_acct
             self.dai = dai
             self.dai_join = dai_join
-            self.mkr = mkr
-            self.spotter = spotter
+            self.gov = gov
+            self.oracle_relayer = oracle_relayer
             self.ds_chief = ds_chief
             self.esm = esm
             self.end = end
             self.proxy_registry = proxy_registry
             self.dss_proxy_actions = dss_proxy_actions
             self.cdp_manager = cdp_manager
-            self.dsr_manager = dsr_manager
+            #self.dsr_manager = dsr_manager
             self.collaterals = collaterals or {}
 
         @staticmethod
         def from_json(web3: Web3, conf: str):
             conf = json.loads(conf)
             pause = DSPause(web3, Address(conf['GEB_PAUSE']))
-            vat = Vat(web3, Address(conf['GEB_CDP_ENGINE']))
-            vow = Vow(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
-            jug = Jug(web3, Address(conf['GEB_TAX_COLLECTOR']))
-            cat = Cat(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
+            cdp_engine = CDPEngine(web3, Address(conf['GEB_CDP_ENGINE']))
+            acct_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
+            tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
+            liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
             dai = DSToken(web3, Address(conf['MCD_DAI']))#
             dai_adapter = DaiJoin(web3, Address(conf['GEB_COIN_JOIN']))#
-            flapper = Flapper(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
-            flopper = Flopper(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
-            pot = Pot(web3, Address(conf['MCD_POT']))
-            mkr = DSToken(web3, Address(conf['GEB_GOV']))
-            spotter = Spotter(web3, Address(conf['GEB_ORACLE_RELAYER']))
+            surplus_auction_house = SurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
+            debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
+            coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
+            gov = DSToken(web3, Address(conf['GEB_GOV']))
+            oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
             ds_chief = DSChief(web3, Address(conf['MCD_ADM']))
             esm = ShutdownModule(web3, Address(conf['MCD_ESM']))
             end = End(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             dss_proxy_actions = DssProxyActionsDsr(web3, Address(conf['PROXY_ACTIONS_DSR']))
             cdp_manager = CdpManager(web3, Address(conf['CDP_MANAGER']))
-            dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
+            #dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
 
             collaterals = {}
             for name in DssDeployment.Config._infer_collaterals_from_addresses(conf.keys()):
-                ilk = Ilk(name[0].replace('_', '-'))
+                collateral_type = CollateralType(name[0].replace('_', '-'))
                 if name[1] == "ETH":
-                    gem = DSEthToken(web3, Address(conf[name[1]]))
+                    collateral = DSEthToken(web3, Address(conf[name[1]]))
                 else:
-                    gem = DSToken(web3, Address(conf[name[1]]))
+                    collateral = DSToken(web3, Address(conf[name[1]]))
 
                 if name[1] in ['USDC', 'WBTC', 'TUSD']:
-                    adapter = GemJoin5(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
+                    adapter = CollateralJoin5(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
                 else:
-                    adapter = GemJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
+                    adapter = CollateralJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
 
                 # PIP contract may be a DSValue, OSM, or bogus address.
                 pip_address = Address(conf[f'PIP_{name[1]}'])
@@ -232,15 +155,16 @@ class DssDeployment:
                 else:
                     pip = OSM(web3, pip_address)
 
-                collateral = Collateral(ilk=ilk, gem=gem, adapter=adapter,
-                                        flipper=Flipper(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'])),
+                collateral = Collateral(collateral_type=collateral_type, collateral=collateral, adapter=adapter,
+                                        collateral_auction_house=CollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'])),
                                         pip=pip)
-                collaterals[ilk.name] = collateral
+                collaterals[collateral_type.name] = collateral
 
-            return DssDeployment.Config(pause, vat, vow, jug, cat, flapper, flopper, pot,
-                                        dai, dai_adapter, mkr, spotter, ds_chief, esm, end,
+            return DssDeployment.Config(pause, cdp_engine, acct_engine, tax_collector, liquidation_engine,
+                                        surplus_auction_house, debt_auction_house, coin_savings_acct,
+                                        dai, dai_adapter, gov, orace_relayer, ds_chief, esm, end,
                                         proxy_registry, dss_proxy_actions, cdp_manager,
-                                        dsr_manager, collaterals)
+                                        collaterals)
 
         @staticmethod
         def _infer_collaterals_from_addresses(keys: []) -> List:
@@ -263,8 +187,8 @@ class DssDeployment:
                 'GEB_ACCOUNTING_ENGINE': self.vow.address.address,
                 'GEB_TAX_COLLECTOR': self.jug.address.address,
                 'GEB_LIQUIDATION_ENGINE': self.cat.address.address,
-                'GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.flapper.address.address,
-                'GEB_DEBT_AUCTION_HOUSE': self.flopper.address.address,
+                'GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.surplus_auction_house.address.address,
+                'GEB_DEBT_AUCTION_HOUSE': self.debt_auction_house.address.address,
                 'MCD_POT': self.pot.address.address,
                 'MCD_DAI': self.dai.address.address,
                 'MCD_JOIN_DAI': self.dai_join.address.address,
@@ -281,11 +205,11 @@ class DssDeployment:
 
             for collateral in self.collaterals.values():
                 match = re.search(r'(\w+)(?:-\w+)?', collateral.ilk.name)
-                name = (collateral.ilk.name.replace('-', '_'), match.group(1))
-                conf_dict[name[1]] = collateral.gem.address.address
+                name = (collateral.collateral_type.name.replace('-', '_'), match.group(1))
+                conf_dict[name[1]] = collateral.collateral.address.address
                 if collateral.pip:
                     conf_dict[f'PIP_{name[1]}'] = collateral.pip.address.address
-                conf_dict[f'MCD_JOIN_{name[0]}'] = collateral.adapter.address.address
+                conf_dict[f'GEB_JOIN_{name[0]}'] = collateral.adapter.address.address
                 conf_dict[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'] = collateral.flipper.address.address
 
             return conf_dict
@@ -300,25 +224,25 @@ class DssDeployment:
         self.web3 = web3
         self.config = config
         self.pause = config.pause
-        self.vat = config.vat
-        self.vow = config.vow
-        self.jug = config.jug
-        self.cat = config.cat
-        self.flapper = config.flapper
-        self.flopper = config.flopper
-        self.pot = config.pot
+        self.cdp_engine = config.cdp_engine
+        self.acct_engine = config.acct_engine
+        self.tax_collector = config.tax_collector
+        self.liquidation_engine = config.liquidation_engine
+        self.surplus_auction_house = config.surplus_auction_house
+        self.debt_auction_house = config.debt_auction_house
+        self.coin_savings_acct = config.coin_savings_acct
         self.dai = config.dai
         self.dai_adapter = config.dai_join
-        self.mkr = config.mkr
+        self.gov = config.gov
         self.collaterals = config.collaterals
-        self.spotter = config.spotter
+        self.oracle_relayer = config.oracle_relayer
         self.ds_chief = config.ds_chief
         self.esm = config.esm
         self.end = config.end
         self.proxy_registry = config.proxy_registry
         self.dss_proxy_actions = config.dss_proxy_actions
         self.cdp_manager = config.cdp_manager
-        self.dsr_manager = config.dsr_manager
+        #self.dsr_manager = config.dsr_manager
 
     @staticmethod
     def from_json(web3: Web3, conf: str):
@@ -355,20 +279,20 @@ class DssDeployment:
         assert isinstance(usr, Address)
 
         gas_price = kwargs['gas_price'] if 'gas_price' in kwargs else DefaultGasPrice()
-        self.dai_adapter.approve(approval_function=hope_directly(from_address=usr, gas_price=gas_price),
-                                 source=self.vat.address)
+        self.dai_adapter.approve(approval_function=approve_cdp_modification_directly(from_address=usr, gas_price=gas_price),
+                                 source=self.cdp_engine.address)
         self.dai.approve(self.dai_adapter.address).transact(from_address=usr, gas_price=gas_price)
 
     def active_auctions(self) -> dict:
         flips = {}
         for collateral in self.collaterals.values():
             # Each collateral has it's own flip contract; add auctions from each.
-            flips[collateral.ilk.name] = collateral.flipper.active_auctions()
+            flips[collateral.collateral_type.name] = collateral.collateral_auction_house.active_auctions()
 
         return {
             "flips": flips,
-            "flaps": self.flapper.active_auctions(),
-            "flops": self.flopper.active_auctions()
+            "flaps": self.surplus_auction_house.active_auctions(),
+            "flops": self.debt_auction_house.active_auctions()
         }
 
     def __repr__(self):

@@ -22,9 +22,9 @@ from datetime import datetime
 from web3 import Web3
 
 from pyflex import Address
-from pyflex.approval import hope_directly
+from pyflex.approval import approve_cdp_modification_directly
 from pyflex.deployment import DssDeployment
-from pyflex.dss import Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Urn, Vat, Vow
+from pyflex.dss import Collateral, CoinJoin, CollateralJoin, CollateralType, CDP, CDPEngine, AccountingEngine
 from pyflex.feed import DSValue
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.oracles import OSM

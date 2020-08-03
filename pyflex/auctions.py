@@ -41,7 +41,7 @@ class AuctionContract(Contract):
 
     class SettleAuctionLog:
         def __init__(self, lognote: LogNote):
-            # This is whoever called `settleAuction`, which could differ from the `guy` who won the auction
+            # This is whoever called `settleAuction`, which could differ from the `high_bigger` who won the auction
             self.usr = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
             self.block = lognote.block
@@ -71,12 +71,12 @@ class AuctionContract(Contract):
             elif not self.start_auction_abi and member.get('name') == 'StartAuction':
                 self.start_auction_abi = member
 
-    def authorizedAccounts(self, address: Address) -> bool:
+    def authorized_accounts(self, address: Address) -> bool:
         assert isinstance(address, Address)
 
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
-    def cdpEngine(self) -> Address:
+    def cdp_engine(self) -> Address:
         """Returns the `cdpEngine` address.
          Returns:
             The address of the `cdpEngine` contract.
@@ -90,8 +90,8 @@ class AuctionContract(Contract):
         in `pyflex.approval`.
 
         Args:
-            source: Address of the contract or token relevant to the auction (for Flipper and Flopper pass Vat address,
-            for Flapper pass MKR token address)
+            source: Address of the contract or token relevant to the auction (for Flipper and DebtAuctionHouse pass Vat address,
+            for SurplusAuctionHouse pass MKR token address)
             approval_function: Approval function (i.e. approval mode)
         """
         assert isinstance(source, Address)
@@ -107,12 +107,12 @@ class AuctionContract(Contract):
             bid = self._bids(index)
             if bid.guy != Address("0x0000000000000000000000000000000000000000"):
                 now = datetime.now().timestamp()
-                if (bid.tic == 0 or now < bid.tic) and now < bid.end:
+                if (bid.bid_expiry == 0 or now < bid.bid_expiry) and now < bid.auction_deadline:
                     active_auctions.append(bid)
             index += 1
         return active_auctions
 
-    def bidIncrease(self) -> Wad:
+    def bid_increase(self) -> Wad:
         """Returns the percentage minimum bid increase.
 
         Returns:
@@ -120,7 +120,7 @@ class AuctionContract(Contract):
         """
         return Wad(self._contract.functions.bidIncrease().call())
 
-    def bidDuration(self) -> int:
+    def bid_duration(self) -> int:
         """Returns the bid lifetime.
 
         Returns:
@@ -128,7 +128,7 @@ class AuctionContract(Contract):
         """
         return int(self._contract.functions.bidDuration().call())
 
-    def totalAuctionLength(self) -> int:
+    def total_auction_length(self) -> int:
         """Returns the total auction length.
 
         Returns:
@@ -136,7 +136,7 @@ class AuctionContract(Contract):
         """
         return int(self._contract.functions.totalAuctionLength().call())
 
-    def auctionsStarted(self) -> int:
+    def auctions_started(self) -> int:
         """Returns the number of auctions started so far.
 
         Returns:
@@ -144,7 +144,7 @@ class AuctionContract(Contract):
         """
         return int(self._contract.functions.auctionsStarted().call())
 
-    def settleAuctions(self, id: int) -> Transact:
+    def settle_auctions(self, id: int) -> Transact:
         assert(isinstance(id, int))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
@@ -189,27 +189,28 @@ class CollateralAuctionHouse(AuctionContract):
     """
 
     abi = Contract._load_abi(__name__, 'abi/CollateralAuctionHouse.abi')
-    bin = Contract._load_bin(__name__, 'abi/CollateralAuctionHouse.bin')
+    #bin = Contract._load_bin(__name__, 'abi/CollateralAuctionHouse.bin')
+    bin = Contract._load_bin(__name__, 'abi/EnglishCollateralAuctionHouse.bin')
 
     class Bid:
-        def __init__(self, id: int, bid: Rad, lot: Wad, guy: Address, tic: int, end: int,
+        def __init__(self, id: int, bid: Rad, amount_to_sell: Wad, high_bidder: Address, bid_expiry: int, auction_deadline: int,
                      usr: Address, gal: Address, tab: Rad):
             assert(isinstance(id, int))
             assert(isinstance(bid, Rad))
-            assert(isinstance(lot, Wad))
-            assert(isinstance(guy, Address))
-            assert(isinstance(tic, int))
-            assert(isinstance(end, int))
+            assert(isinstance(amount_to_sell, Wad))
+            assert(isinstance(high_bigger, Address))
+            assert(isinstance(bid_expiry, int))
+            assert(isinstance(auction_deadline, int))
             assert(isinstance(usr, Address))
             assert(isinstance(gal, Address))
             assert(isinstance(tab, Rad))
 
             self.id = id
             self.bid = bid
-            self.lot = lot
-            self.guy = guy
-            self.tic = tic
-            self.end = end
+            self.amount_to_sell = amount_to_sell
+            self.high_bigger = high_bigger
+            self.bid_expiry = bid_expiry
+            self.auction_deadline = auction_deadline
             self.usr = usr
             self.gal = gal
             self.tab = tab
@@ -221,7 +222,7 @@ class CollateralAuctionHouse(AuctionContract):
         def __init__(self, log):
             args = log['args']
             self.id = args['id']
-            self.lot = Wad(args['lot'])
+            self.amount_to_sell = Wad(args['amountToSell'])
             self.bid = Rad(args['bid'])
             self.tab = Rad(args['tab'])
             self.usr = Address(args['usr'])
@@ -234,9 +235,9 @@ class CollateralAuctionHouse(AuctionContract):
 
     class IncreaseBidSizeLog:
         def __init__(self, lognote: LogNote):
-            self.guy = Address(lognote.usr)
+            self.high_bigger = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
-            self.lot = Wad(Web3.toInt(lognote.arg2))
+            self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
             self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
@@ -246,9 +247,9 @@ class CollateralAuctionHouse(AuctionContract):
 
     class DecreaseSoldAmountLog:
         def __init__(self, lognote: LogNote):
-            self.guy = Address(lognote.usr)
+            self.high_bigger = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
-            self.lot = Wad(Web3.toInt(lognote.arg2))
+            self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
             self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
@@ -274,40 +275,40 @@ class CollateralAuctionHouse(AuctionContract):
 
         return CollateralAuctionHouse.Bid(id=id,
                            bid=Rad(array[0]),
-                           lot=Wad(array[1]),
-                           guy=Address(array[2]),
-                           tic=int(array[3]),
-                           end=int(array[4]),
+                           amount_to_sell=Wad(array[1]),
+                           high_bigger=Address(array[2]),
+                           bid_expiry=int(array[3]),
+                           auction_deadline=int(array[4]),
                            usr=Address(array[5]),
                            gal=Address(array[6]),
                            tab=Rad(array[7]))
 
-    def startAuction(self, usr: Address, gal: Address, tab: Rad, lot: Wad, bid: Rad) -> Transact:
+    def startAuction(self, usr: Address, gal: Address, tab: Rad, amount_to_sell: Wad, bid: Rad) -> Transact:
         assert(isinstance(usr, Address))
         assert(isinstance(gal, Address))
         assert(isinstance(tab, Rad))
-        assert(isinstance(lot, Wad))
+        assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid, Rad))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [usr.address,
                                                                                           gal.address,
                                                                                           tab.value,
-                                                                                          lot.value,
+                                                                                          amount_to_sell.value,
                                                                                           bid.value])
 
-    def increaseBidSize(self, id: int, lot: Wad, bid: Rad) -> Transact:
+    def increaseBidSize(self, id: int, amount_to_sell: Wad, bid: Rad) -> Transact:
         assert(isinstance(id, int))
-        assert(isinstance(lot, Wad))
+        assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, lot.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid.value])
 
-    def decreaseSoldAmount(self, id: int, lot: Wad, bid: Rad) -> Transact:
+    def decreaseSoldAmount(self, id: int, amount_to_sell: Wad, bid: Rad) -> Transact:
         assert(isinstance(id, int))
-        assert(isinstance(lot, Wad))
+        assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount', [id, lot.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount', [id, amount_to_sell.value, bid.value])
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
@@ -341,15 +342,15 @@ class CollateralAuctionHouse(AuctionContract):
         return f"CollateralAuctionHouse('{self.address}')"
 
 
-class Flapper(AuctionContract):
-    """A client for the `Flapper` contract, used to interact with surplus auctions.
+class SurplusAuctionHouse(AuctionContract):
+    """A client for the `SurplusAuctionHouse` contract, used to interact with surplus auctions.
 
-    You can find the source code of the `Flapper` contract here:
+    You can find the source code of the `SurplusAuctionHouse` contract here:
     <https://github.com/makerdao/dss/blob/master/src/flap.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
-        address: Ethereum address of the `Flapper` contract.
+        address: Ethereum address of the `SurplusAuctionHouse` contract.
 
     Event signatures:
         0x65fae35e: (deployment-related)
@@ -360,54 +361,54 @@ class Flapper(AuctionContract):
         0xc959c42b: deal
     """
 
-    abi = Contract._load_abi(__name__, 'abi/Flapper.abi')
-    bin = Contract._load_bin(__name__, 'abi/Flapper.bin')
+    abi = Contract._load_abi(__name__, 'abi/PreSettlementSurplusAuctionHouse.abi')
+    bin = Contract._load_bin(__name__, 'abi/PreSettlementSurplusAuctionHouse.bin')
 
     class Bid:
-        def __init__(self, id: int, bid: Wad, lot: Rad, guy: Address, tic: int, end: int):
+        def __init__(self, id: int, bid: Wad, amount_to_sell: Rad, high_bidder: Address, bid_expiry: int, auction_deadline: int):
             assert(isinstance(id, int))
             assert(isinstance(bid, Wad))        # MKR
-            assert(isinstance(lot, Rad))        # DAI
-            assert(isinstance(guy, Address))
-            assert(isinstance(tic, int))
-            assert(isinstance(end, int))
+            assert(isinstance(amount_to_sell, Rad))        # DAI
+            assert(isinstance(high_bidder, Address))
+            assert(isinstance(bid_expiry, int))
+            assert(isinstance(auction_deadline, int))
 
             self.id = id
             self.bid = bid
-            self.lot = lot
-            self.guy = guy
-            self.tic = tic
-            self.end = end
+            self.amount_to_sell = amount_to_sell
+            self.high_bidder = high_bidder
+            self.bid_expiry = bid_expiry
+            self.auction_deadline = auction_deadline
 
         def __repr__(self):
-            return f"Flapper.Bid({pformat(vars(self))})"
+            return f"SurplusAuctionHouse.Bid({pformat(vars(self))})"
 
-    class KickLog:
+    class StartAuctionLog:
         def __init__(self, log):
             args = log['args']
             self.id = args['id']
-            self.lot = Rad(args['lot'])
+            self.amount_to_sell = Rad(args['amountToSell'])
             self.bid = Wad(args['bid'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
-            return f"Flapper.KickLog({pformat(vars(self))})"
+            return f"SurplusAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
-    class TendLog:
+    class IncreaseBidSizeLog:
         def __init__(self, lognote: LogNote):
-            self.guy = Address(lognote.usr)
+            self.high_bidder = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
-            self.lot = Rad(Web3.toInt(lognote.arg2))
+            self.amount_to_sell = Rad(Web3.toInt(lognote.arg2))
             self.bid = Wad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"Flapper.TendLog({pformat(vars(self))})"
+            return f"SurplusAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
-        super(Flapper, self).__init__(web3, address, Flapper.abi, self.bids)
+        super(SurplusAuctionHouse, self).__init__(web3, address, Flapper.abi, self.bids)
 
     def live(self) -> bool:
         return self._contract.functions.live().call() > 0
@@ -425,32 +426,32 @@ class Flapper(AuctionContract):
 
         array = self._contract.functions.bids(id).call()
 
-        return Flapper.Bid(id=id,
+        return SurplusAuctionHouse.Bid(id=id,
                            bid=Wad(array[0]),
-                           lot=Rad(array[1]),
-                           guy=Address(array[2]),
-                           tic=int(array[3]),
-                           end=int(array[4]))
+                           amount_to_sell=Rad(array[1]),
+                           high_bidder=Address(array[2]),
+                           bid_expiry=int(array[3]),
+                           auction_deadline=int(array[4]))
 
-    def kick(self, lot: Rad, bid: Wad) -> Transact:
-        assert(isinstance(lot, Rad))
+    def start_auction(self, amount_to_sell: Rad, bid: Wad) -> Transact:
+        assert(isinstance(amount_to_sell, Rad))
         assert(isinstance(bid, Wad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'kick', [lot.value,
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [amount_to_sell.value,
                                                                                           bid.value])
 
-    def tend(self, id: int, lot: Rad, bid: Wad) -> Transact:
+    def increase_bid_size(self, id: int, amount_to_sell: Rad, bid: Wad) -> Transact:
         assert(isinstance(id, int))
-        assert(isinstance(lot, Rad))
+        assert(isinstance(amount_to_sell, Rad))
         assert(isinstance(bid, Wad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'tend', [id, lot.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid.value])
 
-    def tick(self, id: int) -> Transact:
+    def restart_auction(self, id: int) -> Transact:
         """Resurrect an auction which expired without any bids."""
         assert (isinstance(id, int))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'tick', [id])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
 
     def yank(self, id: int) -> Transact:
         """While `cage`d, refund current bid to the bidder"""
@@ -460,18 +461,18 @@ class Flapper(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, Flapper.abi)
+        logs = super().get_past_lognotes(number_of_past_blocks, SurplusAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
-            elif isinstance(log, Flapper.KickLog):
+            elif isinstance(log, SurplusAuctionHouse.StartAuctionLog):
                 history.append(log)
             elif log.sig == '0x4b43ed12':
-                history.append(Flapper.TendLog(log))
+                history.append(SurplusAuctionHouse.IncreaseBidSizeLog(log))
             elif log.sig == '0xc959c42b':
-                history.append(AuctionContract.DealLog(log))
+                history.append(AuctionContract.SettleAuctionLog(log))
         return history
 
     def parse_event(self, event):
@@ -479,24 +480,24 @@ class Flapper(AuctionContract):
         codec = ABICodec(default_registry)
         if signature == "0xe6dde59cbc017becba89714a037778d234a84ce7f0a137487142a007e580d609":
             event_data = get_event_data(codec, self.start_auction_abi, event)
-            return Flapper.KickLog(event_data)
+            return SurplusAuctionHouse.StartAuctionLog(event_data)
         else:
             event_data = get_event_data(codec, self.log_note_abi, event)
             return LogNote(event_data)
 
     def __repr__(self):
-        return f"Flapper('{self.address}')"
+        return f"SurplusAuctionHouse('{self.address}')"
 
 
-class Flopper(AuctionContract):
-    """A client for the `Flopper` contract, used to interact with debt auctions.
+class DebtAuctionHouse(AuctionContract):
+    """A client for the `DebtAuctionHouse` contract, used to interact with debt auctions.
 
-    You can find the source code of the `Flopper` contract here:
+    You can find the source code of the `DebtAuctionHouse` contract here:
     <https://github.com/makerdao/dss/blob/master/src/flop.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
-        address: Ethereum address of the `Flopper` contract.
+        address: Ethereum address of the `DebtAuctionHouse` contract.
 
     Event signatures:
         0x65fae35e: (deployment-related)
@@ -507,64 +508,64 @@ class Flopper(AuctionContract):
         0xc959c42b: deal
     """
 
-    abi = Contract._load_abi(__name__, 'abi/Flopper.abi')
-    bin = Contract._load_bin(__name__, 'abi/Flopper.bin')
+    abi = Contract._load_abi(__name__, 'abi/DebtAuctionHouse.abi')
+    bin = Contract._load_bin(__name__, 'abi/DebtAuctionHouse.bin')
 
     class Bid:
-        def __init__(self, id: int, bid: Rad, lot: Wad, guy: Address, tic: int, end: int):
+        def __init__(self, id: int, bid: Rad, amount_to_sell: Wad, high_bidder: Address, bid_expiry: int, auction_deadline: int):
             assert(isinstance(id, int))
             assert(isinstance(bid, Rad))
-            assert(isinstance(lot, Wad))
-            assert(isinstance(guy, Address))
-            assert(isinstance(tic, int))
-            assert(isinstance(end, int))
+            assert(isinstance(amount_to_sell, Wad))
+            assert(isinstance(high_bidder, Address))
+            assert(isinstance(bid_expiry, int))
+            assert(isinstance(auction_deadline, int))
 
             self.id = id
             self.bid = bid
-            self.lot = lot
-            self.guy = guy
-            self.tic = tic
-            self.end = end
+            self.amount_to_sell = amount_to_sell
+            self.high_bidder = high_bidder
+            self.bid_expiry = bid_expiry
+            self.auction_deadline = auction_deadline
 
         def __repr__(self):
-            return f"Flopper.Bid({pformat(vars(self))})"
+            return f"DebtAuctionHouse.Bid({pformat(vars(self))})"
 
-    class KickLog:
+    class StartAuctionLog:
         def __init__(self, log):
             args = log['args']
             self.id = args['id']
-            self.lot = Wad(args['lot'])
+            self.amount_to_sell = Wad(args['amountToSell'])
             self.bid = Rad(args['bid'])
             self.gal = Address(args['gal'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
-            return f"Flopper.KickLog({pformat(vars(self))})"
+            return f"DebtAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
-    class DentLog:
+    class DecreaseSoldAmountLog:
         def __init__(self, lognote: LogNote):
-            self.guy = Address(lognote.usr)
+            self.high_bidder = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
-            self.lot = Wad(Web3.toInt(lognote.arg2))
+            self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
             self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"Flopper.DentLog({pformat(vars(self))})"
+            return f"DebtAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
 
-        super(Flopper, self).__init__(web3, address, Flopper.abi, self.bids)
+        super(DebtAuctionHouse, self).__init__(web3, address, DebtAuctionHouse.abi, self.bids)
 
     def live(self) -> bool:
         return self._contract.functions.live().call() > 0
 
     def pad(self) -> Wad:
-        """Returns the lot increase applied after an auction has been `tick`ed."""
+        """Returns the amount_to_sell increase applied after an auction has been `restartAuction`ed."""
 
         return Wad(self._contract.functions.pad().call())
 
@@ -581,34 +582,34 @@ class Flopper(AuctionContract):
 
         array = self._contract.functions.bids(id).call()
 
-        return Flopper.Bid(id=id,
+        return DebtAuctionHouse.Bid(id=id,
                            bid=Rad(array[0]),
-                           lot=Wad(array[1]),
-                           guy=Address(array[2]),
-                           tic=int(array[3]),
-                           end=int(array[4]))
+                           amount_to_sell=Wad(array[1]),
+                           high_bidder=Address(array[2]),
+                           bid_expiry=int(array[3]),
+                           auction_deadline=int(array[4]))
 
-    def kick(self, gal: Address, lot: Wad, bid: Wad) -> Transact:
+    def start_auction(self, gal: Address, amount_to_sell: Wad, bid: Wad) -> Transact:
         assert(isinstance(gal, Address))
-        assert(isinstance(lot, Wad))
+        assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid, Wad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'kick', [gal.address,
-                                                                                          lot.value,
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [gal.address,
+                                                                                          amount_to_sell.value,
                                                                                           bid.value])
 
-    def dent(self, id: int, lot: Wad, bid: Rad) -> Transact:
+    def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid: Rad) -> Transact:
         assert(isinstance(id, int))
-        assert(isinstance(lot, Wad))
+        assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'dent', [id, lot.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount', [id, amount_to_sell.value, bid.value])
 
-    def tick(self, id: int) -> Transact:
+    def restart_auction(self, id: int) -> Transact:
         """Resurrect an auction which expired without any bids."""
         assert (isinstance(id, int))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'tick', [id])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
 
     def yank(self, id: int) -> Transact:
         """While `cage`d, refund current bid to the bidder"""
@@ -618,18 +619,18 @@ class Flopper(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, Flopper.abi)
+        logs = super().get_past_lognotes(number_of_past_blocks, DebtAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
-            elif isinstance(log, Flopper.KickLog):
+            elif isinstance(log, DebtAuctionHouse.StartAuctionLog):
                 history.append(log)
             elif log.sig == '0x5ff3a382':
-                history.append(Flopper.DentLog(log))
+                history.append(DebtAuctionHouse.DecreaseSoldAmountLog(log))
             elif log.sig == '0xc959c42b':
-                history.append(AuctionContract.DealLog(log))
+                history.append(AuctionContract.SettleAuctionLog(log))
         return history
 
     def parse_event(self, event):
@@ -637,10 +638,10 @@ class Flopper(AuctionContract):
         codec = ABICodec(default_registry)
         if signature == "0x7e8881001566f9f89aedb9c5dc3d856a2b81e5235a8196413ed484be91cc0df6":
             event_data = get_event_data(codec, self.start_auction_abi, event)
-            return Flopper.KickLog(event_data)
+            return DebtAuctionHouse.StartAuctionLog(event_data)
         else:
             event_data = get_event_data(codec, self.log_note_abi, event)
             return LogNote(event_data)
 
     def __repr__(self):
-        return f"Flopper('{self.address}')"
+        return f"DebtAuctionHouse('{self.address}')"

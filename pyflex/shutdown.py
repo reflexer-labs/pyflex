@@ -22,8 +22,8 @@ from typing import Optional, List
 from web3 import Web3
 
 from pyflex import Address, Contract, Transact
-from pyflex.approval import directly, hope_directly
-from pyflex.dss import Ilk
+from pyflex.approval import directly, approve_cdp_modification_directly
+from pyflex.dss import CollateralType
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.token import DSToken, ERC20Token
 
@@ -117,24 +117,24 @@ class End(Contract):
         """total outstanding dai following processing"""
         return Rad(self._contract.functions.debt().call())
 
-    def tag(self, ilk: Ilk) -> Ray:
+    def tag(self, ilk: CollateralType) -> Ray:
         """Cage price for the collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         return Ray(self._contract.functions.tag(ilk.toBytes()).call())
 
-    def gap(self, ilk: Ilk) -> Wad:
+    def gap(self, ilk: CollateralType) -> Wad:
         """Collateral shortfall (difference of debt and collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         return Wad(self._contract.functions.gap(ilk.toBytes()).call())
 
-    def art(self, ilk: Ilk) -> Wad:
+    def art(self, ilk: CollateralType) -> Wad:
         """Total debt for the collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         return Wad(self._contract.functions.Art(ilk.toBytes()).call())
 
-    def fix(self, ilk: Ilk) -> Ray:
+    def fix(self, ilk: CollateralType) -> Ray:
         """Final cash price for the collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         return Ray(self._contract.functions.fix(ilk.toBytes()).call())
 
     def bag(self, address: Address) -> Wad:
@@ -142,41 +142,41 @@ class End(Contract):
         assert isinstance(address, Address)
         return Wad(self._contract.functions.bag(address.address).call())
 
-    def out(self, ilk: Ilk, address: Address) -> Wad:
-        assert isinstance(ilk, Ilk)
+    def out(self, ilk: CollateralType, address: Address) -> Wad:
+        assert isinstance(ilk, CollateralType)
         assert isinstance(address, Address)
         return Wad(self._contract.functions.out(ilk.toBytes(), address.address).call())
 
-    def cage(self, ilk: Ilk) -> Transact:
+    def cage(self, ilk: CollateralType) -> Transact:
         """Set the `cage` price for the collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'cage(bytes32)', [ilk.toBytes()])
 
-    def skip(self, ilk: Ilk, flip_id: int) -> Transact:
+    def skip(self, ilk: CollateralType, flip_id: int) -> Transact:
         """Cancel a flip auction and seize it's collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         assert isinstance(flip_id, int)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'skip', [ilk.toBytes(), flip_id])
 
-    def skim(self, ilk: Ilk, address: Address) -> Transact:
+    def skim(self, ilk: CollateralType, address: Address) -> Transact:
         """Cancels undercollateralized CDP debt to determine collateral shortfall"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         assert isinstance(address, Address)
         return Transact(self, self.web3, self.abi, self.address, self._contract,
                         'skim', [ilk.toBytes(), address.address])
 
-    def free(self, ilk: Ilk) -> Transact:
+    def free(self, ilk: CollateralType) -> Transact:
         """Releases excess collateral after `skim`ming"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'free', [ilk.toBytes()])
 
     def thaw(self):
         """Fix the total outstanding supply of Dai"""
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'thaw', [])
 
-    def flow(self, ilk: Ilk) -> Transact:
+    def flow(self, ilk: CollateralType) -> Transact:
         """Calculate the `fix`, the cash price for a given collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'flow', [ilk.toBytes()])
 
     def pack(self, dai: Wad) -> Transact:
@@ -184,8 +184,8 @@ class End(Contract):
         assert isinstance(dai, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'pack', [dai.value])
 
-    def cash(self, ilk: Ilk, dai: Wad):
+    def cash(self, ilk: CollateralType, dai: Wad):
         """Exchange an amount of dai (already `pack`ed in the `bag`) for collateral"""
-        assert isinstance(ilk, Ilk)
+        assert isinstance(ilk, CollateralType)
         assert isinstance(dai, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'cash', [ilk.toBytes(), dai.value])

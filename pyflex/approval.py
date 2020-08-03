@@ -64,14 +64,14 @@ def via_tx_manager(tx_manager: TxManager, **kwargs):
     return approval_function
 
 
-def hope_directly(**kwargs):
+def approve_cdp_modification_directly(**kwargs):
     """Approval function: Approves the caller to access tokens directly.
 
     This function is meant to be passed as a parameter to the `approve(...)` method
     of `Flipper` and `Flopper` and possibly others in the future.
     """
 
-    move_abi = [{'constant': False, 'inputs': [{'name': 'guy', 'type': 'address'}], 'name': 'hope', 'outputs': [],
+    move_abi = [{'constant': False, 'inputs': [{'name': 'guy', 'type': 'address'}], 'name': 'approveCDPModification', 'outputs': [],
                  'payable': False, 'stateMutability': 'nonpayable', 'type': 'function'},
                 {'constant': True, 'inputs': [{'name': '', 'type': 'address'}, {'name': '', 'type': 'address'}],
                  'name': 'can', 'outputs': [{'name': '', 'type': 'bool'}], 'payable': False, 'stateMutability': 'view',
@@ -86,10 +86,10 @@ def hope_directly(**kwargs):
             logger = logging.getLogger()
             logger.info(f"Approving {spender_name} ({spender_address}) to move our {token.address} directly")
 
-            hope = Transact(move_contract, move_contract.web3, move_contract.abi, Address(move_contract.address),
-                            move_contract, 'hope', [spender_address.address])
+            approve_cdp_modification = Transact(move_contract, move_contract.web3, move_contract.abi, Address(move_contract.address),
+                            move_contract, 'approveCDPModification', [spender_address.address])
 
-            if not hope.transact(**kwargs):
+            if not approve_cdp_modification.transact(**kwargs):
                 raise RuntimeError("Approval failed!")
 
     return approval_function

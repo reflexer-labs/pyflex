@@ -19,7 +19,7 @@
 
 from web3 import Web3
 from pyflex import Address, Contract, Transact
-from pyflex.dss import Ilk, Urn, Vat
+from pyflex.dss import CollateralType, CDP, CDPEngine
 from pyflex.numeric import Wad
 
 
@@ -39,24 +39,24 @@ class CdpManager(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.vat = Vat(self.web3, Address(self._contract.functions.vat().call()))
+        self.cdp_engine = CDPEngine(self.web3, Address(self._contract.functions.cdpEngine().call()))
 
-    def open(self, ilk: Ilk, address: Address) -> Transact:
-        assert isinstance(ilk, Ilk)
+    def open(self, collateral_type: CollateralType, address: Address) -> Transact:
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'open',
-                        [ilk.toBytes(), address.address])
+                        [collateral_type.toBytes(), address.address])
 
-    def urn(self, cdpid: int) -> Urn:
-        '''Returns Urn for respective CDP ID'''
+    def cdp(self, cdpid: int) -> CDP:
+        '''Returns CDP for respective CDP ID'''
         assert isinstance(cdpid, int)
 
-        urn_address = Address(self._contract.functions.urns(cdpid).call())
-        ilk = self.ilk(cdpid)
-        urn = self.vat.urn(ilk, Address(urn_address))
+        cdp_address = Address(self._contract.functions.cdps(cdpid).call())
+        collateral_type = self.collateral_type(cdpid)
+        cdp = self.cdp_engine.cdp(collateral_type, Address(cdp_address))
 
-        return urn
+        return cdp
 
     def owns(self, cdpid: int) -> Address:
         '''Returns owner Address of respective CDP ID'''
@@ -65,12 +65,12 @@ class CdpManager(Contract):
         owner = Address(self._contract.functions.owns(cdpid).call())
         return owner
 
-    def ilk(self, cdpid: int) -> Ilk:
-        '''Returns Ilk for respective CDP ID'''
+    def collateral_type(self, cdpid: int) -> CollateralType:
+        '''Returns CollateralType for respective CDP ID'''
         assert isinstance(cdpid, int)
 
-        ilk = Ilk.fromBytes(self._contract.functions.ilks(cdpid).call())
-        return ilk
+        collateral_type = CollateralType.fromBytes(self._contract.functions.collateral_types(cdpid).call())
+        return collateral_type
 
     def first(self, address: Address) -> int:
         '''Returns first CDP Id created by owner address'''
