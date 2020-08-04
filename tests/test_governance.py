@@ -25,7 +25,7 @@ from pyflex.numeric import Wad
 from pyflex.deployment import DssDeployment
 from datetime import datetime, timedelta
 
-from tests.test_dss import mint_mkr
+from tests.test_gf import mint_mkr
 
 
 @pytest.mark.skip(reason="not fully implemented")

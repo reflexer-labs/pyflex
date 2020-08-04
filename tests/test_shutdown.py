@@ -22,13 +22,13 @@ from datetime import datetime, timedelta
 from pyflex import Address
 from pyflex.approval import directly, hope_directly
 from pyflex.deployment import DssDeployment
-from pyflex.dss import Collateral
+from pyflex.gf import Collateral
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.shutdown import ShutdownModule, End
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
-from tests.test_dss import mint_mkr, wrap_eth, frob
+from tests.test_gf import mint_mkr, wrap_eth, frob
 
 
 def open_cdp(mcd: DssDeployment, collateral: Collateral, address: Address):

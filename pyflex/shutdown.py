@@ -23,7 +23,7 @@ from web3 import Web3
 
 from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_cdp_modification_directly
-from pyflex.dss import CollateralType
+from pyflex.gf import CollateralType
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.token import DSToken, ERC20Token
 

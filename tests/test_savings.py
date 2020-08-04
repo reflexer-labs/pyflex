@@ -22,7 +22,7 @@ from pyflex.deployment import DssDeployment
 from pyflex.dsr import Dsr
 from pyflex.numeric import Wad
 
-from tests.test_dss import wrap_eth, frob, max_dart
+from tests.test_gf import wrap_eth, frob, max_dart
 
 
 @pytest.fixture

@@ -19,7 +19,7 @@
 
 from web3 import Web3
 from pyflex import Address, Contract, Transact
-from pyflex.dss import CollateralType, CDP, CDPEngine
+from pyflex.gf import CollateralType, CDP, CDPEngine
 from pyflex.numeric import Wad
 
 
@@ -29,8 +29,8 @@ class CdpManager(Contract):
     Ref. <https://github.com/makerdao/dss-cdp-manager/blob/master/src/DssCdpManager.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/DssCdpManager.abi')
-    bin = Contract._load_bin(__name__, 'abi/DssCdpManager.bin')
+    abi = Contract._load_abi(__name__, 'abi/GebCdpManager.abi')
+    bin = Contract._load_bin(__name__, 'abi/GebCdpManager.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)

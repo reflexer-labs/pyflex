@@ -231,7 +231,7 @@ class CollateralJoin(BasicTokenAdapter):
 
     def decimals(self) -> int:
         return 18
-'''
+
 class CollateralJoin5(CollateralJoin):
     """A client for the `CollateralJoin5` contract, which allows the user to deposit collateral into a new or existing vault.
 
@@ -247,8 +247,6 @@ class CollateralJoin5(CollateralJoin):
     def dec(self) -> int:
         return int(self._contract.functions.dec().call())
 
-'''
-
 class Collateral:
     """The `Collateral` object wraps accounting information in the CollateralType with token-wide artifacts shared across
     multiple collateral types for the same token.  For example, ETH-A and ETH-B are represented by different CollateralTypes,
@@ -258,9 +256,9 @@ class Collateral:
     def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: CollateralJoin,
                  collateral_auction_house: CollateralAuctionHouse, pip):
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(gem, ERC20Token)
+        assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, CollateralJoin)
-        assert isinstance(flipper, Flipper)
+        assert isinstance(collateral_auction_house, CollateralAuctionHouse)
 
         self.collateral_type = collateral_type
         self.collateral = collateral
@@ -297,8 +295,8 @@ class CDPEngine(Contract):
             self.cdp = Address(Web3.toHex(lognote.arg2)[26:])
             self.collateral_owner = Address(Web3.toHex(lognote.arg3)[26:])
             self.system_coin_recipient = Address(Web3.toHex(lognote.get_bytes_at_index(3))[26:])
-            self.dink = Wad(int.from_bytes(lognote.get_bytes_at_index(4), byteorder="big", signed=True))
-            self.dart = Wad(int.from_bytes(lognote.get_bytes_at_index(5), byteorder="big", signed=True))
+            self.delta_collateral = Wad(int.from_bytes(lognote.get_bytes_at_index(4), byteorder="big", signed=True))
+            self.delta_debt = Wad(int.from_bytes(lognote.get_bytes_at_index(5), byteorder="big", signed=True))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
@@ -414,41 +412,41 @@ class CDPEngine(Contract):
         move_args = [src.address, dst.address, rad.value]
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferInternalCoins', move_args)
 
-    def transfer_CDP_collateral_and_debt(self, collateral_type: CollateralType, src: Address, dst: Address, dink: Wad, dart: Wad) -> Transact:
+    def transfer_CDP_collateral_and_debt(self, collateral_type: CollateralType, src: Address, dst: Address, delta_collateral: Wad, delta_debt: Wad) -> Transact:
         """Split a Vault - binary approval or splitting/merging Vault's
 
         Args:
             collateral_type: Identifies the type of collateral.
             src: Address of the source CDP.
             dst: Address of the destiny CDP.
-            dink: Amount of collateral to exchange.
-            dart: Amount of stable coin debt to exchange.
+            delta_collateral: Amount of collateral to exchange.
+            delta_debt: Amount of stable coin debt to exchange.
         """
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(src, Address)
         assert isinstance(dst, Address)
-        assert isinstance(dink, Wad)
-        assert isinstance(dart, Wad)
+        assert isinstance(delta_collateral, Wad)
+        assert isinstance(delta_debt, Wad)
 
-        transfer_args = [collateral_type.toBytes(), src.address, dst.address, dink.value, dart.value]
+        transfer_args = [collateral_type.toBytes(), src.address, dst.address, delta_collateral.value, delta_debt.value]
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferCDPCollateralAndDebt', transfer_args)
 
-    def modify_CDP_collateralization(self, collateral_type: CollateralType, cdp_address: Address, dink: Wad, dart: Wad,
+    def modify_CDP_collateralization(self, collateral_type: CollateralType, cdp_address: Address, delta_collateral: Wad, delta_debt: Wad,
                                    collateral_owner=None, system_coin_recipient=None):
         """Adjust amount of collateral and reserved amount of system coin for the CDP
 
         Args:
             collateral_type: Identifies the type of collateral.
             urn_address: CDP holder (address of the CDP).
-            dink: Amount of collateral to add/remove.
-            dart: Adjust CDP debt (amount of system coin available for borrowing).
+            delta_collateral: Amount of collateral to add/remove.
+            delta_debt: Adjust CDP debt (amount of system coin available for borrowing).
             collateral_owner: Holder of the collateral used to fund the CDP.
             dai_recipient: Party receiving the system coin 
         """
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(cdp_address, Address)
-        assert isinstance(dink, Wad)
-        assert isinstance(dart, Wad)
+        assert isinstance(delta_collateral, Wad)
+        assert isinstance(delta_debt, Wad)
         assert isinstance(collateral_owner, Address) or (collateral_owner is None)
         assert isinstance(system_coin_recipient, Address) or (system_coin_recipient is None)
 
@@ -458,19 +456,21 @@ class CDPEngine(Contract):
         assert isinstance(v, Address)
         assert isinstance(w, Address)
 
-        self.validate_frob(collateral_type, cdp_address, dink, dart)
+        self.validate_frob(collateral_type, cdp_address, delta_collateral, delta_debt)
 
         if v == cdp_address and w == cdp_address:
-            logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} with dink={dink}, dart={dart}")
+            logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} with "
+                        f"delta_collateral={delta_collateral}, delta_debt={delta_debt}")
         else:
             logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} "
-                        f"with dink={dink} from {v.address}, "
-                        f"dart={dart} for {w.address}")
+                        f"with delta_collateral={delta_collateral} from {v.address}, "
+                        f"delta_debt={delta_debt} for {w.address}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'modifyCDPCollateralization', [collateral_type.toBytes(), cdp_address.address, v.address, w.address, dink.value, dart.value])
+                        'modifyCDPCollateralization',
+                        [collateral_type.toBytes(), cdp_address.address, v.address, w.address, delta_collateral.value, delta_debt.value])
 
-    def validate_cdp_modification(self, collateral_type: CollateralType, address: Address, dink: Wad, dart: Wad):
+    def validate_cdp_modification(self, collateral_type: CollateralType, address: Address, delta_collateral: Wad, delta_debt: Wad):
         """Helps diagnose `frob` transaction failures by asserting on `require` conditions in the contract"""
 
         def r(value, decimals=1):  # rounding function
@@ -481,8 +481,8 @@ class CDPEngine(Contract):
 
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
-        assert isinstance(dink, Wad)
-        assert isinstance(dart, Wad)
+        assert isinstance(delta_collateral, Wad)
+        assert isinstance(delta_debt, Wad)
 
         assert self.contract_enabled()  # system is live
 
@@ -490,26 +490,30 @@ class CDPEngine(Contract):
         collateral_type = self.collateral_type(collateral_type.name)
         assert collateral_type.accumulated_rates != Ray(0)  # collateral_type has been initialised
 
-        cdp_collateral = cdp.cdp_collateral + dink
-        cdp_debt = cdp.cdp_debt + dart
-        collateral_type_cdp_debt = collateral_type.cdp_debt + dart
+        cdp_collateral = cdp.cdp_collateral + delta_collateral
+        cdp_debt = cdp.cdp_debt + delta_debt
+        collateral_type_cdp_debt = collateral_type.cdp_debt + delta_debt
 
         logger.debug(f"System     | debt {f(self.global_debt())} | ceiling {f(self.global_debt_ceiling())}")
-        logger.debug(f"Collateral | debt {f(Ray(collateral_type_cdp_debt) * collateral_type.accumulated_rates)} | ceiling {f(collateral_type.debt_ceiling)}")
+        logger.debug(f"Collateral | debt {f(Ray(collateral_type_cdp_debt) * collateral_type.accumulated_rates)} "
+                     f"| ceiling {f(collateral_type.debt_ceiling)}")
 
-        dtab = Rad(collateral_type.accumulated_rates * Ray(dart))
+        dtab = Rad(collateral_type.accumulated_rates * Ray(delta_debt))
         tab = collateral_type.accumulated_rates * cdp_debt
         debt = self.global_debt() + dtab
-        logger.debug(f"Modifying CDP collateralization debt={r(collateral_type_cdp_debt)}, cdp_collateral={r(cdp_collateral)}, dink={r(dink)}, dart={r(dart)}, "
-                     f"collateral_type.rate={r(collateral_type.accumulated_rates,8)}, tab={r(tab)}, safety_price={r(collateral_type.safety_price, 4)}, debt={r(debt)}")
+        logger.debug(f"Modifying CDP collateralization debt={r(collateral_type_cdp_debt)}, "
+                     f"cdp_collateral={r(cdp_collateral)}, delta_collateral={r(delta_collateral)}, "
+                     f"delta_debt={r(delta_debt)}, " f"collateral_type.rate={r(collateral_type.accumulated_rates,8)}, "
+                     f"tab={r(tab)}, safety_price={r(collateral_type.safety_price, 4)}, debt={r(debt)}")
 
         # either debt has decreased, or debt ceilings are not exceeded
         under_collateral_debt_ceiling = Rad(Ray(collateral_type_cdp_debt) * collateral_type.accumulated_rates) <= collateral_type.debt_ceiling
         under_system_debt_ceiling = debt < self.global_debt_ceiling()
-        calm = dart <= Wad(0) or (under_collateral_debt_ceiling and under_system_debt_ceiling)
+        calm = delta_debt <= Wad(0) or (under_collateral_debt_ceiling and under_system_debt_ceiling)
 
         # urn is either less risky than before, or it is safe
-        safe = (dart <= Wad(0) and dink >= Wad(0)) or tab <= Ray(cdp_collateral) * collateral_type.safety_price
+        safe = (delta_debt <= Wad(0) and delta_collateral >= Wad(0)) or \
+                tab <= Ray(cdp_collateral) * collateral_type.safety_price
 
         # urn has no debt, or a non-dusty amount
         neat = cdp_debt == Wad(0) or Rad(tab) >= collateral_type.debt_floor
@@ -534,7 +538,7 @@ class CDPEngine(Contract):
             chunk_size: Number of blocks to fetch from chain at one time, for performance tuning
          Returns:
             List of past `LogModifyCDPCollateralization` events represented as 
-            :py:class:`pyflex.dss.CDPEngine.LogModifyCDPCollateralization` class.
+            :py:class:`pyflex.gf.CDPEngine.LogModifyCDPCollateralization` class.
         """
         current_block = self._contract.web3.eth.blockNumber
         assert isinstance(from_block, int)
@@ -742,7 +746,7 @@ class TaxCollector(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
         self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
-        self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.accountingEngine().call()))
+        #self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.accountingEngine().call()))
 
     def initialize_collateral_type(self, collateral_type: CollateralType) -> Transact:
         assert isinstance(collateral_type, CollateralType)

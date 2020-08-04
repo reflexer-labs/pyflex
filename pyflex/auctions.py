@@ -90,8 +90,9 @@ class AuctionContract(Contract):
         in `pyflex.approval`.
 
         Args:
-            source: Address of the contract or token relevant to the auction (for Flipper and DebtAuctionHouse pass Vat address,
-            for SurplusAuctionHouse pass MKR token address)
+            source: Address of the contract or token relevant to the auction 
+                    (for CollateralAuctionHouse and DebtAuctionHouse pass CDPEngine address,
+                    for SurplusAuctionHouse pass FLX token address)
             approval_function: Approval function (i.e. approval mode)
         """
         assert isinstance(source, Address)
@@ -408,7 +409,7 @@ class SurplusAuctionHouse(AuctionContract):
             return f"SurplusAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
-        super(SurplusAuctionHouse, self).__init__(web3, address, Flapper.abi, self.bids)
+        super(SurplusAuctionHouse, self).__init__(web3, address, SurplusAuctionHouse.abi, self.bids)
 
     def live(self) -> bool:
         return self._contract.functions.live().call() > 0

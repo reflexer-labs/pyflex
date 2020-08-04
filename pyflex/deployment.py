@@ -31,8 +31,8 @@ from pyflex.auth import DSGuard
 from pyflex.etherdelta import EtherDelta
 #from pyflex.dss import Cat, Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Jug, Pot, Spotter, Vat, Vow
 # removed CollateralJoin5
-from pyflex.dss import LiquidationEngine, Collateral, CoinJoin, CollateralJoin, CollateralType, TaxCollector, CoinSavingsAccount, OracleRelayer, CDPEngine, AccountingEngine
-from pyflex.proxy import ProxyRegistry, DssProxyActionsDsr
+from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, CollateralJoin, CollateralType, TaxCollector, CoinSavingsAccount, OracleRelayer, CDPEngine, AccountingEngine
+from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
 from pyflex.governance import DSPause, DSChief
@@ -71,8 +71,8 @@ def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None)
     receipt = web3.eth.getTransactionReceipt(tx_hash)
     return Address(receipt['contractAddress'])
 
-class DssDeployment:
-    """Represents a Dai Stablecoin System deployment for multi-collateral Dai (MCD).
+class GfDeployment:
+    """Represents a GEB Framework deployment.
 
     Static method `from_json()` should be used to instantiate all the objet of
     a deployment from a json description of all the system addresses.
@@ -88,7 +88,7 @@ class DssDeployment:
                      liquidation_engine: LiquidationEngine, surplus_auction_house: DebtAuctionHouse,
                      debt_auction_house: DebtAuctionHouse, coin_savings_acct: CoinSavingsAccount, dai: DSToken, coin_join: CoinJoin,
                      gov: DSToken, oracle_relayer: OracleRelayer, ds_chief: DSChief, esm: ShutdownModule, end: End,
-                     proxy_registry: ProxyRegistry, dss_proxy_actions: DssProxyActionsDsr, cdp_manager: CdpManager,
+                     proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, cdp_manager: CdpManager,
                      collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.cdp_engine = cdp_engine
@@ -99,14 +99,14 @@ class DssDeployment:
             self.debt_auction_house = debt_auction_house
             self.coin_savings_acct = coin_savings_acct
             self.dai = dai
-            self.dai_join = dai_join
+            self.coin_join = coin_join
             self.gov = gov
             self.oracle_relayer = oracle_relayer
             self.ds_chief = ds_chief
             self.esm = esm
             self.end = end
             self.proxy_registry = proxy_registry
-            self.dss_proxy_actions = dss_proxy_actions
+            self.proxy_actions = proxy_actions
             self.cdp_manager = cdp_manager
             #self.dsr_manager = dsr_manager
             self.collaterals = collaterals or {}
@@ -119,23 +119,24 @@ class DssDeployment:
             acct_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
             tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
-            dai = DSToken(web3, Address(conf['MCD_DAI']))#
-            dai_adapter = DaiJoin(web3, Address(conf['GEB_COIN_JOIN']))#
+            dai = DSToken(web3, Address(conf['GEB_COIN']))#
+            dai_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))#
             surplus_auction_house = SurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
             gov = DSToken(web3, Address(conf['GEB_GOV']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
-            ds_chief = DSChief(web3, Address(conf['MCD_ADM']))
-            esm = ShutdownModule(web3, Address(conf['MCD_ESM']))
+            #ds_chief = DSChief(web3, Address(conf['MCD_ADM']))
+            ds_chief = DSChief(web3, Address(conf['GEB_ESM']))
+            esm = ShutdownModule(web3, Address(conf['GEB_ESM']))
             end = End(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
-            dss_proxy_actions = DssProxyActionsDsr(web3, Address(conf['PROXY_ACTIONS_DSR']))
+            proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
             cdp_manager = CdpManager(web3, Address(conf['CDP_MANAGER']))
             #dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
 
             collaterals = {}
-            for name in DssDeployment.Config._infer_collaterals_from_addresses(conf.keys()):
+            for name in GfDeployment.Config._infer_collaterals_from_addresses(conf.keys()):
                 collateral_type = CollateralType(name[0].replace('_', '-'))
                 if name[1] == "ETH":
                     collateral = DSEthToken(web3, Address(conf[name[1]]))
@@ -149,7 +150,7 @@ class DssDeployment:
 
                 # PIP contract may be a DSValue, OSM, or bogus address.
                 pip_address = Address(conf[f'PIP_{name[1]}'])
-                network = DssDeployment.NETWORKS.get(web3.net.version, "testnet")
+                network = GfDeployment.NETWORKS.get(web3.net.version, "testnet")
                 if network == "testnet":
                     pip = DSValue(web3, pip_address)
                 else:
@@ -160,10 +161,10 @@ class DssDeployment:
                                         pip=pip)
                 collaterals[collateral_type.name] = collateral
 
-            return DssDeployment.Config(pause, cdp_engine, acct_engine, tax_collector, liquidation_engine,
+            return GfDeployment.Config(pause, cdp_engine, acct_engine, tax_collector, liquidation_engine,
                                         surplus_auction_house, debt_auction_house, coin_savings_acct,
-                                        dai, dai_adapter, gov, orace_relayer, ds_chief, esm, end,
-                                        proxy_registry, dss_proxy_actions, cdp_manager,
+                                        dai, dai_adapter, gov, oracle_relayer, ds_chief, esm, end,
+                                        proxy_registry, proxy_actions, cdp_manager,
                                         collaterals)
 
         @staticmethod
@@ -189,18 +190,18 @@ class DssDeployment:
                 'GEB_LIQUIDATION_ENGINE': self.cat.address.address,
                 'GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.surplus_auction_house.address.address,
                 'GEB_DEBT_AUCTION_HOUSE': self.debt_auction_house.address.address,
-                'MCD_POT': self.pot.address.address,
-                'MCD_DAI': self.dai.address.address,
-                'MCD_JOIN_DAI': self.dai_join.address.address,
+                #'MCD_POT': self.pot.address.address,
+                'GEB_COIN': self.dai.address.address,
+                'GEB_COIN_JOIN': self.coin_join.address.address,
                 'GEB_GOV': self.mkr.address.address,
-                'GEB_ORACLE_RELAYER': self.spotter.address.address,
+                'GEB_ORACLE_RELAYER': self.oracle_relayer.address.address,
                 'MCD_ADM': self.ds_chief.address.address,
-                'MCD_ESM': self.esm.address.address,
+                'GEB_ESM': self.esm.address.address,
                 'GEB_GLOBAL_SETTLEMENT': self.end.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
-                'PROXY_ACTIONS_DSR': self.dss_proxy_actions.address.address,
-                'CDP_MANAGER': self.cdp_manager.address.address,
-                'DSR_MANAGER': self.dsr_manager.address.address
+                'PROXY_ACTIONS': self.proxy_actions.address.address,
+                'CDP_MANAGER': self.cdp_manager.address.address
+                 #'DSR_MANAGER': self.dsr_manager.address.address
             }
 
             for collateral in self.collaterals.values():
@@ -219,7 +220,7 @@ class DssDeployment:
 
     def __init__(self, web3: Web3, config: Config):
         assert isinstance(web3, Web3)
-        assert isinstance(config, DssDeployment.Config)
+        assert isinstance(config, GfDeployment.Config)
 
         self.web3 = web3
         self.config = config
@@ -232,7 +233,7 @@ class DssDeployment:
         self.debt_auction_house = config.debt_auction_house
         self.coin_savings_acct = config.coin_savings_acct
         self.dai = config.dai
-        self.dai_adapter = config.dai_join
+        self.dai_adapter = config.coin_join
         self.gov = config.gov
         self.collaterals = config.collaterals
         self.oracle_relayer = config.oracle_relayer
@@ -240,13 +241,13 @@ class DssDeployment:
         self.esm = config.esm
         self.end = config.end
         self.proxy_registry = config.proxy_registry
-        self.dss_proxy_actions = config.dss_proxy_actions
+        self.proxy_actions = config.proxy_actions
         self.cdp_manager = config.cdp_manager
         #self.dsr_manager = config.dsr_manager
 
     @staticmethod
     def from_json(web3: Web3, conf: str):
-        return DssDeployment(web3, DssDeployment.Config.from_json(web3, conf))
+        return GfDeployment(web3, GfDeployment.Config.from_json(web3, conf))
 
     def to_json(self) -> str:
         return self.config.to_json()
@@ -255,9 +256,9 @@ class DssDeployment:
     def from_node(web3: Web3):
         assert isinstance(web3, Web3)
 
-        network = DssDeployment.NETWORKS.get(web3.net.version, "testnet")
+        network = GfDeployment.NETWORKS.get(web3.net.version, "testnet")
 
-        return DssDeployment.from_network(web3=web3, network=network)
+        return GfDeployment.from_network(web3=web3, network=network)
 
     @staticmethod
     def from_network(web3: Web3, network: str):
@@ -267,7 +268,7 @@ class DssDeployment:
         cwd = os.path.dirname(os.path.realpath(__file__))
         addresses_path = os.path.join(cwd, "../config", f"{network}-addresses.json")
 
-        return DssDeployment.from_json(web3=web3, conf=open(addresses_path, "r").read())
+        return GfDeployment.from_json(web3=web3, conf=open(addresses_path, "r").read())
 
     def approve_dai(self, usr: Address, **kwargs):
         """
@@ -296,4 +297,4 @@ class DssDeployment:
         }
 
     def __repr__(self):
-        return f'DssDeployment({self.config.to_json()})'
+        return f'GfDeployment({self.config.to_json()})'

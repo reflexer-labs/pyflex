@@ -268,7 +268,7 @@ class DSProxyFactory(Contract):
 class ProxyRegistry(Contract):
     """A client for the `ProxyRegistry` contract.
 
-    Ref. <https://github.com/makerdao/proxy-registry/blob/master/src/ProxyRegistry.sol>
+    Ref. <https://github.com/reflexer-labs/geb-proxy-actions/blob/master/src/GebProxyRegistry.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/ProxyRegistry.abi')
@@ -294,14 +294,14 @@ class ProxyRegistry(Contract):
         return f"ProxyRegistry('{self.address}')"
 
 
-class DssProxyActionsDsr(Contract):
-    """A client for the `DssProxyActionsDsr` contract.
+class GebProxyActions(Contract):
+    """A client for the `GebProxyActionsDsr` contract.
 
-    Ref. <https://github.com/makerdao/dss-proxy-actions/blob/master/src/DssProxyActions.sol>
+    Ref. <https://github.com/reflexer-labs/geb-proxy-actions/blob/master/src/GebProxyActions.sol>
     """
 
-    abi = Contract._load_abi(__name__, 'abi/DssProxyActionsDsr.abi')
-    bin = Contract._load_bin(__name__, 'abi/DssProxyActionsDsr.bin')
+    abi = Contract._load_abi(__name__, 'abi/GebProxyActions.abi')
+    bin = Contract._load_bin(__name__, 'abi/GebProxyActions.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)

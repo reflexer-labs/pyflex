@@ -22,11 +22,11 @@ from web3 import Web3, HTTPProvider
 
 from pyflex import Address
 #from pyflex.auctions import Flipper, Flapper, Flopper
-#from pyflex.auctions import CollateralAuctionHouse#, SurplusAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import CollateralAuctionHouse, SurplusAuctionHouse, DebtAuctionHouse
 #from pyflex.deployment import Deployment, DssDeployment
-from pyflex.deployment import DssDeployment
+from pyflex.deployment import GfDeployment
 #from pyflex.dss import Vat, Vow, Cat, Jug, Pot
-from pyflex.dss import CDPEngine, AccountingEngine, LiquidationEngine, TaxCollector, CoinSavingsAccount
+from pyflex.gf import CDPEngine, AccountingEngine, LiquidationEngine, TaxCollector, CoinSavingsAccount
 from pyflex.keys import register_keys
 
 
@@ -81,13 +81,13 @@ def deployment_address(web3) -> Address:
 
 
 @pytest.fixture(scope="session")
-def geb(web3) -> DssDeployment:
+def geb(web3) -> GfDeployment:
     # for local dockerized parity testchain
-    deployment = DssDeployment.from_node(web3=web3)
+    deployment = GfDeployment.from_node(web3=web3)
     validate_contracts_loaded(deployment)
     return deployment
 
-def validate_contracts_loaded(deployment: DssDeployment):
+def validate_contracts_loaded(deployment: GfDeployment):
     assert isinstance(deployment.cdp_engine, CDPEngine)
     assert deployment.cdp_engine.address is not None
     assert isinstance(deployment.acct_engine, AccountingEngine)
