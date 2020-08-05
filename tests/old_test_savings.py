@@ -18,7 +18,7 @@
 import pytest
 
 from pyflex import Address
-from pyflex.deployment import DssDeployment
+from pyflex.deployment import GfDeployment
 from pyflex.dsr import Dsr
 from pyflex.numeric import Wad
 
@@ -26,7 +26,7 @@ from tests.test_gf import wrap_eth, frob, max_dart
 
 
 @pytest.fixture
-def dsr(our_address: Address, mcd: DssDeployment) -> Dsr:
+def dsr(our_address: Address, mcd: GfDeployment) -> Dsr:
     return Dsr(mcd, our_address)
 
 

@@ -21,283 +21,284 @@ from datetime import datetime
 from web3 import Web3
 
 from pyflex import Address
-from pyflex.approval import directly, hope_directly
-from pyflex.auctions import AuctionContract, Flipper, Flapper, Flopper
-from pyflex.deployment import DssDeployment
-from pyflex.dss import Collateral, Urn
+from pyflex.approval import directly, approve_cdp_modification_directly
+from pyflex.auctions import AuctionContract, CollateralAuctionHouse, SurplusAuctionHouse, DebtAuctionHouse
+from pyflex.deployment import GfDeployment
+from pyflex.gf import Collateral, CDP
 from pyflex.numeric import Wad, Ray, Rad
-from tests.test_dss import wrap_eth, mint_mkr, set_collateral_price, wait, frob, cleanup_urn, max_dart, simulate_bite
+from tests.test_gf import wrap_eth, mint_gov, set_collateral_price, wait, wrap_modify_CDP_collateralization
+from tests.test_gf import cleanup_cdp, max_delta_debt, simulate_bite
 
 
-def create_surplus(mcd: DssDeployment, flapper: Flapper, deployment_address: Address):
-    assert isinstance(mcd, DssDeployment)
-    assert isinstance(flapper, Flapper)
+def create_surplus(geb: GfDeployment, surplus_auction_house: SurplusAuctionHouse, deployment_address: Address):
+    assert isinstance(geb, GfDeployment)
+    assert isinstance(surplus_auction_house, SurplusAuctionHouse)
     assert isinstance(deployment_address, Address)
 
-    joy = mcd.vat.dai(mcd.vow.address)
+    joy = geb.cdp_engine.dai(geb.accounting_engine.address)
 
-    if joy < mcd.vow.hump() + mcd.vow.bump():
+    if joy < geb.accounting_engine.hump() + geb.accounting_engine.bump():
         # Create a CDP with surplus
         print('Creating a CDP with surplus')
-        collateral = mcd.collaterals['ETH-B']
-        assert flapper.kicks() == 0
-        wrap_eth(mcd, deployment_address, Wad.from_number(0.1))
+        collateral = geb.collaterals['ETH-B']
+        assert surplus_auction_house.auctions_started() == 0
+        wrap_eth(geb, deployment_address, Wad.from_number(0.1))
         collateral.approve(deployment_address)
         assert collateral.adapter.join(deployment_address, Wad.from_number(0.1)).transact(
             from_address=deployment_address)
-        frob(mcd, collateral, deployment_address, dink=Wad.from_number(0.1), dart=Wad.from_number(10))
-        assert mcd.jug.drip(collateral.ilk).transact(from_address=deployment_address)
-        joy = mcd.vat.dai(mcd.vow.address)
-        assert joy >= mcd.vow.hump() + mcd.vow.bump()
+        frob(geb, collateral, deployment_address, dink=Wad.from_number(0.1), dart=Wad.from_number(10))
+        assert geb.jug.drip(collateral.collateral_type).transact(from_address=deployment_address)
+        joy = geb.cdp_engine.dai(geb.accounting_engine.address)
+        assert joy >= geb.accounting_engine.hump() + geb.accounting_engine.bump()
     else:
         print(f'Surplus of {joy} already exists; skipping CDP creation')
 
 
-def create_debt(web3: Web3, mcd: DssDeployment, our_address: Address, deployment_address: Address):
+def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_address: Address):
     assert isinstance(web3, Web3)
-    assert isinstance(mcd, DssDeployment)
+    assert isinstance(geb, GfDeployment)
     assert isinstance(our_address, Address)
     assert isinstance(deployment_address, Address)
 
     # Create a CDP
-    collateral = mcd.collaterals['ETH-A']
-    ilk = collateral.ilk
-    wrap_eth(mcd, deployment_address, Wad.from_number(1))
+    collateral = geb.collaterals['ETH-A']
+    collateral_type = collateral.collateral_type
+    wrap_eth(geb, deployment_address, Wad.from_number(1))
     collateral.approve(deployment_address)
     assert collateral.adapter.join(deployment_address, Wad.from_number(1)).transact(
         from_address=deployment_address)
-    frob(mcd, collateral, deployment_address, dink=Wad.from_number(1), dart=Wad(0))
-    dart = max_dart(mcd, collateral, deployment_address) - Wad(1)
-    frob(mcd, collateral, deployment_address, dink=Wad(0), dart=dart)
+    frob(geb, collateral, deployment_address, dink=Wad.from_number(1), dart=Wad(0))
+    dart = max_dart(geb, collateral, deployment_address) - Wad(1)
+    frob(geb, collateral, deployment_address, dink=Wad(0), dart=dart)
 
     # Undercollateralize and bite the CDP
     to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
-    set_collateral_price(mcd, collateral, to_price)
-    urn = mcd.vat.urn(collateral.ilk, deployment_address)
-    ilk = mcd.vat.ilk(ilk.name)
-    safe = Ray(urn.art) * mcd.vat.ilk(ilk.name).rate <= Ray(urn.ink) * ilk.spot
+    set_collateral_price(geb, collateral, to_price)
+    cdp = geb.cdp_engine.cdp(collateral.collateral_type, deployment_address)
+    collateral_type = geb.cdp_engine.collateral_type(collateral_type.name)
+    safe = Ray(cdp.art) * geb.cdp_engine.collateral_type(collateral_type.name).rate <= Ray(cdp.ink) * collateral_type.spot
     assert not safe
-    simulate_bite(mcd, collateral, deployment_address)
-    assert mcd.cat.bite(collateral.ilk, Urn(deployment_address)).transact()
-    flip_kick = collateral.flipper.kicks()
+    simulate_bite(geb, collateral, deployment_address)
+    assert geb.cat.bite(collateral.collateral_type, Urn(deployment_address)).transact()
+    flip_kick = collateral.collateral_auction_house.auctions_started()
 
     # Generate some Dai, bid on and win the flip auction without covering all the debt
-    wrap_eth(mcd, our_address, Wad.from_number(10))
+    wrap_eth(geb, our_address, Wad.from_number(10))
     collateral.approve(our_address)
     assert collateral.adapter.join(our_address, Wad.from_number(10)).transact(from_address=our_address)
     web3.eth.defaultAccount = our_address.address
-    frob(mcd, collateral, our_address, dink=Wad.from_number(10), dart=Wad.from_number(200))
-    collateral.flipper.approve(mcd.vat.address, approval_function=hope_directly())
-    current_bid = collateral.flipper.bids(flip_kick)
-    urn = mcd.vat.urn(collateral.ilk, our_address)
-    assert Rad(urn.art) > current_bid.tab
+    frob(geb, collateral, our_address, dink=Wad.from_number(10), dart=Wad.from_number(200))
+    collateral.collateral_auction_house.approve(geb.cdp_engine.address, approval_function=hope_directly())
+    current_bid = collateral.collateral_auction_house.bids(flip_kick)
+    cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+    assert Rad(cdp.art) > current_bid.tab
     bid = Rad.from_number(6)
-    TestFlipper.tend(collateral.flipper, flip_kick, our_address, current_bid.lot, bid)
-    mcd.vat.can(our_address, collateral.flipper.address)
-    wait(mcd, our_address, collateral.flipper.ttl()+1)
-    assert collateral.flipper.deal(flip_kick).transact()
+    TestCollateralAuctionHouse.tend(collateral.collateral_auction_house, flip_kick, our_address, current_bid.lot, bid)
+    geb.cdp_engine.can(our_address, collateral.collateral_auction_house.address)
+    wait(geb, our_address, collateral.collateral_auction_house.ttl()+1)
+    assert collateral.collateral_auction_house.deal(flip_kick).transact()
 
     # Raise debt from the queue (note that vow.wait is 0 on our testchain)
-    bites = mcd.cat.past_bites(100)
+    bites = geb.cat.past_bites(100)
     for bite in bites:
         era_bite = bite.era(web3)
         assert era_bite > int(datetime.now().timestamp()) - 120
-        assert mcd.vow.sin_of(era_bite) > Rad(0)
-        assert mcd.vow.flog(era_bite).transact()
-        assert mcd.vow.sin_of(era_bite) == Rad(0)
+        assert geb.accounting_engine.debt_balance_of(era_bite) > Rad(0)
+        assert geb.accounting_engine.flog(era_bite).transact()
+        assert geb.accounting_engine.debt_balance_of(era_bite) == Rad(0)
     # Cancel out surplus and debt
-    dai_vow = mcd.vat.dai(mcd.vow.address)
-    assert dai_vow <= mcd.vow.woe()
-    assert mcd.vow.heal(dai_vow).transact()
-    assert mcd.vow.woe() >= mcd.vow.sump()
+    dai_vow = geb.cdp_engine.dai(geb.accounting_engine.address)
+    assert dai_vow <= geb.accounting_engine.woe()
+    assert geb.accounting_engine.heal(dai_vow).transact()
+    assert geb.accounting_engine.woe() >= geb.accounting_engine.sump()
 
 
 def check_active_auctions(auction: AuctionContract):
     for bid in auction.active_auctions():
         assert bid.id > 0
-        assert auction.kicks() >= bid.id
-        assert isinstance(bid.guy, Address)
-        assert bid.guy != Address("0x0000000000000000000000000000000000000000")
+        assert auction.auctions_started() >= bid.id
+        assert isinstance(bid.high_bidder, Address)
+        assert bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
 
 
-class TestFlipper:
+class TestCollateralAuctionHouse:
     @pytest.fixture(scope="session")
-    def collateral(self, mcd: DssDeployment) -> Collateral:
-        return mcd.collaterals['ETH-A']
+    def collateral(self, geb: GfDeployment) -> Collateral:
+        return geb.collaterals['ETH-A']
 
     @pytest.fixture(scope="session")
-    def flipper(self, collateral, deployment_address) -> Flipper:
-        return collateral.flipper
+    def collateral_auction_house(self, collateral, deployment_address) -> CollateralAuctionHouse:
+        return collateral.collateral_auction_house
 
     @staticmethod
-    def tend(flipper: Flipper, id: int, address: Address, lot: Wad, bid: Rad):
-        assert (isinstance(flipper, Flipper))
+    def tend(collateral_auction_house: CollateralAuctionHouse, id: int, address: Address, lot: Wad, bid: Rad):
+        assert (isinstance(collateral_auction_house, CollateralAuctionHouse))
         assert (isinstance(id, int))
         assert (isinstance(lot, Wad))
         assert (isinstance(bid, Rad))
 
-        current_bid = flipper.bids(id)
-        assert current_bid.guy != Address("0x0000000000000000000000000000000000000000")
+        current_bid = collateral_auction_house.bids(id)
+        assert current_bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
         assert current_bid.tic > datetime.now().timestamp() or current_bid.tic == 0
         assert current_bid.end > datetime.now().timestamp()
 
         assert lot == current_bid.lot
         assert bid <= current_bid.tab
         assert bid > current_bid.bid
-        assert (bid >= Rad(flipper.beg()) * current_bid.bid) or (bid == current_bid.tab)
+        assert (bid >= Rad(collateral_auction_house.bid_increase()) * current_bid.bid) or (bid == current_bid.tab)
 
-        assert flipper.tend(id, lot, bid).transact(from_address=address)
+        assert collateral_auction_house.tend(id, lot, bid).transact(from_address=address)
 
     @staticmethod
-    def dent(flipper: Flipper, id: int, address: Address, lot: Wad, bid: Rad):
-        assert (isinstance(flipper, Flipper))
+    def dent(collateral_auction_house: CollateralAuctionHouse, id: int, address: Address, lot: Wad, bid: Rad):
+        assert (isinstance(collateral_auction_house, CollateralAuctionHouse))
         assert (isinstance(id, int))
         assert (isinstance(lot, Wad))
         assert (isinstance(bid, Rad))
 
-        current_bid = flipper.bids(id)
-        assert current_bid.guy != Address("0x0000000000000000000000000000000000000000")
+        current_bid = collateral_auction_house.bids(id)
+        assert current_bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
         assert current_bid.tic > datetime.now().timestamp() or current_bid.tic == 0
         assert current_bid.end > datetime.now().timestamp()
 
         assert bid == current_bid.bid
         assert bid == current_bid.tab
         assert lot < current_bid.lot
-        assert flipper.beg() * lot <= current_bid.lot
+        assert collateral_auction_house.bid_increase() * lot <= current_bid.lot
 
-        assert flipper.dent(id, lot, bid).transact(from_address=address)
+        assert collateral_auction_house.dent(id, lot, bid).transact(from_address=address)
 
-    def test_getters(self, mcd, flipper):
-        assert flipper.vat() == mcd.vat.address
-        assert flipper.beg() > Wad.from_number(1)
-        assert flipper.ttl() > 0
-        assert flipper.tau() > flipper.ttl()
-        assert flipper.kicks() >= 0
+    def test_getters(self, geb, collateral_auction_house):
+        assert collateral_auction_house.cdp_engine() == geb.cdp_engine.address
+        assert collateral_auction_house.bid_increase() > Wad.from_number(1)
+        assert collateral_auction_house.ttl() > 0
+        assert collateral_auction_house.tau() > collateral_auction_house.ttl()
+        assert collateral_auction_house.auctions_started() >= 0
 
-    def test_scenario(self, web3, mcd, collateral, flipper, our_address, other_address, deployment_address):
+    def test_scenario(self, web3, geb, collateral, collateral_auction_house, our_address, other_address, deployment_address):
         # Create a CDP
-        collateral = mcd.collaterals['ETH-A']
-        kicks_before = flipper.kicks()
-        ilk = collateral.ilk
-        wrap_eth(mcd, deployment_address, Wad.from_number(1))
+        collateral = geb.collaterals['ETH-A']
+        auctions_started_before = collateral_auction_house.auctions_started()
+        collateral_type = collateral.collateral_type
+        wrap_eth(geb, deployment_address, Wad.from_number(1))
         collateral.approve(deployment_address)
         assert collateral.adapter.join(deployment_address, Wad.from_number(1)).transact(
             from_address=deployment_address)
-        frob(mcd, collateral, deployment_address, dink=Wad.from_number(1), dart=Wad(0))
-        dart = max_dart(mcd, collateral, deployment_address) - Wad(1)
-        frob(mcd, collateral, deployment_address, dink=Wad(0), dart=dart)
+        frob(geb, collateral, deployment_address, dink=Wad.from_number(1), dart=Wad(0))
+        dart = max_dart(geb, collateral, deployment_address) - Wad(1)
+        frob(geb, collateral, deployment_address, dink=Wad(0), dart=dart)
 
         # Mint and withdraw all the Dai
-        mcd.approve_dai(deployment_address)
-        assert mcd.dai_adapter.exit(deployment_address, dart).transact(from_address=deployment_address)
-        assert mcd.dai.balance_of(deployment_address) == dart
-        assert mcd.vat.dai(deployment_address) == Rad(0)
+        geb.approve_dai(deployment_address)
+        assert geb.dai_adapter.exit(deployment_address, dart).transact(from_address=deployment_address)
+        assert geb.dai.balance_of(deployment_address) == dart
+        assert geb.cdp_engine.dai(deployment_address) == Rad(0)
 
         # Undercollateralize the CDP
         to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
-        set_collateral_price(mcd, collateral, to_price)
-        urn = mcd.vat.urn(collateral.ilk, deployment_address)
-        ilk = mcd.vat.ilk(ilk.name)
-        assert ilk.rate is not None
-        assert ilk.spot is not None
-        safe = Ray(urn.art) * mcd.vat.ilk(ilk.name).rate <= Ray(urn.ink) * ilk.spot
+        set_collateral_price(geb, collateral, to_price)
+        cdp = geb.cdp_engine.cdp(collateral.collateral_type, deployment_address)
+        collateral_type = geb.cdp_engine.collateral_type(collateral_type.name)
+        assert collateral_type.rate is not None
+        assert collateral_type.spot is not None
+        safe = Ray(cdp.art) * geb.cdp_engine.collateral_type(collateral_type.name).rate <= Ray(cdp.ink) * collateral_type.spot
         assert not safe
-        assert len(flipper.active_auctions()) == 0
+        assert len(collateral_auction_house.active_auctions()) == 0
 
-        # Bite the CDP, which moves debt to the vow and kicks the flipper
-        urn = mcd.vat.urn(collateral.ilk, deployment_address)
-        assert urn.ink > Wad(0)
-        lot = min(urn.ink, mcd.cat.lump(ilk))  # Wad
-        art = min(urn.art, (lot * urn.art) / urn.ink)  # Wad
-        tab = art * ilk.rate  # Wad
+        # Bite the CDP, which moves debt to the vow and auctions_started the collateral_auction_house
+        cdp = geb.cdp_engine.cdp(collateral.collateral_type, deployment_address)
+        assert cdp.ink > Wad(0)
+        lot = min(cdp.ink, geb.cat.lump(collateral_type))  # Wad
+        art = min(cdp.art, (lot * cdp.art) / cdp.ink)  # Wad
+        tab = art * collateral_type.rate  # Wad
         assert tab == dart
-        simulate_bite(mcd, collateral, deployment_address)
-        assert mcd.cat.bite(collateral.ilk, Urn(deployment_address)).transact()
-        kick = flipper.kicks()
-        assert kick == kicks_before + 1
-        urn = mcd.vat.urn(collateral.ilk, deployment_address)
-        # Check vat, vow, and cat
-        assert urn.ink == Wad(0)
-        assert urn.art == dart - art
-        assert mcd.vat.vice() > Rad(0)
-        assert mcd.vow.sin() == Rad(tab)
-        bites = mcd.cat.past_bites(1)
+        simulate_bite(geb, collateral, deployment_address)
+        assert geb.cat.bite(collateral.collateral_type, Urn(deployment_address)).transact()
+        kick = collateral_auction_house.auctions_started()
+        assert kick == auctions_started_before + 1
+        cdp = geb.cdp_engine.cdp(collateral.collateral_type, deployment_address)
+        # Check cdp_engine, accounting_engine, and liquidation_engine
+        assert cdp.ink == Wad(0)
+        assert cdp.art == dart - art
+        assert geb.cdp_engine.global_unbacked_debt() > Rad(0)
+        assert geb.accounting_engine.debt_balance() == Rad(tab)
+        bites = geb.cat.past_bites(1)
         assert len(bites) == 1
         last_bite = bites[0]
         assert last_bite.tab > Rad(0)
-        # Check the flipper
-        current_bid = flipper.bids(kick)
-        assert isinstance(current_bid, Flipper.Bid)
+        # Check the collateral_auction_house
+        current_bid = collateral_auction_house.bids(kick)
+        assert isinstance(current_bid, CollateralAuctionHouse.Bid)
         assert current_bid.lot > Wad(0)
         assert current_bid.tab > Rad(0)
         assert current_bid.bid == Rad(0)
         # Cat doesn't incorporate the liquidation penalty (chop), but the kicker includes it.
         # Awaiting word from @dc why this is so.
         #assert last_bite.tab == current_bid.tab
-        log = flipper.past_logs(1)[0]
-        assert isinstance(log, Flipper.KickLog)
+        log = collateral_auction_house.past_logs(1)[0]
+        assert isinstance(log, CollateralAuctionHouse.KickLog)
         assert log.id == kick
         assert log.lot == current_bid.lot
         assert log.bid == current_bid.bid
         assert log.tab == current_bid.tab
         assert log.usr == deployment_address
-        assert log.gal == mcd.vow.address
+        assert log.gal == geb.accounting_engine.address
 
         # Wrap some eth and handle approvals before bidding
-        eth_required = Wad(current_bid.tab / Rad(ilk.spot)) * Wad.from_number(1.1)
-        wrap_eth(mcd, other_address, eth_required)
+        eth_required = Wad(current_bid.tab / Rad(collateral_type.spot)) * Wad.from_number(1.1)
+        wrap_eth(geb, other_address, eth_required)
         collateral.approve(other_address)
         assert collateral.adapter.join(other_address, eth_required).transact(from_address=other_address)
-        wrap_eth(mcd, our_address, eth_required)
+        wrap_eth(geb, our_address, eth_required)
         collateral.approve(our_address)
         assert collateral.adapter.join(our_address, eth_required).transact(from_address=our_address)
 
         # Test the _tend_ phase of the auction
-        flipper.approve(mcd.vat.address, approval_function=hope_directly(from_address=other_address))
+        collateral_auction_house.approve(geb.cdp_engine.address, approval_function=hope_directly(from_address=other_address))
         # Add Wad(1) to counter precision error converting tab from Rad to Wad
-        frob(mcd, collateral, other_address, dink=eth_required, dart=Wad(current_bid.tab) + Wad(1))
-        urn = mcd.vat.urn(collateral.ilk, other_address)
-        assert Rad(urn.art) >= current_bid.tab
+        frob(geb, collateral, other_address, dink=eth_required, dart=Wad(current_bid.tab) + Wad(1))
+        cdp = geb.cdp_engine.cdp(collateral.collateral_type, other_address)
+        assert Rad(cdp.art) >= current_bid.tab
         # Bid the tab to instantly transition to dent stage
-        TestFlipper.tend(flipper, kick, other_address, current_bid.lot, current_bid.tab)
-        current_bid = flipper.bids(kick)
-        assert current_bid.guy == other_address
+        TestCollateralAuctionHouse.tend(collateral_auction_house, kick, other_address, current_bid.lot, current_bid.tab)
+        current_bid = collateral_auction_house.bids(kick)
+        assert current_bid.high_bidder == other_address
         assert current_bid.bid == current_bid.tab
-        assert len(flipper.active_auctions()) == 1
-        check_active_auctions(flipper)
-        log = flipper.past_logs(1)[0]
-        assert isinstance(log, Flipper.TendLog)
-        assert log.guy == current_bid.guy
+        assert len(collateral_auction_house.active_auctions()) == 1
+        check_active_auctions(collateral_auction_house)
+        log = collateral_auction_house.past_logs(1)[0]
+        assert isinstance(log, CollateralAuctionHouse.TendLog)
+        assert log.high_bidder == current_bid.guy
         assert log.id == current_bid.id
         assert log.lot == current_bid.lot
         assert log.bid == current_bid.bid
 
         # Test the _dent_ phase of the auction
-        flipper.approve(mcd.vat.address, approval_function=hope_directly(from_address=our_address))
-        frob(mcd, collateral, our_address, dink=eth_required, dart=Wad(current_bid.tab) + Wad(1))
+        collateral_auction_house.approve(geb.cdp_engine.address, approval_function=hope_directly(from_address=our_address))
+        frob(geb, collateral, our_address, dink=eth_required, dart=Wad(current_bid.tab) + Wad(1))
         lot = current_bid.lot - Wad.from_number(0.2)
-        assert flipper.beg() * lot <= current_bid.lot
-        assert mcd.vat.can(our_address, flipper.address)
-        TestFlipper.dent(flipper, kick, our_address, lot, current_bid.tab)
-        current_bid = flipper.bids(kick)
-        assert current_bid.guy == our_address
+        assert collateral_auction_house.bid_increase() * lot <= current_bid.lot
+        assert geb.cdp_engine.can(our_address, collateral_auction_house.address)
+        TestCollateralAuctionHouse.dent(collateral_auction_house, kick, our_address, lot, current_bid.tab)
+        current_bid = collateral_auction_house.bids(kick)
+        assert current_bid.high_bidder == our_address
         assert current_bid.bid == current_bid.tab
         assert current_bid.lot == lot
-        log = flipper.past_logs(1)[0]
-        assert isinstance(log, Flipper.DentLog)
-        assert log.guy == current_bid.guy
+        log = collateral_auction_house.past_logs(1)[0]
+        assert isinstance(log, CollateralAuctionHouse.DentLog)
+        assert log.high_bidder == current_bid.guy
         assert log.id == current_bid.id
         assert log.lot == current_bid.lot
         assert log.bid == current_bid.bid
 
         # Exercise _deal_ after bid has expired
-        wait(mcd, our_address, flipper.ttl()+1)
+        wait(geb, our_address, collateral_auction_house.ttl()+1)
         now = datetime.now().timestamp()
         assert 0 < current_bid.tic < now or current_bid.end < now
-        assert flipper.deal(kick).transact(from_address=our_address)
-        assert len(flipper.active_auctions()) == 0
-        log = flipper.past_logs(1)[0]
-        assert isinstance(log, Flipper.DealLog)
+        assert collateral_auction_house.deal(kick).transact(from_address=our_address)
+        assert len(collateral_auction_house.active_auctions()) == 0
+        log = collateral_auction_house.past_logs(1)[0]
+        assert isinstance(log, CollateralAuctionHouse.DealLog)
         assert log.usr == our_address
 
         # Grab our collateral
@@ -307,183 +308,183 @@ class TestFlipper:
         assert collateral_before < collateral_after
 
         # Cleanup
-        set_collateral_price(mcd, collateral, Wad.from_number(230))
-        cleanup_urn(mcd, collateral, other_address)
+        set_collateral_price(geb, collateral, Wad.from_number(230))
+        cleanup_cdp(geb, collateral, other_address)
 
 
-class TestFlapper:
+class TestSurplusAuctionHouse:
     @pytest.fixture(scope="session")
-    def flapper(self, mcd: DssDeployment) -> Flapper:
-        return mcd.flapper
+    def surplus_auction_house(self, geb: GfDeployment) -> SurplusAuctionHouse:
+        return geb.surplus_auction_house
 
     @staticmethod
-    def tend(flapper: Flapper, id: int, address: Address, lot: Rad, bid: Wad):
-        assert (isinstance(flapper, Flapper))
+    def tend(surplus_auction_house: SurplusAuctionHouse, id: int, address: Address, lot: Rad, bid: Wad):
+        assert (isinstance(surplus_auction_house, SurplusAuctionHouse))
         assert (isinstance(id, int))
         assert (isinstance(lot, Rad))
         assert (isinstance(bid, Wad))
 
-        assert flapper.live() == 1
+        assert surplus_auction_house.contract_enabled() == 1
 
-        current_bid = flapper.bids(id)
-        assert current_bid.guy != Address("0x0000000000000000000000000000000000000000")
+        current_bid = surplus_auction_house.bids(id)
+        assert current_bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
         assert current_bid.tic > datetime.now().timestamp() or current_bid.tic == 0
         assert current_bid.end > datetime.now().timestamp()
 
         assert lot == current_bid.lot
         assert bid > current_bid.bid
-        assert bid >= flapper.beg() * current_bid.bid
+        assert bid >= surplus_auction_house.bid_increase() * current_bid.bid
 
-        assert flapper.tend(id, lot, bid).transact(from_address=address)
-        log = flapper.past_logs(1)[0]
-        assert isinstance(log, Flapper.TendLog)
-        assert log.guy == address
+        assert surplus_auction_house.tend(id, lot, bid).transact(from_address=address)
+        log = surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, SurplusAuctionHouse.TendLog)
+        assert log.high_bidder == address
         assert log.id == id
         assert log.lot == lot
         assert log.bid == bid
 
-    def test_getters(self, mcd, flapper):
-        assert flapper.vat() == mcd.vat.address
-        assert flapper.beg() > Wad.from_number(1)
-        assert flapper.ttl() > 0
-        assert flapper.tau() > flapper.ttl()
-        assert flapper.kicks() >= 0
+    def test_getters(self, geb, surplus_auction_house):
+        assert surplus_auction_house.vat() == geb.cdp_engine.address
+        assert surplus_auction_house.bid_increase() > Wad.from_number(1)
+        assert surplus_auction_house.ttl() > 0
+        assert surplus_auction_house.tau() > surplus_auction_house.ttl()
+        assert surplus_auction_house.auctions_started() >= 0
 
-    def test_scenario(self, web3, mcd, flapper, our_address, other_address, deployment_address):
-        create_surplus(mcd, flapper, deployment_address)
+    def test_scenario(self, web3, geb, surplus_auction_house, our_address, other_address, deployment_address):
+        create_surplus(geb, surplus_auction_house, deployment_address)
 
-        joy_before = mcd.vat.dai(mcd.vow.address)
+        joy_before = geb.cdp_engine.dai(geb.accounting_engine.address)
         # total surplus > total debt + surplus auction lot size + surplus buffer
-        assert joy_before > mcd.vat.sin(mcd.vow.address) + mcd.vow.bump() + mcd.vow.hump()
-        assert (mcd.vat.sin(mcd.vow.address) - mcd.vow.sin()) - mcd.vow.ash() == Rad(0)
-        assert mcd.vow.flap().transact()
-        kick = flapper.kicks()
+        assert joy_before > geb.cdp_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.bump() + geb.accounting_engine.hump()
+        assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.sin()) - geb.accounting_engine.ash() == Rad(0)
+        assert geb.accounting_engine.flap().transact()
+        kick = surplus_auction_house.auctions_started()
         assert kick == 1
-        assert len(flapper.active_auctions()) == 1
-        check_active_auctions(flapper)
-        current_bid = flapper.bids(1)
+        assert len(surplus_auction_house.active_auctions()) == 1
+        check_active_auctions(surplus_auction_house)
+        current_bid = surplus_auction_house.bids(1)
         assert current_bid.lot > Rad(0)
-        log = flapper.past_logs(1)[0]
-        assert isinstance(log, Flapper.KickLog)
+        log = surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, SurplusAuctionHouse.KickLog)
         assert log.id == kick
         assert log.lot == current_bid.lot
         assert log.bid == current_bid.bid
 
         # Allow the auction to expire, and then resurrect it
-        wait(mcd, our_address, flapper.tau()+1)
-        assert flapper.tick(kick).transact()
+        wait(geb, our_address, surplus_auction_house.tau()+1)
+        assert surplus_auction_house.tick(kick).transact()
 
         # Bid on the resurrected auction
-        mint_mkr(mcd.mkr, our_address, Wad.from_number(10))
-        flapper.approve(mcd.mkr.address, directly(from_address=our_address))
+        mint_gov(geb.gov, our_address, Wad.from_number(10))
+        surplus_auction_house.approve(geb.gov.address, directly(from_address=our_address))
         bid = Wad.from_number(0.001)
-        assert mcd.mkr.balance_of(our_address) > bid
-        TestFlapper.tend(flapper, kick, our_address, current_bid.lot, bid)
-        current_bid = flapper.bids(kick)
+        assert geb.gov.balance_of(our_address) > bid
+        TestSurplusAuctionHouse.tend(surplus_auction_house, kick, our_address, current_bid.lot, bid)
+        current_bid = surplus_auction_house.bids(kick)
         assert current_bid.bid == bid
-        assert current_bid.guy == our_address
+        assert current_bid.high_bidder == our_address
 
         # Exercise _deal_ after bid has expired
-        wait(mcd, our_address, flapper.ttl()+1)
+        wait(geb, our_address, surplus_auction_house.ttl()+1)
         now = datetime.now().timestamp()
         assert 0 < current_bid.tic < now or current_bid.end < now
-        assert flapper.deal(kick).transact(from_address=our_address)
-        joy_after = mcd.vat.dai(mcd.vow.address)
+        assert surplus_auction_house.deal(kick).transact(from_address=our_address)
+        joy_after = geb.cdp_engine.dai(geb.accounting_engine.address)
         print(f'joy_before={str(joy_before)}, joy_after={str(joy_after)}')
-        assert joy_before - joy_after == mcd.vow.bump()
-        log = flapper.past_logs(1)[0]
-        assert isinstance(log, Flapper.DealLog)
+        assert joy_before - joy_after == geb.accounting_engine.bump()
+        log = surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, SurplusAuctionHouse.DealLog)
         assert log.usr == our_address
         assert log.id == kick
 
         # Grab our dai
-        mcd.approve_dai(our_address)
-        assert mcd.dai_adapter.exit(our_address, Wad(current_bid.lot)).transact(from_address=our_address)
-        assert mcd.dai.balance_of(our_address) >= Wad(current_bid.lot)
-        assert (mcd.vat.sin(mcd.vow.address) - mcd.vow.sin()) - mcd.vow.ash() == Rad(0)
+        geb.approve_dai(our_address)
+        assert geb.dai_adapter.exit(our_address, Wad(current_bid.lot)).transact(from_address=our_address)
+        assert geb.dai.balance_of(our_address) >= Wad(current_bid.lot)
+        assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.sin()) - geb.accounting_engine.ash() == Rad(0)
 
 
-class TestFlopper:
+class TestDebtAuctionHouse:
     @pytest.fixture(scope="session")
-    def flopper(self, mcd: DssDeployment) -> Flopper:
-        return mcd.flopper
+    def debt_auction_house(self, geb: GfDeployment) -> DebtAuctionHouse:
+        return geb.debt_auction_house
 
     @staticmethod
-    def dent(flopper: Flopper, id: int, address: Address, lot: Wad, bid: Rad):
-        assert (isinstance(flopper, Flopper))
+    def dent(debt_auction_house: DebtAuctionHouse, id: int, address: Address, lot: Wad, bid: Rad):
+        assert (isinstance(debt_auction_house, DebtAuctionHouse))
         assert (isinstance(id, int))
         assert (isinstance(lot, Wad))
         assert (isinstance(bid, Rad))
 
-        assert flopper.live() == 1
+        assert debt_auction_house.contract_enabled() == 1
 
-        current_bid = flopper.bids(id)
-        assert current_bid.guy != Address("0x0000000000000000000000000000000000000000")
+        current_bid = debt_auction_house.bids(id)
+        assert current_bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
         assert current_bid.tic > datetime.now().timestamp() or current_bid.tic == 0
         assert current_bid.end > datetime.now().timestamp()
 
         assert bid == current_bid.bid
         assert Wad(0) < lot < current_bid.lot
-        assert flopper.beg() * lot <= current_bid.lot
+        assert debt_auction_house.bid_decerase() * lot <= current_bid.lot
 
-        assert flopper.dent(id, lot, bid).transact(from_address=address)
-        log = flopper.past_logs(1)[0]
-        assert isinstance(log, Flopper.DentLog)
-        assert log.guy == address
+        assert debt_auction_house.dent(id, lot, bid).transact(from_address=address)
+        log = debt_auction_house.past_logs(1)[0]
+        assert isinstance(log, DebtAuctionHouse.DentLog)
+        assert log.high_bidder == address
         assert log.id == id
         assert log.lot == lot
         assert log.bid == bid
 
-    def test_getters(self, mcd, flopper):
-        assert flopper.vat() == mcd.vat.address
-        assert flopper.beg() > Wad.from_number(1)
-        assert flopper.ttl() > 0
-        assert flopper.tau() > flopper.ttl()
-        assert flopper.kicks() >= 0
+    def test_getters(self, geb, debt_auction_house):
+        assert debt_auction_house.cdp_engine() == geb.cdp_engine.address
+        assert debt_auction_house.bid_decrease() > Wad.from_number(1)
+        assert debt_auction_house.ttl() > 0
+        assert debt_auction_house.tau() > debt_auction_house.ttl()
+        assert debt_auction_house.auctions_started() >= 0
 
-    def test_scenario(self, web3, mcd, flopper, our_address, other_address, deployment_address):
-        create_debt(web3, mcd, our_address, deployment_address)
+    def test_scenario(self, web3, geb, debt_auction_house, our_address, other_address, deployment_address):
+        create_debt(web3, geb, our_address, deployment_address)
 
         # Kick off the flop auction
-        assert flopper.kicks() == 0
-        assert len(flopper.active_auctions()) == 0
-        assert mcd.vat.dai(mcd.vow.address) == Rad(0)
-        assert mcd.vow.flop().transact()
-        kick = flopper.kicks()
+        assert debt_auction_house.auctions_started() == 0
+        assert len(debt_auction_house.active_auctions()) == 0
+        assert geb.cdp_engine.dai(geb.accounting_engine.address) == Rad(0)
+        assert geb.accounting_engine.flop().transact()
+        kick = debt_auction_house.auctions_started()
         assert kick == 1
-        assert len(flopper.active_auctions()) == 1
-        check_active_auctions(flopper)
-        current_bid = flopper.bids(kick)
-        log = flopper.past_logs(1)[0]
-        assert isinstance(log, Flopper.KickLog)
+        assert len(debt_auction_house.active_auctions()) == 1
+        check_active_auctions(debt_auction_house)
+        current_bid = debt_auction_house.bids(kick)
+        log = debt_auction_house.past_logs(1)[0]
+        assert isinstance(log, DebtAuctionHouse.KickLog)
         assert log.id == kick
         assert log.lot == current_bid.lot
         assert log.bid == current_bid.bid
-        assert log.gal == mcd.vow.address
+        assert log.gal == geb.accounting_engine.address
 
         # Allow the auction to expire, and then resurrect it
-        wait(mcd, our_address, flopper.tau()+1)
-        assert flopper.tick(kick).transact()
-        assert flopper.bids(kick).lot == current_bid.lot * flopper.pad()
+        wait(geb, our_address, debt_auction_house.tau()+1)
+        assert debt_auction_house.tick(kick).transact()
+        assert debt_auction_house.bids(kick).lot == current_bid.lot * debt_auction_house.pad()
 
         # Bid on the resurrected auction
         bid = Wad.from_number(0.000005)
-        flopper.approve(mcd.vat.address, hope_directly())
-        assert mcd.vat.can(our_address, flopper.address)
-        TestFlopper.dent(flopper, kick, our_address, bid, current_bid.bid)
-        current_bid = flopper.bids(kick)
-        assert current_bid.guy == our_address
+        debt_auction_house.approve(geb.cdp_engine.address, hope_directly())
+        assert geb.cdp_engine.can(our_address, debt_auction_house.address)
+        TestDebtAuctionHouse.dent(debt_auction_house, kick, our_address, bid, current_bid.bid)
+        current_bid = debt_auction_house.bids(kick)
+        assert current_bid.high_bidder == our_address
 
         # Confirm victory
-        wait(mcd, our_address, flopper.ttl()+1)
-        assert flopper.live()
+        wait(geb, our_address, debt_auction_house.ttl()+1)
+        assert debt_auction_house.contract_enabled()
         now = int(datetime.now().timestamp())
         assert (current_bid.tic < now and current_bid.tic != 0) or current_bid.end < now
-        mkr_before = mcd.mkr.balance_of(our_address)
-        assert flopper.deal(kick).transact(from_address=our_address)
-        mkr_after = mcd.mkr.balance_of(our_address)
-        assert mkr_after > mkr_before
-        log = flopper.past_logs(1)[0]
-        assert isinstance(log, Flopper.DealLog)
+        gov_before = geb.gov.balance_of(our_address)
+        assert debt_auction_house.deal(kick).transact(from_address=our_address)
+        gov_after = geb.gov.balance_of(our_address)
+        assert gov_after > gov_before
+        log = debt_auction_house.past_logs(1)[0]
+        assert isinstance(log, DebtAuctionHouse.DealLog)
         assert log.usr == our_address
         assert log.id == kick

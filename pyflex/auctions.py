@@ -41,7 +41,7 @@ class AuctionContract(Contract):
 
     class SettleAuctionLog:
         def __init__(self, lognote: LogNote):
-            # This is whoever called `settleAuction`, which could differ from the `high_bigger` who won the auction
+            # This is whoever called `settleAuction`, which could differ from the `high_bidder` who won the auction
             self.usr = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
             self.block = lognote.block
@@ -103,7 +103,7 @@ class AuctionContract(Contract):
 
     def active_auctions(self) -> list:
         active_auctions = []
-        auction_count = self.auctionsStarted()+1
+        auction_count = self.auctions_started() + 1
         for index in range(1, auction_count):
             bid = self._bids(index)
             if bid.guy != Address("0x0000000000000000000000000000000000000000"):
@@ -194,27 +194,27 @@ class CollateralAuctionHouse(AuctionContract):
     bin = Contract._load_bin(__name__, 'abi/EnglishCollateralAuctionHouse.bin')
 
     class Bid:
-        def __init__(self, id: int, bid: Rad, amount_to_sell: Wad, high_bidder: Address, bid_expiry: int, auction_deadline: int,
-                     usr: Address, gal: Address, tab: Rad):
+        def __init__(self, id: int, bid_amount: Rad, amount_to_sell: Wad, high_bidder: Address, bid_expiry: int, auction_deadline: int,
+                     forgone_collateral_receiver: Address, auction_income_recipient: Address, amount_to_raise: Rad):
             assert(isinstance(id, int))
-            assert(isinstance(bid, Rad))
+            assert(isinstance(bid_amount, Rad))
             assert(isinstance(amount_to_sell, Wad))
-            assert(isinstance(high_bigger, Address))
+            assert(isinstance(high_bidder, Address))
             assert(isinstance(bid_expiry, int))
             assert(isinstance(auction_deadline, int))
-            assert(isinstance(usr, Address))
-            assert(isinstance(gal, Address))
-            assert(isinstance(tab, Rad))
+            assert(isinstance(forgone_collateral_receiver, Address))
+            assert(isinstance(auction_income_recipient, Address))
+            assert(isinstance(amount_to_raise, Rad))
 
             self.id = id
-            self.bid = bid
+            self.bid_amount = bid
             self.amount_to_sell = amount_to_sell
-            self.high_bigger = high_bigger
+            self.high_bidder = high_bidder
             self.bid_expiry = bid_expiry
             self.auction_deadline = auction_deadline
-            self.usr = usr
-            self.gal = gal
-            self.tab = tab
+            self.forgone_collateral_receiver = forgone_collateral_receiver
+            self.auction_income_recipient = auction_income_recipient
+            self.amount_to_raise = amount_to_raise
 
         def __repr__(self):
             return f"CollateralAuctionHouse.Bid({pformat(vars(self))})"
@@ -236,7 +236,7 @@ class CollateralAuctionHouse(AuctionContract):
 
     class IncreaseBidSizeLog:
         def __init__(self, lognote: LogNote):
-            self.high_bigger = Address(lognote.usr)
+            self.high_bidder = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
             self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
             self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
@@ -248,7 +248,7 @@ class CollateralAuctionHouse(AuctionContract):
 
     class DecreaseSoldAmountLog:
         def __init__(self, lognote: LogNote):
-            self.high_bigger = Address(lognote.usr)
+            self.high_bidder = Address(lognote.usr)
             self.id = Web3.toInt(lognote.arg1)
             self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
             self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
@@ -277,7 +277,7 @@ class CollateralAuctionHouse(AuctionContract):
         return CollateralAuctionHouse.Bid(id=id,
                            bid=Rad(array[0]),
                            amount_to_sell=Wad(array[1]),
-                           high_bigger=Address(array[2]),
+                           high_bidder=Address(array[2]),
                            bid_expiry=int(array[3]),
                            auction_deadline=int(array[4]),
                            usr=Address(array[5]),
@@ -366,10 +366,11 @@ class SurplusAuctionHouse(AuctionContract):
     bin = Contract._load_bin(__name__, 'abi/PreSettlementSurplusAuctionHouse.bin')
 
     class Bid:
-        def __init__(self, id: int, bid: Wad, amount_to_sell: Rad, high_bidder: Address, bid_expiry: int, auction_deadline: int):
+        def __init__(self, id: int, bid_amount: Wad, amount_to_sell: Rad, high_bidder: Address,
+                     bid_expiry: int, auction_deadline: int):
             assert(isinstance(id, int))
-            assert(isinstance(bid, Wad))        # MKR
-            assert(isinstance(amount_to_sell, Rad))        # DAI
+            assert(isinstance(bid_amount, Wad))        # Gov
+            assert(isinstance(amount_to_sell, Rad))        # System coin
             assert(isinstance(high_bidder, Address))
             assert(isinstance(bid_expiry, int))
             assert(isinstance(auction_deadline, int))
@@ -454,7 +455,7 @@ class SurplusAuctionHouse(AuctionContract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
 
-    def yank(self, id: int) -> Transact:
+    def terminate_auction_prematurely(self, id: int) -> Transact:
         """While `cage`d, refund current bid to the bidder"""
         assert (isinstance(id, int))
 
@@ -513,16 +514,17 @@ class DebtAuctionHouse(AuctionContract):
     bin = Contract._load_bin(__name__, 'abi/DebtAuctionHouse.bin')
 
     class Bid:
-        def __init__(self, id: int, bid: Rad, amount_to_sell: Wad, high_bidder: Address, bid_expiry: int, auction_deadline: int):
+        def __init__(self, id: int, bid_amount: Rad, amount_to_sell: Wad, high_bidder: Address,
+                     bid_expiry: int, auction_deadline: int):
             assert(isinstance(id, int))
-            assert(isinstance(bid, Rad))
+            assert(isinstance(bid_amount, Rad))
             assert(isinstance(amount_to_sell, Wad))
             assert(isinstance(high_bidder, Address))
             assert(isinstance(bid_expiry, int))
             assert(isinstance(auction_deadline, int))
 
             self.id = id
-            self.bid = bid
+            self.bid_amount = bid_amount
             self.amount_to_sell = amount_to_sell
             self.high_bidder = high_bidder
             self.bid_expiry = bid_expiry
@@ -562,13 +564,13 @@ class DebtAuctionHouse(AuctionContract):
 
         super(DebtAuctionHouse, self).__init__(web3, address, DebtAuctionHouse.abi, self.bids)
 
-    def live(self) -> bool:
-        return self._contract.functions.live().call() > 0
+    def contract_enabled(self) -> bool:
+        return self._contract.functions.contract_enabled().call() > 0
 
-    def pad(self) -> Wad:
+    def amount_sold_increase(self) -> Wad:
         """Returns the amount_to_sell increase applied after an auction has been `restartAuction`ed."""
 
-        return Wad(self._contract.functions.pad().call())
+        return Wad(self._contract.functions.amountSoldIncrease().call())
 
     def bids(self, id: int) -> Bid:
         """Returns the auction details.
@@ -584,27 +586,27 @@ class DebtAuctionHouse(AuctionContract):
         array = self._contract.functions.bids(id).call()
 
         return DebtAuctionHouse.Bid(id=id,
-                           bid=Rad(array[0]),
+                           bid_amount=Rad(array[0]),
                            amount_to_sell=Wad(array[1]),
                            high_bidder=Address(array[2]),
                            bid_expiry=int(array[3]),
                            auction_deadline=int(array[4]))
 
-    def start_auction(self, gal: Address, amount_to_sell: Wad, bid: Wad) -> Transact:
-        assert(isinstance(gal, Address))
+    def start_auction(self, initial_bidder: Address, amount_to_sell: Wad, bid_amount: Wad) -> Transact:
+        assert(isinstance(initial_bidder, Address))
         assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid, Wad))
+        assert(isinstance(bid_amount, Wad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [gal.address,
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [initial_bidder.address,
                                                                                           amount_to_sell.value,
                                                                                           bid.value])
 
-    def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid: Rad) -> Transact:
+    def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid, Rad))
+        assert(isinstance(bid_amount, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount', [id, amount_to_sell.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount', [id, amount_to_sell.value, bid_amount.value])
 
     def restart_auction(self, id: int) -> Transact:
         """Resurrect an auction which expired without any bids."""
@@ -612,11 +614,11 @@ class DebtAuctionHouse(AuctionContract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
 
-    def yank(self, id: int) -> Transact:
+    def terminate_auction_prematurely(self, id: int) -> Transact:
         """While `cage`d, refund current bid to the bidder"""
         assert (isinstance(id, int))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'yank', [id])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'terminateAuctionPrematurely', [id])
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)

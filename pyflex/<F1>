@@ -21,6 +21,7 @@ import re
 from typing import Dict, List, Optional
 
 import pkg_resources
+#from pyflex.auctions import Flapper, Flopper, Flipper
 from pyflex.auctions import SurplusAuctionHouse, DebtAuctionHouse, CollateralAuctionHouse
 from web3 import Web3, HTTPProvider
 
@@ -38,8 +39,8 @@ from pyflex.governance import DSPause, DSChief
 from pyflex.numeric import Wad, Ray
 from pyflex.oasis import MatchingMarket
 from pyflex.oracles import OSM
-#from pyflex.sai import Tub, Tap, Top, Vox
-from pyflex.shutdown import ShutdownModule, GlobalSettlement
+from pyflex.sai import Tub, Tap, Top, Vox
+from pyflex.shutdown import ShutdownModule, End
 from pyflex.token import DSToken, DSEthToken
 from pyflex.vault import DSVault
 from pyflex.cdpmanager import CdpManager
@@ -83,27 +84,27 @@ class GfDeployment:
     }
 
     class Config:
-        def __init__(self, pause: DSPause, cdp_engine: CDPEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
+        def __init__(self, pause: DSPause, cdp_engine: CDPEngine, acct_engine: AccountingEngine, tax_collector: TaxCollector,
                      liquidation_engine: LiquidationEngine, surplus_auction_house: DebtAuctionHouse,
-                     debt_auction_house: DebtAuctionHouse, coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
-                     gov: DSToken, oracle_relayer: OracleRelayer, ds_chief: DSChief, esm: ShutdownModule, global_settlement: GlobalSettlement,
+                     debt_auction_house: DebtAuctionHouse, coin_savings_acct: CoinSavingsAccount, dai: DSToken, coin_join: CoinJoin,
+                     gov: DSToken, oracle_relayer: OracleRelayer, ds_chief: DSChief, esm: ShutdownModule, end: End,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, cdp_manager: CdpManager,
                      collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.cdp_engine = cdp_engine
-            self.accounting_engine = accounting_engine
+            self.acct_engine = acct_engine
             self.tax_collector = tax_collector
             self.liquidation_engine = liquidation_engine
             self.surplus_auction_house = surplus_auction_house
             self.debt_auction_house = debt_auction_house
             self.coin_savings_acct = coin_savings_acct
-            self.system_coin = system_coin
+            self.dai = dai
             self.coin_join = coin_join
             self.gov = gov
             self.oracle_relayer = oracle_relayer
             self.ds_chief = ds_chief
             self.esm = esm
-            self.global_settlement = global_settlement
+            self.end = end
             self.proxy_registry = proxy_registry
             self.proxy_actions = proxy_actions
             self.cdp_manager = cdp_manager
@@ -115,19 +116,19 @@ class GfDeployment:
             conf = json.loads(conf)
             pause = DSPause(web3, Address(conf['GEB_PAUSE']))
             cdp_engine = CDPEngine(web3, Address(conf['GEB_CDP_ENGINE']))
-            accounting_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
+            acct_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
             tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
-            system_coin = DSToken(web3, Address(conf['GEB_COIN']))#
-            system_coin_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))#
+            dai = DSToken(web3, Address(conf['GEB_COIN']))#
+            dai_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))#
             surplus_auction_house = SurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
-            coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
+            coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN_SAVINGS_ACCOUNT']))
             gov = DSToken(web3, Address(conf['GEB_GOV']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
-            ds_chief = DSChief(web3, Address(conf['GEB_COIN']))
+            ds_chief = DSChief(web3, Address(conf['GEB_VOTE_QUORUM']))
             esm = ShutdownModule(web3, Address(conf['GEB_ESM']))
-            global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
+            end = End(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
             cdp_manager = CdpManager(web3, Address(conf['CDP_MANAGER']))
@@ -159,9 +160,9 @@ class GfDeployment:
                                         pip=pip)
                 collaterals[collateral_type.name] = collateral
 
-            return GfDeployment.Config(pause, cdp_engine, accounting_engine, tax_collector, liquidation_engine,
+            return GfDeployment.Config(pause, cdp_engine, acct_engine, tax_collector, liquidation_engine,
                                         surplus_auction_house, debt_auction_house, coin_savings_acct,
-                                        system_coin, system_coin_adapter, gov, oracle_relayer, ds_chief, esm, global_settlement,
+                                        dai, dai_adapter, gov, oracle_relayer, ds_chief, esm, end,
                                         proxy_registry, proxy_actions, cdp_manager,
                                         collaterals)
 
@@ -182,20 +183,20 @@ class GfDeployment:
         def to_dict(self) -> dict:
             conf_dict = {
                 'GEB_PAUSE': self.pause.address.address,
-                'GEB_CDP_ENGINE': self.cdp_engine.address.address,
-                'GEB_ACCOUNTING_ENGINE': self.accounting_engine.address.address,
-                'GEB_TAX_COLLECTOR': self.tax_collector.address.address,
-                'GEB_LIQUIDATION_ENGINE': self.liquidation_engine.address.address,
+                'GEB_CDP_ENGINE': self.vat.address.address,
+                'GEB_ACCOUNTING_ENGINE': self.vow.address.address,
+                'GEB_TAX_COLLECTOR': self.jug.address.address,
+                'GEB_LIQUIDATION_ENGINE': self.cat.address.address,
                 'GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.surplus_auction_house.address.address,
                 'GEB_DEBT_AUCTION_HOUSE': self.debt_auction_house.address.address,
                 #'MCD_POT': self.pot.address.address,
-                'GEB_COIN': self.system_coin.address.address,
+                'GEB_COIN': self.dai.address.address,
                 'GEB_COIN_JOIN': self.coin_join.address.address,
-                'GEB_GOV': self.gov.address.address,
+                'GEB_GOV': self.mkr.address.address,
                 'GEB_ORACLE_RELAYER': self.oracle_relayer.address.address,
                 'MCD_ADM': self.ds_chief.address.address,
                 'GEB_ESM': self.esm.address.address,
-                'GEB_GLOBAL_SETTLEMENT': self.global_settlement.address.address,
+                'GEB_GLOBAL_SETTLEMENT': self.end.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
                 'PROXY_ACTIONS': self.proxy_actions.address.address,
                 'CDP_MANAGER': self.cdp_manager.address.address
@@ -203,13 +204,13 @@ class GfDeployment:
             }
 
             for collateral in self.collaterals.values():
-                match = re.search(r'(\w+)(?:-\w+)?', collateral.collateral_type.name)
+                match = re.search(r'(\w+)(?:-\w+)?', collateral.ilk.name)
                 name = (collateral.collateral_type.name.replace('-', '_'), match.group(1))
                 conf_dict[name[1]] = collateral.collateral.address.address
                 if collateral.pip:
                     conf_dict[f'PIP_{name[1]}'] = collateral.pip.address.address
                 conf_dict[f'GEB_JOIN_{name[0]}'] = collateral.adapter.address.address
-                conf_dict[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'] = collateral.collateral_auction_house.address.address
+                conf_dict[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'] = collateral.flipper.address.address
 
             return conf_dict
 
@@ -224,20 +225,20 @@ class GfDeployment:
         self.config = config
         self.pause = config.pause
         self.cdp_engine = config.cdp_engine
-        self.accounting_engine = config.accounting_engine
+        self.acct_engine = config.acct_engine
         self.tax_collector = config.tax_collector
         self.liquidation_engine = config.liquidation_engine
         self.surplus_auction_house = config.surplus_auction_house
         self.debt_auction_house = config.debt_auction_house
         self.coin_savings_acct = config.coin_savings_acct
-        self.system_coin = config.system_coin
-        self.system_coin_adapter = config.coin_join
+        self.dai = config.dai
+        self.dai_adapter = config.coin_join
         self.gov = config.gov
         self.collaterals = config.collaterals
         self.oracle_relayer = config.oracle_relayer
         self.ds_chief = config.ds_chief
         self.esm = config.esm
-        self.global_settlement = config.global_settlement
+        self.end = config.end
         self.proxy_registry = config.proxy_registry
         self.proxy_actions = config.proxy_actions
         self.cdp_manager = config.cdp_manager
@@ -268,30 +269,30 @@ class GfDeployment:
 
         return GfDeployment.from_json(web3=web3, conf=open(addresses_path, "r").read())
 
-    def approve_system_coin(self, usr: Address, **kwargs):
+    def approve_dai(self, usr: Address, **kwargs):
         """
-        Allows the user to draw system coin from and repay system coin to their CDPs.
+        Allows the user to draw Dai from and repay Dai to their CDPs.
 
         Args
-            usr: Recipient of system coin from one or more CDPs
+            usr: Recipient of Dai from one or more CDPs
         """
         assert isinstance(usr, Address)
 
         gas_price = kwargs['gas_price'] if 'gas_price' in kwargs else DefaultGasPrice()
-        self.system_coin_adapter.approve(approval_function=approve_cdp_modification_directly(from_address=usr, gas_price=gas_price),
+        self.dai_adapter.approve(approval_function=approve_cdp_modification_directly(from_address=usr, gas_price=gas_price),
                                  source=self.cdp_engine.address)
-        self.system_coin.approve(self.system_coin_adapter.address).transact(from_address=usr, gas_price=gas_price)
+        self.dai.approve(self.dai_adapter.address).transact(from_address=usr, gas_price=gas_price)
 
     def active_auctions(self) -> dict:
-        collateral_auctions = {}
+        flips = {}
         for collateral in self.collaterals.values():
-            # Each collateral has it's own CollateralAuctionHouse contract; add auctions from each.
-            collateral_auctions[collateral.collateral_type.name] = collateral.collateral_auction_house.active_auctions()
+            # Each collateral has it's own flip contract; add auctions from each.
+            flips[collateral.collateral_type.name] = collateral.collateral_auction_house.active_auctions()
 
         return {
-            "collateral_auctions": collateral_auctions,
-            "surplus_auctions": self.surplus_auction_house.active_auctions(),
-            "debt_auctions": self.debt_auction_house.active_auctions()
+            "flips": flips,
+            "flaps": self.surplus_auction_house.active_auctions(),
+            "flops": self.debt_auction_house.active_auctions()
         }
 
     def __repr__(self):

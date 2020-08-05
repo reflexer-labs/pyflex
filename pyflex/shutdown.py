@@ -32,7 +32,7 @@ logger = logging.getLogger()
 
 
 class ShutdownModule(Contract):
-    """A client for the `ESM` contract, which allows users to call `end.cage()` and thereby trigger a shutdown.
+    """A client for the `ESM` contract, which allows users to call `global_settlement.shutdown_system()` and thereby trigger a shutdown.
 
     Ref. <https://github.com/makerdao/esm/blob/master/src/ESM.sol>
 
@@ -52,17 +52,17 @@ class ShutdownModule(Contract):
         self._contract = self._get_contract(web3, self.abi, address)
 
     def sum(self) -> Wad:
-        """Total balance of MKR `join`ed to this contract"""
+        """Total balance of Gov `join`ed to this contract"""
         return Wad(self._contract.functions.Sum().call())
 
     def sum_of(self, address: Address) -> Wad:
-        """MKR `join`ed to this contract by a specific account"""
+        """Gov `join`ed to this contract by a specific account"""
         assert isinstance(address, Address)
 
         return Wad(self._contract.functions.sum(address.address).call())
 
     def min(self) -> Wad:
-        """Minimum amount of MKR required to call `fire`"""
+        """Minimum amount of Gov required to call `fire`"""
         return Wad(self._contract.functions.min().call())
 
     def fired(self) -> bool:
@@ -70,17 +70,17 @@ class ShutdownModule(Contract):
         return bool(self._contract.functions.fired().call())
 
     def join(self, value: Wad) -> Transact:
-        """Before `fire` can be called, sufficient MKR must be `join`ed to this contract"""
+        """Before `fire` can be called, sufficient Gov must be `join`ed to this contract"""
         assert isinstance(value, Wad)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'join', [value.value])
 
     def fire(self):
-        """Calls `cage` on the `end` contract, initiating a shutdown."""
-        logger.info("Calling fire to cage the end")
+        """Calls `shutdown_system` on the `end` contract, initiating a shutdown."""
+        logger.info("Calling fire to shutdowm the end")
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'fire', [])
 
 
-class End(Contract):
+class GlobalSettlement(Contract):
     """A client for the `End` contract, used to orchestrate a shutdown.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/end.sol>
@@ -100,92 +100,92 @@ class End(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
-    def live(self) -> bool:
-        """False when caged, true when uncaged"""
-        return self._contract.functions.live().call() > 0
+    def contract_enabled(self) -> bool:
+        """True when enabled, false when disabled"""
+        return self._contract.functions.contractEnabled().call() > 0
 
-    def when(self) -> datetime:
-        """Time of cage"""
-        timestamp = self._contract.functions.when().call()
+    def shutdown_time(self) -> datetime:
+        """Time of disable_contract"""
+        timestamp = self._contract.functions.shutdownTime().call()
         return datetime.utcfromtimestamp(timestamp)
 
-    def wait(self) -> int:
+    def shutdown_cooldown(self) -> int:
         """Processing cooldown length, in seconds"""
-        return int(self._contract.functions.wait().call())
+        return int(self._contract.functions.shutdownCooldown().call())
 
-    def debt(self) -> Rad:
-        """total outstanding dai following processing"""
-        return Rad(self._contract.functions.debt().call())
+    def outstanding_coin_supply(self) -> Rad:
+        """total outstanding system coin following processing"""
+        return Rad(self._contract.functions.outstandingCoinSupply().call())
 
-    def tag(self, ilk: CollateralType) -> Ray:
-        """Cage price for the collateral"""
-        assert isinstance(ilk, CollateralType)
-        return Ray(self._contract.functions.tag(ilk.toBytes()).call())
+    def final_coin_per_collateral_price(self, collateral_type: CollateralType) -> Ray:
+        """Shutdown price for the collateral"""
+        assert isinstance(collateral_type, CollateralType)
+        return Ray(self._contract.functions.finalCoinPerCollateralPrice(collateral_type.toBytes()).call())
 
-    def gap(self, ilk: CollateralType) -> Wad:
+    def collateral_shortfall(self, collateral_type: CollateralType) -> Wad:
         """Collateral shortfall (difference of debt and collateral"""
-        assert isinstance(ilk, CollateralType)
-        return Wad(self._contract.functions.gap(ilk.toBytes()).call())
+        assert isinstance(collateral_type, CollateralType)
+        return Wad(self._contract.functions.collateralShortfall(collateral_type.toBytes()).call())
 
-    def art(self, ilk: CollateralType) -> Wad:
+    def collateral_total_debt(self, collateral_type: CollateralType) -> Wad:
         """Total debt for the collateral"""
-        assert isinstance(ilk, CollateralType)
-        return Wad(self._contract.functions.Art(ilk.toBytes()).call())
+        assert isinstance(collateral_type, CollateralType)
+        return Wad(self._contract.functions.collateralTotalDebt(collateral_type.toBytes()).call())
 
-    def fix(self, ilk: CollateralType) -> Ray:
+    def collateral_cash_price(self, collateral_type: CollateralType) -> Ray:
         """Final cash price for the collateral"""
-        assert isinstance(ilk, CollateralType)
-        return Ray(self._contract.functions.fix(ilk.toBytes()).call())
+        assert isinstance(collateral_type, CollateralType)
+        return Ray(self._contract.functions.collateralCashPrice(collateral_type.toBytes()).call())
 
-    def bag(self, address: Address) -> Wad:
-        """Amount of Dai `pack`ed for retrieving collateral in return"""
+    def coin_bag(self, address: Address) -> Wad:
+        """Amount of system `prepare_coins_for_redeeming`ed for retrieving collateral in return"""
         assert isinstance(address, Address)
-        return Wad(self._contract.functions.bag(address.address).call())
+        return Wad(self._contract.functions.coinBag(address.address).call())
 
-    def out(self, ilk: CollateralType, address: Address) -> Wad:
-        assert isinstance(ilk, CollateralType)
+    def coins_used_to_redeem(self, collateral_type: CollateralType, address: Address) -> Wad:
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
-        return Wad(self._contract.functions.out(ilk.toBytes(), address.address).call())
+        return Wad(self._contract.functions.coinsUsedToRedeem(collateral_type.toBytes(), address.address).call())
 
-    def cage(self, ilk: CollateralType) -> Transact:
-        """Set the `cage` price for the collateral"""
-        assert isinstance(ilk, CollateralType)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'cage(bytes32)', [ilk.toBytes()])
+    def shutdown_system(self, collateral_type: CollateralType) -> Transact:
+        """Set the `shutdownSystem` price for the collateral"""
+        assert isinstance(collateral_type, CollateralType)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutDownSystem(bytes32)', [collateral_type.toBytes()])
 
-    def skip(self, ilk: CollateralType, flip_id: int) -> Transact:
+    def fast_track_auction(self, collateral_type: CollateralType, collateral_auction_id: int) -> Transact:
         """Cancel a flip auction and seize it's collateral"""
-        assert isinstance(ilk, CollateralType)
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(flip_id, int)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'skip', [ilk.toBytes(), flip_id])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'fastTrackAuction', [collateral_type.toBytes(), collateral_auction_id])
 
-    def skim(self, ilk: CollateralType, address: Address) -> Transact:
+    def process_cdp(self, collateral_type: CollateralType, address: Address) -> Transact:
         """Cancels undercollateralized CDP debt to determine collateral shortfall"""
-        assert isinstance(ilk, CollateralType)
+        assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'skim', [ilk.toBytes(), address.address])
+                        'processCDP', [collateral_type.toBytes(), address.address])
 
-    def free(self, ilk: CollateralType) -> Transact:
+    def free_collateral(self, collateral_type: CollateralType) -> Transact:
         """Releases excess collateral after `skim`ming"""
-        assert isinstance(ilk, CollateralType)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'free', [ilk.toBytes()])
+        assert isinstance(collateral_type, CollateralType)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'freeCollateral', [collateral_type.toBytes()])
 
-    def thaw(self):
-        """Fix the total outstanding supply of Dai"""
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'thaw', [])
+    def set_outstanding_coin_supply(self):
+        """Fix the total outstanding supply of system coin"""
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'setOutstandingCoinSupply', [])
 
-    def flow(self, ilk: CollateralType) -> Transact:
+    def calculate_cash_price(self, collateral_type: CollateralType) -> Transact:
         """Calculate the `fix`, the cash price for a given collateral"""
-        assert isinstance(ilk, CollateralType)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'flow', [ilk.toBytes()])
+        assert isinstance(collateral_type, CollateralType)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'calculateCashPrice', [collateral_type.toBytes()])
 
-    def pack(self, dai: Wad) -> Transact:
-        """Deposit Dai into the `bag`, from which it cannot be withdrawn"""
-        assert isinstance(dai, Wad)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'pack', [dai.value])
+    def prepare_coins_for_redeeming(self, system_coin: Wad) -> Transact:
+        """Deposit system coin into the `coin_bag`, from which it cannot be withdrawn"""
+        assert isinstance(system_coin, Wad)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'prepareCoinsForRedeeming', [system_coin.value])
 
-    def cash(self, ilk: CollateralType, dai: Wad):
-        """Exchange an amount of dai (already `pack`ed in the `bag`) for collateral"""
-        assert isinstance(ilk, CollateralType)
-        assert isinstance(dai, Wad)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'cash', [ilk.toBytes(), dai.value])
+    def redeem_collateral(self, collateral_type: CollateralType, system_coin: Wad):
+        """Exchange an amount of system coin (already `prepare_coins_for_redeemin`ed in the `coin_bag`) for collateral"""
+        assert isinstance(collateral_type, CollateralType)
+        assert isinstance(system_coin, Wad)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'redeemCollateral', [collateral_type.toBytes(), system_coin.value])

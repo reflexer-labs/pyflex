@@ -63,7 +63,7 @@ class CollateralType:
         assert (isinstance(debt_floor, Rad) or (debt_floor is None))
 
         self.name = name
-        self.accumulate_rates = accumulated_rates 
+        self.accumulated_rates = accumulated_rates 
         self.cdp_collateral = cdp_collateral
         self.cdp_debt = cdp_debt
         self.safety_price = safety_price
@@ -342,16 +342,18 @@ class CDPEngine(Contract):
         assert isinstance(name, str)
 
         b32_collateral_type = CollateralType(name).toBytes()
-        (cdp_debt, rate, safety_price, line, dust) = self._contract.functions.collateralTypes(b32_collateral_type).call()
+        (cdp_debt, rate, safety_price, d_ceiling, d_floor, liq_price) = self._contract.functions.collateralTypes(b32_collateral_type).call()
 
-        # We could get "cdp_collateral" from the urn, but caller must provide an address.
-        return CollateralType(name, rate=Ray(rate), cdp_collateral=Wad(0), cdp_debt=Wad(cdp_debt), safety_price=Ray(safety_price), line=Rad(line), dust=Rad(dust))
+        # We could get "cdp_collateral" from the CDP, but caller must provide an address.
 
-    def collateral(self, collateral_type: CollateralType, urn: Address) -> Wad:
+        return CollateralType(name, accumulated_rates=Ray(rate), cdp_collateral=Wad(0), cdp_debt=Wad(cdp_debt),
+                safety_price=Ray(safety_price), debt_ceiling=Rad(d_ceiling), debt_floor=Rad(d_floor))
+
+    def token_collateral(self, collateral_type: CollateralType, cdp: Address) -> Wad:
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(urn, Address)
+        assert isinstance(cdp, Address)
 
-        return Wad(self._contract.functions.collateral(collateral_type.toBytes(), urn.address).call())
+        return Wad(self._contract.functions.tokenCollateral(collateral_type.toBytes(), cdp.address).call())
 
     def coin_balance(self, cdp: Address) -> Rad:
         assert isinstance(cdp, Address)
@@ -359,7 +361,7 @@ class CDPEngine(Contract):
         return Rad(self._contract.functions.coinBalance(cdp.address).call())
 
     def debt_balance(self, cdp: Address) -> Rad:
-        assert isinstance(urn, Address)
+        assert isinstance(cdp, Address)
 
         return Rad(self._contract.functions.debtBalance(cdp.address).call())
 
@@ -437,7 +439,7 @@ class CDPEngine(Contract):
 
         Args:
             collateral_type: Identifies the type of collateral.
-            urn_address: CDP holder (address of the CDP).
+            cdp_address: CDP holder (address of the CDP).
             delta_collateral: Amount of collateral to add/remove.
             delta_debt: Adjust CDP debt (amount of system coin available for borrowing).
             collateral_owner: Holder of the collateral used to fund the CDP.
@@ -450,13 +452,13 @@ class CDPEngine(Contract):
         assert isinstance(collateral_owner, Address) or (collateral_owner is None)
         assert isinstance(system_coin_recipient, Address) or (system_coin_recipient is None)
 
-        # Usually these addresses are the same as the account holding the urn
+        # Usually these addresses are the same as the account holding the cdp
         v = collateral_owner or cdp_address
         w = system_coin_recipient or cdp_address
         assert isinstance(v, Address)
         assert isinstance(w, Address)
 
-        self.validate_frob(collateral_type, cdp_address, delta_collateral, delta_debt)
+        self.validate_cdp_modification(collateral_type, cdp_address, delta_collateral, delta_debt)
 
         if v == cdp_address and w == cdp_address:
             logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} with "
@@ -511,11 +513,11 @@ class CDPEngine(Contract):
         under_system_debt_ceiling = debt < self.global_debt_ceiling()
         calm = delta_debt <= Wad(0) or (under_collateral_debt_ceiling and under_system_debt_ceiling)
 
-        # urn is either less risky than before, or it is safe
+        # cdp is either less risky than before, or it is safe
         safe = (delta_debt <= Wad(0) and delta_collateral >= Wad(0)) or \
                 tab <= Ray(cdp_collateral) * collateral_type.safety_price
 
-        # urn has no debt, or a non-dusty amount
+        # cdp has no debt, or a non-dusty amount
         neat = cdp_debt == Wad(0) or Rad(tab) >= collateral_type.debt_floor
 
         if not under_collateral_debt_ceiling:
@@ -680,7 +682,7 @@ class AccountingEngine(Contract):
         return Rad(self._contract.functions.totalOnAuctionDebt().call())
 
     def woe(self) -> Rad:
-        return (self.cdp_engine.debtBalance(self.address) - self.debt_queue()) - self.total_on_auction_debt()
+        return (self.cdp_engine.debt_balance(self.address) - self.debt_queue()) - self.total_on_auction_debt()
 
     def pop_debt_delay(self) -> int:
         return int(self._contract.functions.popDebtDelay().call())
@@ -704,7 +706,7 @@ class AccountingEngine(Contract):
 
     def settle_debt(self, rad: Rad) -> Transact:
         assert isinstance(rad, Rad)
-        logger.info(f"Settling debt joy={self.cdp_engine.coinBalance(self.address)} woe={self.woe()}")
+        logger.info(f"Settling debt joy={self.cdp_engine.coin_balance(self.address)} woe={self.woe()}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [rad.value])
 
@@ -746,7 +748,7 @@ class TaxCollector(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
         self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
-        #self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.accountingEngine().call()))
+        self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.primaryTaxReceiver().call()))
 
     def initialize_collateral_type(self, collateral_type: CollateralType) -> Transact:
         assert isinstance(collateral_type, CollateralType)
@@ -791,7 +793,7 @@ class LiquidationEngine(Contract):
     class LogLiquidate:
         def __init__(self, log):
             self.collateral_type = CollateralType.fromBytes(log['args']['collateralType'])
-            self.urn = CDP(Address(log['args']['CDP']))
+            self.cdp = CDP(Address(log['args']['CDP']))
             self.cdp_collateral = Wad(log['args']['cdpCollateral'])
             self.cdp_debt = Wad(log['args']['cdpDebt'])
             self.tab = Rad(log['args']['amountToRaise'])

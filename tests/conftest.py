@@ -90,8 +90,8 @@ def geb(web3) -> GfDeployment:
 def validate_contracts_loaded(deployment: GfDeployment):
     assert isinstance(deployment.cdp_engine, CDPEngine)
     assert deployment.cdp_engine.address is not None
-    assert isinstance(deployment.acct_engine, AccountingEngine)
-    assert deployment.acct_engine.address is not None
+    assert isinstance(deployment.accounting_engine, AccountingEngine)
+    assert deployment.accounting_engine.address is not None
     assert isinstance(deployment.liquidation_engine, LiquidationEngine)
     assert deployment.liquidation_engine.address is not None
     assert isinstance(deployment.tax_collector, TaxCollector)

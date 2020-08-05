@@ -20,182 +20,182 @@ import pytest
 from datetime import datetime, timedelta
 
 from pyflex import Address
-from pyflex.approval import directly, hope_directly
-from pyflex.deployment import DssDeployment
+from pyflex.approval import directly, approve_cdp_modification_directly
+from pyflex.deployment import GfDeployment
 from pyflex.gf import Collateral
 from pyflex.numeric import Wad, Ray, Rad
-from pyflex.shutdown import ShutdownModule, End
+from pyflex.shutdown import ShutdownModule, GlobalSettlement
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
-from tests.test_gf import mint_mkr, wrap_eth, frob
+from tests.test_gf import mint_gov, wrap_eth, wrap_modify_CDP_collateralization
 
 
-def open_cdp(mcd: DssDeployment, collateral: Collateral, address: Address):
-    assert isinstance(mcd, DssDeployment)
+def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
+    assert isinstance(geb, GfDeployment)
     assert isinstance(collateral, Collateral)
     assert isinstance(address, Address)
 
     collateral.approve(address)
-    wrap_eth(mcd, address, Wad.from_number(10))
+    wrap_eth(geb, address, Wad.from_number(10))
     assert collateral.adapter.join(address, Wad.from_number(10)).transact(from_address=address)
-    frob(mcd, collateral, address, Wad.from_number(10), Wad.from_number(15))
+    wrap_modify_CDP_collateralization(geb, collateral, address, Wad.from_number(10), Wad.from_number(15))
 
-    assert mcd.vat.debt() >= Rad(Wad.from_number(15))
-    assert mcd.vat.dai(address) >= Rad.from_number(10)
+    assert geb.cdp_engine.debt() >= Rad(Wad.from_number(15))
+    assert geb.cdp_engine.coin_balance(address) >= Rad.from_number(10)
 
 
-def create_flap_auction(mcd: DssDeployment, deployment_address: Address, our_address: Address):
-    assert isinstance(mcd, DssDeployment)
+def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_address: Address):
+    assert isinstance(geb, GfDeployment)
     assert isinstance(deployment_address, Address)
     assert isinstance(our_address, Address)
 
-    flapper = mcd.flapper
-    create_surplus(mcd, flapper, deployment_address)
-    joy = mcd.vat.dai(mcd.vow.address)
-    assert joy > mcd.vat.sin(mcd.vow.address) + mcd.vow.bump() + mcd.vow.hump()
-    assert (mcd.vat.sin(mcd.vow.address) - mcd.vow.sin()) - mcd.vow.ash() == Rad(0)
-    assert mcd.vow.flap().transact()
+    surplus_auction_house = geb.surplus_auction_house
+    create_surplus(geb, surplus_auction_house, deployment_address)
+    coin_balance = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
+    assert coin_balance > geb.cdp_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
+    assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - geb.accounting_engine.total_on_auction_debt() == Rad(0)
+    assert geb.accounting_engine.auction_surplus().transact()
 
-    mint_mkr(mcd.mkr, our_address, Wad.from_number(10))
-    flapper.approve(mcd.mkr.address, directly(from_address=our_address))
+    mint_gov(geb.gov, our_address, Wad.from_number(10))
+    surplus_auction_house.approve(geb.gov.address, directly(from_address=our_address))
     bid = Wad.from_number(0.001)
-    assert mcd.mkr.balance_of(our_address) > bid
-    assert flapper.tend(flapper.kicks(), mcd.vow.bump(), bid).transact(from_address=our_address)
+    assert geb.gov.balance_of(our_address) > bid
+    assert surplus_auction_house.increase_bid_size(surplus_auction_house.auctions_started(), geb.accounting_engine.surplus_auction_amount_to_sell(), bid).transact(from_address=our_address)
 
 
 nobody = Address("0x0000000000000000000000000000000000000000")
 
 
 class TestShutdownModule:
-    """This test must be run after other MCD tests because it will leave the testchain `cage`d."""
+    """This test must be run after other GEB tests because it will leave the testchain `disabled`d."""
 
-    def test_init(self, mcd, deployment_address, our_address):
-        assert mcd.esm is not None
-        assert isinstance(mcd.esm, ShutdownModule)
-        assert isinstance(mcd.esm.address, Address)
-        assert mcd.esm.sum() == Wad(0)
-        assert mcd.esm.min() > Wad(0)
-        assert not mcd.esm.fired()
+    def test_init(self, geb, deployment_address, our_address):
+        assert geb.esm is not None
+        assert isinstance(geb.esm, ShutdownModule)
+        assert isinstance(geb.esm.address, Address)
+        assert geb.esm.sum() == Wad(0)
+        assert geb.esm.min() > Wad(0)
+        assert not geb.esm.fired()
 
-        joy = mcd.vat.dai(mcd.vow.address)
-        awe = mcd.vat.sin(mcd.vow.address)
-        # If `test_shutdown.py` is run in isolation, create a flap auction to exercise `yank`
-        if joy == Rad(0) and awe == Rad(0):
-            create_flap_auction(mcd, deployment_address, our_address)
+        coin_balance = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
+        awe = geb.cdp_engine.debt_balance(geb.accounting_engine.address)
+        # If `test_shutdown.py` is run in isolation, create a surplus auction to exercise `terminate_auction_prematurely`
+        if coin_balance == Rad(0) and awe == Rad(0):
+            create_surplus_auction(geb, deployment_address, our_address)
 
-    def test_join(self, mcd, our_address):
-        assert mcd.mkr.approve(mcd.esm.address).transact()
+    def test_join(self, geb, our_address):
+        assert geb.gov.approve(geb.esm.address).transact()
 
         # This should have no effect yet succeed regardless
-        assert mcd.esm.join(Wad(0)).transact()
-        assert mcd.esm.sum() == Wad(0)
-        assert mcd.esm.sum_of(our_address) == Wad(0)
+        assert geb.esm.join(Wad(0)).transact()
+        assert geb.esm.sum() == Wad(0)
+        assert geb.esm.sum_of(our_address) == Wad(0)
 
         # Ensure the appropriate amount of MKR can be joined
-        mint_mkr(mcd.mkr, our_address, mcd.esm.min())
-        assert mcd.esm.join(mcd.esm.min()).transact()
-        assert mcd.esm.sum() == mcd.esm.min()
+        mint_gov(geb.gov, our_address, geb.esm.min())
+        assert geb.esm.join(geb.esm.min()).transact()
+        assert geb.esm.sum() == geb.esm.min()
 
         # Joining extra MKR should succeed yet have no effect
-        mint_mkr(mcd.mkr, our_address, Wad(153))
-        assert mcd.esm.join(Wad(153)).transact()
-        assert mcd.esm.sum() == mcd.esm.min() + Wad(153)
-        assert mcd.esm.sum_of(our_address) == mcd.esm.sum()
+        mint_gov(geb.gov, our_address, Wad(153))
+        assert geb.esm.join(Wad(153)).transact()
+        assert geb.esm.sum() == geb.esm.min() + Wad(153)
+        assert geb.esm.sum_of(our_address) == geb.esm.sum()
 
-    def test_fire(self, mcd, our_address):
-        open_cdp(mcd, mcd.collaterals['ETH-A'], our_address)
+    def test_fire(self, geb, our_address):
+        open_cdp(geb, geb.collaterals['ETH-A'], our_address)
 
-        assert mcd.end.live()
-        assert mcd.esm.fire().transact()
-        assert mcd.esm.fired()
-        assert not mcd.end.live()
+        assert geb.global_settlement.contract_enabled()
+        assert geb.esm.fire().transact()
+        assert geb.esm.fired()
+        assert not geb.global_settlement.contract_enabled()
 
 
-class TestEnd:
+class TestGlobalSettlement:
     """This test must be run after TestShutdownModule, which calls `esm.fire`."""
 
-    def test_init(self, mcd):
-        assert mcd.end is not None
-        assert isinstance(mcd.end, End)
-        assert isinstance(mcd.esm.address, Address)
+    def test_init(self, geb):
+        assert geb.global_settlement is not None
+        assert isinstance(geb.global_settlement, GlobalSettlement)
+        assert isinstance(geb.esm.address, Address)
 
-    def test_getters(self, mcd):
-        assert not mcd.end.live()
-        assert datetime.utcnow() - timedelta(minutes=5) < mcd.end.when() < datetime.utcnow()
-        assert mcd.end.wait() >= 0
-        assert mcd.end.debt() >= Rad(0)
+    def test_getters(self, geb):
+        assert not geb.global_settlement.contract_enabled()
+        assert datetime.utcnow() - timedelta(minutes=5) < geb.global_settlement.when() < datetime.utcnow()
+        assert geb.global_settlement.shutdown_cooldown() >= 0
+        assert geb.global_settlement.outstanding_coin_supply() >= Rad(0)
 
-        for collateral in mcd.collaterals.values():
-            ilk = collateral.ilk
-            assert mcd.end.tag(ilk) == Ray(0)
-            assert mcd.end.gap(ilk) == Wad(0)
-            assert mcd.end.art(ilk) == Wad(0)
-            assert mcd.end.fix(ilk) == Ray(0)
+        for collateral in geb.collaterals.values():
+            collateral_type = collateral.collateral_type
+            assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) == Ray(0)
+            assert geb.global_settlement.collateral_shortfall(collateral_type) == Wad(0)
+            assert geb.global_settlement.art(collateral_type) == Wad(0)
+            assert geb.global_settlement.collatera_cash_price(collateral_type) == Ray(0)
 
-    def test_cage(self, mcd):
-        collateral = mcd.collaterals['ETH-A']
-        ilk = collateral.ilk
+    def test_disable_contract(self, geb):
+        collateral = geb.collaterals['ETH-A']
+        collateral_type = collateral.collateral_type
 
-        assert mcd.end.cage(ilk).transact()
-        assert mcd.end.art(ilk) > Wad(0)
-        assert mcd.end.tag(ilk) > Ray(0)
+        assert geb.global_settlement.disable_contract(collateral_type).transact()
+        assert geb.global_settlement.art(collateral_type) > Wad(0)
+        assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) > Ray(0)
 
-    def test_yank(self, mcd):
-        last_flap = mcd.flapper.bids(mcd.flapper.kicks())
-        last_flop = mcd.flopper.bids(mcd.flopper.kicks())
-        if last_flap.end > 0 and last_flap.guy is not nobody:
-            auction = mcd.flapper
-        elif last_flop.end > 0 and last_flop.guy is not nobody:
-            auction = mcd.flopper
+    def test_terminate_auction_prematurely(self, geb):
+        last_surplus_auction = geb.surplus_auction_house.bids(geb.surplus_auction_house.auctions_started())
+        last_collateral_auction = geb.debt_auction_house.bids(geb.debt_auction_house.auctions_started())
+        if last_surplus_auction.auction_deadline > 0 and last_surplus_auction.high_bidder is not nobody:
+            auction = geb.surplus_auction_house
+        elif last_collateral_auction.auction_deadline > 0 and last_collatera_auction.high_bidder is not nobody:
+            auction = geb.debt_auction_house
         else:
             auction = None
 
         if auction:
-            print(f"active {auction} auction: {auction.bids(auction.kicks())}")
-            assert not auction.live()
-            kick = auction.kicks()
-            assert auction.yank(kick).transact()
-            assert auction.bids(kick).guy == nobody
+            print(f"active {auction} auction: {auction.bids(auction.auctions_started())}")
+            assert not auction.contract_enabled()
+            kick = auction.auctions_started()
+            assert auction.terminate_auction_prematurely(kick).transact()
+            assert auction.bids(kick).high_bidder == nobody
 
-    def test_skim(self, mcd, our_address):
-        ilk = mcd.collaterals['ETH-A'].ilk
+    def test_process_cdp(self, geb, our_address):
+        collateral_type = geb.collaterals['ETH-A'].collateral_type
 
-        urn = mcd.vat.urn(ilk, our_address)
-        owe = Ray(urn.art) * mcd.vat.ilk(ilk.name).rate * mcd.end.tag(ilk)
+        cdp = geb.cdp_engine.cdp(collateral_type, our_address)
+        owe = Ray(cdp.cdp_debt) * geb.cdp_engine.collateral_type(collateral_type.name).rate * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
         assert owe > Ray(0)
-        wad = min(Ray(urn.ink), owe)
+        wad = min(Ray(cdp.locked_collateral), owe)
         print(f"owe={owe} wad={wad}")
 
-        assert mcd.end.skim(ilk, our_address).transact()
-        assert mcd.vat.urn(ilk, our_address).art == Wad(0)
-        assert mcd.vat.urn(ilk, our_address).ink > Wad(0)
-        assert mcd.vat.sin(mcd.vow.address) > Rad(0)
+        assert geb.global_settlement.process_cdp(collateral_type, our_address).transact()
+        assert geb.cdp_engine.cdp(collateral_type, our_address).generated_debt == Wad(0)
+        assert geb.cdp_engine.cdp(collateral_type, our_address).locked_collateral > Wad(0)
+        assert geb.cdp_engine.debt_balance(geb.accounting_engine.address) > Rad(0)
 
-        assert mcd.vat.debt() > Rad(0)
-        assert mcd.vat.vice() > Rad(0)
+        assert geb.cdp_engine.global_debt() > Rad(0)
+        assert geb.cdp_engine.global_unbacked_debt() > Rad(0)
 
-    def test_close_cdp(self, web3, mcd, our_address):
-        collateral = mcd.collaterals['ETH-A']
-        ilk = collateral.ilk
+    def test_close_cdp(self, web3, geb, our_address):
+        collateral = geb.collaterals['ETH-A']
+        collateral_type = collateral.collateral_type
 
-        assert mcd.end.free(ilk).transact()
-        assert mcd.vat.urn(ilk, our_address).ink == Wad(0)
-        assert mcd.vat.gem(ilk, our_address) > Wad(0)
-        assert collateral.adapter.exit(our_address, mcd.vat.gem(ilk, our_address)).transact()
+        assert geb.global_settlement.free(collateral_type).transact()
+        assert geb.cdp_engine.cdp(collateral_type, our_address).locked_collateral == Wad(0)
+        assert geb.cdp_engine.token_collateral(collateral_type, our_address) > Wad(0)
+        assert collateral.adapter.exit(our_address, geb.cdp_engine.token_collateral(collateral_type, our_address)).transact()
 
-        assert mcd.end.wait() == 5
+        assert geb.global_settlement.shutdown_cooldown() == 5
         time_travel_by(web3, 5)
-        assert mcd.end.thaw().transact()
-        assert mcd.end.flow(ilk).transact()
-        assert mcd.end.fix(ilk) > Ray(0)
+        assert geb.global_settlement.set_outstanding_coin_supply().transact()
+        assert geb.global_settlement.calculate_cash_price(collateral_type).transact()
+        assert geb.global_settlement.collateral_cash_price(collateral_type) > Ray(0)
 
-    @pytest.mark.skip(reason="unable to add dai to the `bag`")
-    def test_pack(self, mcd, our_address):
-        assert mcd.end.bag(our_address) == Wad(0)
-        assert mcd.end.debt() > Rad(0)
-        assert mcd.dai.approve(mcd.end.address).transact()
-        assert mcd.vat.dai(our_address) >= Rad.from_number(10)
-        # FIXME: `pack` fails, possibly because we're passing 0 to `vat.flux`
-        assert mcd.end.pack(Wad.from_number(10)).transact()
-        assert mcd.end.bag(our_address) == Wad.from_number(10)
+    @pytest.mark.skip(reason="unable to add system_coin to the `coin_bag`")
+    def test_prepare_coins_for_rdeeming(self, geb, our_address):
+        assert geb.global_settlement.coin_bag(our_address) == Wad(0)
+        assert geb.global_settlement.outstanding_coin_supply() > Rad(0)
+        assert geb.system_coin.approve(geb.global_settlement.address).transact()
+        assert geb.cdp_engine.coin_balance(our_address) >= Rad.from_number(10)
+        # FIXME: `pack` fails, possibly because we're passing 0 to `cdpEngine.transfer_collateral`
+        assert geb.global_settlement.prepare_coins_for_redeeming(Wad.from_number(10)).transact()
+        assert geb.global_settlement.coin_bag(our_address) == Wad.from_number(10)
