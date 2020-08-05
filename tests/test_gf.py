@@ -174,10 +174,10 @@ def cleanup_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     if cdp.generated_debt == Wad(0) and cdp.locked_collateral > Wad(0):
         wrap_modify_CDP_collateralization(geb, collateral, address, cdp.locked_collateral * -1, Wad(0))
     assert collateral.adapter.exit(address, geb.cdp_engine.token_collateral(collateral.collateral_type, address)).transact(from_address=address)
-    # TestVat.ensure_clean_cdp(geb, collateral, address)
+    # TestCDPEngine.ensure_clean_cdp(geb, collateral, address)
 
 
-def simulate_bite(geb: GfDeployment, collateral: Collateral, our_address: Address):
+def simulate_liquidate_cdp(geb: GfDeployment, collateral: Collateral, our_address: Address):
     assert isinstance(geb, GfDeployment)
     assert isinstance(collateral, Collateral)
     assert isinstance(our_address, Address)
@@ -189,7 +189,7 @@ def simulate_bite(geb: GfDeployment, collateral: Collateral, our_address: Addres
     assert (Ray(cdp.locked_collateral) * collateral_type.spot) < (Ray(cdp.generated_debt) * collateral_type.rate)
 
     # Lesser of our collateral balance and the liquidation quantity
-    lot = min(cdp.locked_collateral, geb.cat.lump(collateral_type))  # Wad
+    lot = min(cdp.locked_collateral, geb.liquidation_engine.lump(collateral_type))  # Wad
     # Lesser of our stablecoin debt and the canceled debt pro rata the seized collateral
     art = min(cdp.generated_debt, (lot * cdp.generated_debt) / cdp.locked_collateral)  # Wad
     # Stablecoin to be raised in flip auction
@@ -220,14 +220,14 @@ def bite(web3: Web3, geb: GfDeployment, our_address: Address):
 
     # Bite the CDP
     simulate_bite(geb, collateral, our_address)
-    assert geb.cat.bite(collateral.collateral_type, Urn(our_address)).transact()
+    assert geb.liquidation_engine.bite(collateral.collateral_type, Urn(our_address)).transact()
 
 
 @pytest.fixture(scope="session")
 def bite_event(web3: Web3, geb: GfDeployment, our_address: Address):
     bite(web3, geb, our_address)
     # Return the corresponding event
-    return geb.cat.past_bites(1)[0]
+    return geb.liquidation_engine.past_bites(1)[0]
 
 
 class TestConfig:
@@ -241,8 +241,8 @@ class TestConfig:
     def test_to_json(self, web3: Web3, geb: GfDeployment):
         config_out = geb.to_json()
         dict = json.loads(config_out)
-        assert "MCD_GOV" in dict
-        assert "MCD_DAI" in dict
+        assert "GEB_GOV" in dict
+        assert "GEB_COIN" in dict
         assert len(dict) > 20
 
     def test_from_node(self, web3: Web3):
@@ -281,12 +281,12 @@ class TestConfig:
 
     def test_get_active_auctions(self, geb):
         auctions = geb.active_auctions()
-        assert "flips" in auctions
-        assert "flaps" in auctions
-        assert "flops" in auctions
+        assert "collateral_auctions" in auctions
+        assert "surplus_auctions" in auctions
+        assert "debt_auctions" in auctions
 
 
-class TestVat:
+class TestCDPEngine:
     @staticmethod
     def ensure_clean_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
         assert isinstance(geb, GfDeployment)
@@ -332,13 +332,14 @@ class TestVat:
         assert after_exit == before_join
 
     def test_collateral_join(self, geb: GfDeployment):
+        pass
         #collateral_bat = geb.collaterals['BAT-A']
         #assert isinstance(collateral_bat.adapter, CollateralJoin)
         #assert collateral_bat.adapter.dec() == 18
 
-        collateral_usdc = geb.collaterals['USDC-A']
-        assert isinstance(collateral_usdc.adapter, CollateralJoin5)
-        assert collateral_usdc.adapter.dec() == 6
+        #collateral_usdc = geb.collaterals['USDC-A']
+        #assert isinstance(collateral_usdc.adapter, CollateralJoin5)
+        #assert collateral_usdc.adapter.dec() == 6
 
     def test_coin_balance(self, geb, cdp):
         coin_balance = geb.cdp_engine.coin_balance(cdp.address)
@@ -365,7 +366,7 @@ class TestVat:
         # then
         assert geb.cdp_engine.cdp(collateral.collateral_type, our_address) == our_cdp
 
-    def test_modify_CDP_collateralization_add_ink(self, geb, our_address):
+    def test_modify_CDP_collateralization_add_collateral(self, geb, our_address):
         # given
         collateral = geb.collaterals['ETH-A']
         our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
@@ -381,7 +382,7 @@ class TestVat:
         # rollback
         cleanup_cdp(geb, collateral, our_address)
 
-    def test_modify_CDP_collateralization_add_art(self, geb, our_address: Address):
+    def test_modify_CDP_collateralization_add_debt(self, geb, our_address: Address):
         # given
         collateral = geb.collaterals['ETH-A']
         our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
@@ -468,7 +469,7 @@ class TestVat:
 
             assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=collateral_type0)) == 1
             assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=collateral_type1)) == 3
-            assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=geb.collaterals['USDC-A'].collateral_type)) == 0
+            #assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=geb.collaterals['USDC-A'].collateral_type)) == 0
 
         finally:
             # teardown
@@ -517,7 +518,7 @@ class TestVat:
         # rollback
         cleanup_cdp(geb, collateral, our_address)
 
-    def test_fork(self, geb, our_address, other_address):
+    def test_transfer_cdp_collateral_and_debt(self, geb, our_address, other_address):
         # given
         collateral = geb.collaterals['ETH-A']
         geb.cdp_engine.approve_cdp_modification(our_address).transact(from_address=other_address)
@@ -530,7 +531,7 @@ class TestVat:
         cdp_before = geb.cdp_engine.cdp(collateral.collateral_type, other_address)
 
         # when
-        assert geb.cdp_engine.fork(collateral.collateral_type, our_address, other_address, Wad(3), Wad(10)).transact()
+        assert geb.cdp_engine.transfer_cdp_collateral_and_debt(collateral.collateral_type, our_address, other_address, Wad(3), Wad(10)).transact()
 
         # then
         cdp_after = geb.cdp_engine.cdp(collateral.collateral_type, other_address)
@@ -541,7 +542,7 @@ class TestVat:
         cleanup_cdp(geb, collateral, our_address)
 
 
-class TestCat:
+class TestLiquidationEngine:
     def test_getters(self, geb):
         assert isinstance(geb.liquidation_engine.contract_enabled(), bool)
         assert isinstance(geb.liquidation_engine.cdp_engine, CDPEngine)
@@ -553,7 +554,7 @@ class TestCat:
         assert isinstance(geb.liquidation_engine.liquidation_penalty(collateral.collateral_type), Ray)
 
 
-class TestSpotter:
+class TestOracleRelayer:
     def test_mat(self, geb):
         val = Ray(geb.collaterals['ETH-A'].pip.read_as_int())
 
@@ -561,19 +562,19 @@ class TestSpotter:
         redemption_price = geb.oracle_relayer.redemption_price()
         mat = geb.oracle_relayer.safety_c_ratio(collateral_type)
 
-        assert mat == (Ray(val * 10 ** 9) / redemption_price) / (collateral_type.spot)
+        assert mat == (Ray(val * 10 ** 9) / redemption_price) / (collateral_type.safety_price)
 
 
 class TestAccountingEngine:
     def test_getters(self, geb):
         assert isinstance(geb.accounting_engine.cdp_engine, CDPEngine)
         assert isinstance(geb.accounting_engine.contract_enabled(), bool)
-        assert isinstance(geb.accounting_engine.surplus_auction_house, Address)
+        assert isinstance(geb.accounting_engine.surplus_auction_house(), Address)
         assert isinstance(geb.accounting_engine.debt_auction_house(), Address)
         assert isinstance(geb.accounting_engine.debt_queue(), Rad)
-        assert isinstance(geb.accounting_engine.sin_of(0), Rad)
+        assert isinstance(geb.accounting_engine.debt_queue_of(0), Rad)
         assert isinstance(geb.accounting_engine.total_on_auction_debt(), Rad)
-        assert isinstance(geb.accounting_engine.woe(), Rad)
+        assert isinstance(geb.accounting_engine.unqueued_unauctioned_debt(), Rad)
         assert isinstance(geb.accounting_engine.pop_debt_delay(), int)
         assert isinstance(geb.accounting_engine.initial_debt_auction_minted_tokens(), Wad)
         assert isinstance(geb.accounting_engine.debt_auction_bid_size(), Rad)
@@ -636,7 +637,7 @@ class TestGeb:
     def test_healthy_cdp(self, web3, geb, our_address):
         collateral = geb.collaterals['ETH-B']
         collateral_type = collateral.collateral_type
-        TestVat.ensure_clean_cdp(geb, collateral, our_address)
+        TestCDPEngine.ensure_clean_cdp(geb, collateral, our_address)
         initial_dai = geb.cdp_engine.coin_balance(our_address)
         wrap_eth(geb, our_address, Wad.from_number(9))
 

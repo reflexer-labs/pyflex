@@ -675,13 +675,13 @@ class AccountingEngine(Contract):
     def debt_queue(self) -> Rad:
         return Rad(self._contract.functions.totalQueuedDebt().call())
 
-    def sin_of(self, era: int) -> Rad:
+    def debt_queue_of(self, era: int) -> Rad:
         return Rad(self._contract.functions.debtQueue(era).call())
 
     def total_on_auction_debt(self) -> Rad:
         return Rad(self._contract.functions.totalOnAuctionDebt().call())
 
-    def woe(self) -> Rad:
+    def unqueued_unauctioned_debt(self) -> Rad:
         return (self.cdp_engine.debt_balance(self.address) - self.debt_queue()) - self.total_on_auction_debt()
 
     def pop_debt_delay(self) -> int:
@@ -706,7 +706,7 @@ class AccountingEngine(Contract):
 
     def settle_debt(self, rad: Rad) -> Transact:
         assert isinstance(rad, Rad)
-        logger.info(f"Settling debt joy={self.cdp_engine.coin_balance(self.address)} woe={self.woe()}")
+        logger.info(f"Settling debt joy={self.cdp_engine.coin_balance(self.address)} unqueued_enauctioned_debt={self.unqueued_unauctioned_debt()}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [rad.value])
 
@@ -717,7 +717,7 @@ class AccountingEngine(Contract):
 
     def auction_debt(self) -> Transact:
         """Initiate a debt auction"""
-        logger.info(f"Initiating a debt auction with woe={self.woe()}")
+        logger.info(f"Initiating a debt auction with unqueued_unauctioned_debt={self.unqueued_unauctioned_debt()}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionDebt', [])
 
@@ -841,7 +841,7 @@ class LiquidationEngine(Contract):
     def contract_enabled(self) -> bool:
         return self._contract.functions.contractEnabled().call() > 0
 
-    def liquidate_CDP(self, collateral_type: CollateralType, cdp: CDP) -> Transact:
+    def liquidate_cdp(self, collateral_type: CollateralType, cdp: CDP) -> Transact:
         """ Initiate liquidation of a CDP, kicking off a collateral auction
 
         Args:

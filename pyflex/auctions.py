@@ -41,8 +41,8 @@ class AuctionContract(Contract):
 
     class SettleAuctionLog:
         def __init__(self, lognote: LogNote):
-            # This is whoever called `settleAuction`, which could differ from the `high_bidder` who won the auction
-            self.usr = Address(lognote.usr)
+            # This is whoever called `settle_auction`, which could differ from the `high_bidder` who won the auction
+            self.forgone_collateral_receiver = Address(lognote.forgone_collateral_receiver)
             self.id = Web3.toInt(lognote.arg1)
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
@@ -106,20 +106,13 @@ class AuctionContract(Contract):
         auction_count = self.auctions_started() + 1
         for index in range(1, auction_count):
             bid = self._bids(index)
-            if bid.guy != Address("0x0000000000000000000000000000000000000000"):
+            if bid.high_bidder != Address("0x0000000000000000000000000000000000000000"):
                 now = datetime.now().timestamp()
                 if (bid.bid_expiry == 0 or now < bid.bid_expiry) and now < bid.auction_deadline:
                     active_auctions.append(bid)
             index += 1
         return active_auctions
 
-    def bid_increase(self) -> Wad:
-        """Returns the percentage minimum bid increase.
-
-        Returns:
-            The percentage minimum bid increase.
-        """
-        return Wad(self._contract.functions.bidIncrease().call())
 
     def bid_duration(self) -> int:
         """Returns the bid lifetime.
@@ -207,7 +200,7 @@ class CollateralAuctionHouse(AuctionContract):
             assert(isinstance(amount_to_raise, Rad))
 
             self.id = id
-            self.bid_amount = bid
+            self.bid_amount = bid_amount
             self.amount_to_sell = amount_to_sell
             self.high_bidder = high_bidder
             self.bid_expiry = bid_expiry
@@ -224,10 +217,10 @@ class CollateralAuctionHouse(AuctionContract):
             args = log['args']
             self.id = args['id']
             self.amount_to_sell = Wad(args['amountToSell'])
-            self.bid = Rad(args['bid'])
-            self.tab = Rad(args['tab'])
-            self.usr = Address(args['usr'])
-            self.gal = Address(args['gal'])
+            self.bid_amount = Rad(args['bidAmount'])
+            self.amount_to_raise = Rad(args['amountToRaise'])
+            self.forgone_collateral_receiver = Address(args['forgoneCollateralReceiver'])
+            self.auction_income_recipient = Address(args['auctionIncomeRecipient'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
@@ -236,10 +229,10 @@ class CollateralAuctionHouse(AuctionContract):
 
     class IncreaseBidSizeLog:
         def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.usr)
+            self.high_bidder = Address(lognote.forgone_collateral_receiver)
             self.id = Web3.toInt(lognote.arg1)
             self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
-            self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
+            self.bid_amount = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
@@ -248,10 +241,10 @@ class CollateralAuctionHouse(AuctionContract):
 
     class DecreaseSoldAmountLog:
         def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.usr)
+            self.high_bidder = Address(lognote.forgone_collateral_receiver)
             self.id = Web3.toInt(lognote.arg1)
             self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
-            self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
+            self.bid_amount = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
@@ -259,7 +252,17 @@ class CollateralAuctionHouse(AuctionContract):
             return f"CollateralAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
         super(CollateralAuctionHouse, self).__init__(web3, address, CollateralAuctionHouse.abi, self.bids)
+
+    def bid_increase(self) -> Wad:
+        """Returns the percentage minimum bid increase.
+
+        Returns:
+            The percentage minimum bid increase.
+        """
+        return Wad(self._contract.functions.bidIncrease().call())
 
     def bids(self, id: int) -> Bid:
         """Returns the auction details.
@@ -275,25 +278,26 @@ class CollateralAuctionHouse(AuctionContract):
         array = self._contract.functions.bids(id).call()
 
         return CollateralAuctionHouse.Bid(id=id,
-                           bid=Rad(array[0]),
+                           bid_amount=Rad(array[0]),
                            amount_to_sell=Wad(array[1]),
                            high_bidder=Address(array[2]),
                            bid_expiry=int(array[3]),
                            auction_deadline=int(array[4]),
-                           usr=Address(array[5]),
-                           gal=Address(array[6]),
-                           tab=Rad(array[7]))
+                           forgone_collateral_receiver=Address(array[5]),
+                           auction_income_recipient=Address(array[6]),
+                           amount_to_raise=Rad(array[7]))
 
-    def startAuction(self, usr: Address, gal: Address, tab: Rad, amount_to_sell: Wad, bid: Rad) -> Transact:
-        assert(isinstance(usr, Address))
-        assert(isinstance(gal, Address))
-        assert(isinstance(tab, Rad))
+    def start_auction(self, forgone_collateral_receiver: Address, auction_income_recipient: Address,
+                      amount_to_raise: Rad, amount_to_sell: Wad, bid: Rad) -> Transact:
+        assert(isinstance(forgoneCollateralReceiver, Address))
+        assert(isinstance(auction_income_recipient, Address))
+        assert(isinstance(amount_to_raise, Rad))
         assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [usr.address,
-                                                                                          gal.address,
-                                                                                          tab.value,
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [forgone_collateral_receiver.address,
+                                                                                          auction_income_recipient.address,
+                                                                                          amount_to_raise.value,
                                                                                           amount_to_sell.value,
                                                                                           bid.value])
 
@@ -399,7 +403,7 @@ class SurplusAuctionHouse(AuctionContract):
 
     class IncreaseBidSizeLog:
         def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.usr)
+            self.high_bidder = Address(lognote.forgone_collateral_receiver)
             self.id = Web3.toInt(lognote.arg1)
             self.amount_to_sell = Rad(Web3.toInt(lognote.arg2))
             self.bid = Wad(Web3.toInt(lognote.get_bytes_at_index(2)))
@@ -410,10 +414,20 @@ class SurplusAuctionHouse(AuctionContract):
             return f"SurplusAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
         super(SurplusAuctionHouse, self).__init__(web3, address, SurplusAuctionHouse.abi, self.bids)
 
-    def live(self) -> bool:
-        return self._contract.functions.live().call() > 0
+    def bid_increase(self) -> Wad:
+        """Returns the percentage minimum bid increase.
+
+        Returns:
+            The percentage minimum bid increase.
+        """
+        return Wad(self._contract.functions.bidIncrease().call())
+
+    def contract_enabled(self) -> bool:
+        return self._contract.functions.contractEnabled().call() > 0
 
     def bids(self, id: int) -> Bid:
         """Returns the auction details.
@@ -429,7 +443,7 @@ class SurplusAuctionHouse(AuctionContract):
         array = self._contract.functions.bids(id).call()
 
         return SurplusAuctionHouse.Bid(id=id,
-                           bid=Wad(array[0]),
+                           bid_amount=Wad(array[0]),
                            amount_to_sell=Rad(array[1]),
                            high_bidder=Address(array[2]),
                            bid_expiry=int(array[3]),
@@ -538,8 +552,8 @@ class DebtAuctionHouse(AuctionContract):
             args = log['args']
             self.id = args['id']
             self.amount_to_sell = Wad(args['amountToSell'])
-            self.bid = Rad(args['bid'])
-            self.gal = Address(args['gal'])
+            self.bid = Rad(args['bidAmount'])
+            self.auction_income_recipient = Address(args['auctionIncomeRecipient'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
@@ -548,10 +562,10 @@ class DebtAuctionHouse(AuctionContract):
 
     class DecreaseSoldAmountLog:
         def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.usr)
+            self.high_bidder = Address(lognote.forgone_collateral_receiver)
             self.id = Web3.toInt(lognote.arg1)
             self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
-            self.bid = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
+            self.bid_amount = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
@@ -563,6 +577,14 @@ class DebtAuctionHouse(AuctionContract):
         assert isinstance(address, Address)
 
         super(DebtAuctionHouse, self).__init__(web3, address, DebtAuctionHouse.abi, self.bids)
+
+    def bid_decrease(self) -> Wad:
+        """Returns the percentage minimum bid decrease.
+
+        Returns:
+            The percentage minimum bid decrease.
+        """
+        return Wad(self._contract.functions.bidDecrease().call())
 
     def contract_enabled(self) -> bool:
         return self._contract.functions.contract_enabled().call() > 0

@@ -137,8 +137,8 @@ class TestGlobalSettlement:
         collateral = geb.collaterals['ETH-A']
         collateral_type = collateral.collateral_type
 
-        assert geb.global_settlement.disable_contract(collateral_type).transact()
-        assert geb.global_settlement.art(collateral_type) > Wad(0)
+        assert geb.global_settlement.shutdown_system(collateral_type).transact()
+        assert geb.global_settlement.collateral_total_debt(collateral_type) > Wad(0)
         assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) > Ray(0)
 
     def test_terminate_auction_prematurely(self, geb):
@@ -162,7 +162,7 @@ class TestGlobalSettlement:
         collateral_type = geb.collaterals['ETH-A'].collateral_type
 
         cdp = geb.cdp_engine.cdp(collateral_type, our_address)
-        owe = Ray(cdp.cdp_debt) * geb.cdp_engine.collateral_type(collateral_type.name).rate * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
+        owe = Ray(cdp.cdp_debt) * geb.cdp_engine.collateral_type(collateral_type.name).accumulate_rates * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
         assert owe > Ray(0)
         wad = min(Ray(cdp.locked_collateral), owe)
         print(f"owe={owe} wad={wad}")
@@ -179,7 +179,7 @@ class TestGlobalSettlement:
         collateral = geb.collaterals['ETH-A']
         collateral_type = collateral.collateral_type
 
-        assert geb.global_settlement.free(collateral_type).transact()
+        assert geb.global_settlement.free_collateral(collateral_type).transact()
         assert geb.cdp_engine.cdp(collateral_type, our_address).locked_collateral == Wad(0)
         assert geb.cdp_engine.token_collateral(collateral_type, our_address) > Wad(0)
         assert collateral.adapter.exit(our_address, geb.cdp_engine.token_collateral(collateral_type, our_address)).transact()
