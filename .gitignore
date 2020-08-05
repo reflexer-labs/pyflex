@@ -13,3 +13,4 @@ tests/config/keys/UnlimitedChain/address_book.json
 
 docs/_doc
 _virtualenv
+*.swp
