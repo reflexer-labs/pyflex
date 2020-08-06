@@ -77,7 +77,7 @@ def set_collateral_price(geb: GfDeployment, collateral: Collateral, price: Wad):
     assert isinstance(pip, DSValue)
 
     print(f"Changing price of {collateral.collateral_type.name} to {price}")
-    assert pip.poke_with_int(price.value).transact(from_address=pip.get_owner())
+    assert pip.update_result_with_int(price.value).transact(from_address=pip.get_owner())
     assert geb.oracle_relayer.update_collateral_price(collateral_type=collateral.collateral_type).transact(from_address=pip.get_owner())
 
     assert get_collateral_price(collateral) == price
@@ -560,9 +560,9 @@ class TestOracleRelayer:
 
         collateral_type = geb.cdp_engine.collateral_type('ETH-A')
         redemption_price = geb.oracle_relayer.redemption_price()
-        mat = geb.oracle_relayer.safety_c_ratio(collateral_type)
+        safe_c_ratio = geb.oracle_relayer.safety_c_ratio(collateral_type)
 
-        assert mat == (Ray(val * 10 ** 9) / redemption_price) / (collateral_type.safety_price)
+        assert safe_c_ratio == (Ray(val * 10 ** 9) / redemption_price) / (collateral_type.safety_price)
 
 
 class TestAccountingEngine:
@@ -607,7 +607,7 @@ class TestTaxCollector:
         # then
         assert geb.tax_collector.tax_single(c.collateral_type).transact()
 
-
+@pytest.mark.skip(reason="Old module")
 class TestCoinSavingsAccount:
     def test_getters(self, geb):
         assert isinstance(geb.coin_savings_acct.savings(), Wad)

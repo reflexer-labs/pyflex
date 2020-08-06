@@ -74,9 +74,10 @@ class TestShutdownModule:
         assert geb.esm is not None
         assert isinstance(geb.esm, ShutdownModule)
         assert isinstance(geb.esm.address, Address)
-        assert geb.esm.sum() == Wad(0)
-        assert geb.esm.min() > Wad(0)
-        assert not geb.esm.fired()
+        # These functions don't exist anymore
+        #assert geb.esm.sum() == Wad(0)
+        #assert geb.esm.min() > Wad(0)
+        #assert not geb.esm.fired()
 
         coin_balance = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
         awe = geb.cdp_engine.debt_balance(geb.accounting_engine.address)

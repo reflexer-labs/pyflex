@@ -29,10 +29,11 @@ class DSValue(DSAuth):
     return that value) or be empty (in which case `has_value()` returns `False` and the read
     methods throw exceptions).
 
-    `DSValue` can be populated with a new value using `poke()` and cleared using `void()`.
+    `DSValue` can be populated with a new value using `updateResult()` and cleared using `void()`.
 
     Everybody can read from a `DSValue`.
-    Calling `poke()` and `void()` is usually whitelisted to some addresses only.
+    Calling `updateResult()` and `void()` is usually whitelisted to some addresses only.
+    upda
 
     The `DSValue` contract keeps the value as a 32-byte array (Ethereum `bytes32` type).
     Methods have been provided to cast it into `int`, read as hex etc.
@@ -66,7 +67,7 @@ class DSValue(DSAuth):
         Returns:
             `True` if this instance contains a value, which can be read. `False` otherwise.
         """
-        return self._contract.functions.peek().call()[1]
+        return self._contract.functions.getResultWithValidity().call()[1]
 
     def read(self) -> bytes:
         """Reads the current value from this instance as a byte array.
@@ -101,7 +102,7 @@ class DSValue(DSAuth):
         """
         return int(self.read_as_hex(), 16)
 
-    def poke(self, new_value: bytes) -> Transact:
+    def update_result(self, new_value: bytes) -> Transact:
         """Populates this instance with a new value.
 
         Args:
@@ -112,9 +113,9 @@ class DSValue(DSAuth):
         """
         assert(isinstance(new_value, bytes))
         assert(len(new_value) == 32)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'poke', [new_value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateResult', [new_value])
 
-    def poke_with_int(self, new_value: int) -> Transact:
+    def update_result_with_int(self, new_value: int) -> Transact:
         """Populates this instance with a new value.
 
         Handles the conversion of a Python `int` into the Solidity `bytes32` type automatically.
@@ -130,15 +131,15 @@ class DSValue(DSAuth):
         """
         assert(isinstance(new_value, int))
         assert(new_value >= 0)
-        return self.poke(new_value.to_bytes(32, byteorder='big'))
+        return self.update_result(new_value.to_bytes(32, byteorder='big'))
 
-    def void(self) -> Transact:
+    def restart_value(self) -> Transact:
         """Removes the current value from this instance.
 
         Returns:
             A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
         """
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'void', [])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartValue', [])
 
     def __repr__(self):
         return f"DSValue('{self.address}')"

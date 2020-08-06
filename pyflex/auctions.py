@@ -182,7 +182,7 @@ class CollateralAuctionHouse(AuctionContract):
         0xc959c42b: deal
     """
 
-    abi = Contract._load_abi(__name__, 'abi/CollateralAuctionHouse.abi')
+    abi = Contract._load_abi(__name__, 'abi/EnglishCollateralAuctionHouse.abi')
     #bin = Contract._load_bin(__name__, 'abi/CollateralAuctionHouse.bin')
     bin = Contract._load_bin(__name__, 'abi/EnglishCollateralAuctionHouse.bin')
 

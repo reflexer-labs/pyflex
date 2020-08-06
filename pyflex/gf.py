@@ -631,7 +631,7 @@ class OracleRelayer(Contract):
 
     def safety_c_ratio(self, collateral_type: CollateralType) -> Ray:
         assert isinstance(collateral_type, CollateralType)
-        (orcl, safety_c_ratio) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
+        (orcl, safety_c_ratio, liquidation_c_ratio) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
 
         return Ray(safety_c_ratio)
 

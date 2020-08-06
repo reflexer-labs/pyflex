@@ -46,9 +46,9 @@ class TestDSValue:
         with pytest.raises(Exception):
             self.dsvalue.read_as_hex()
 
-    def test_poke(self):
+    def test_update_result(self):
         # when
-        self.dsvalue.poke(bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        self.dsvalue.update_result(bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4])).transact()
@@ -61,9 +61,9 @@ class TestDSValue:
                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4])
 
-    def test_poke_with_int(self):
+    def test_update_result_with_int(self):
         # when
-        self.dsvalue.poke_with_int(500).transact()
+        self.dsvalue.update_result_with_int(500).transact()
 
         # then
         assert self.dsvalue.has_value() is True
@@ -73,13 +73,13 @@ class TestDSValue:
                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4])
 
-    def test_void(self):
+    def test_restart_value(self):
         # given
-        self.dsvalue.poke_with_int(250).transact()
+        self.dsvalue.update_result_with_int(250).transact()
         assert self.dsvalue.has_value() is True
 
         # when
-        self.dsvalue.void().transact()
+        self.dsvalue.restart_value().transact()
 
         # then
         assert self.dsvalue.has_value() is False

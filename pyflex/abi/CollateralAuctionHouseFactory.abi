@@ -1,1 +1,0 @@
-[{"inputs":[{"internalType":"address","name":"cdpEngine","type":"address"},{"internalType":"bytes32","name":"collateralType","type":"bytes32"}],"name":"newCollateralAuctionHouse","outputs":[{"internalType":"contract CollateralAuctionHouse","name":"collateralAuctionHouse","type":"address"}],"stateMutability":"nonpayable","type":"function"}]

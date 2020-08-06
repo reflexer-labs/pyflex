@@ -36,7 +36,6 @@ from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
 from pyflex.governance import DSPause, DSChief
 from pyflex.numeric import Wad, Ray
-from pyflex.oasis import MatchingMarket
 from pyflex.oracles import OSM
 #from pyflex.sai import Tub, Tap, Top, Vox
 from pyflex.shutdown import ShutdownModule, GlobalSettlement
@@ -147,7 +146,7 @@ class GfDeployment:
                     adapter = CollateralJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
 
                 # PIP contract may be a DSValue, OSM, or bogus address.
-                pip_address = Address(conf[f'PIP_{name[1]}'])
+                pip_address = Address(conf[f'ORACLE_SECURITY_MODULE_{name[1]}'])
                 network = GfDeployment.NETWORKS.get(web3.net.version, "testnet")
                 if network == "testnet":
                     pip = DSValue(web3, pip_address)

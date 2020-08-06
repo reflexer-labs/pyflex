@@ -75,13 +75,13 @@ class ShutdownModule(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'join', [value.value])
 
     def fire(self):
-        """Calls `shutdown_system` on the `end` contract, initiating a shutdown."""
-        logger.info("Calling fire to shutdowm the end")
+        """Calls `shutdown_system` on the `GlobalSettlement` contract, initiating a shutdown."""
+        logger.info("Calling fire to shutdown the global settlement")
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'fire', [])
 
 
 class GlobalSettlement(Contract):
-    """A client for the `End` contract, used to orchestrate a shutdown.
+    """A client for the `GlobalSettlement` contract, used to orchestrate a shutdown.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/end.sol>
 
@@ -89,8 +89,8 @@ class GlobalSettlement(Contract):
       web3: An instance of `Web` from `web3.py`.
       address: Ethereum address of the `ESM` contract."""
 
-    abi = Contract._load_abi(__name__, 'abi/End.abi')
-    bin = Contract._load_bin(__name__, 'abi/End.bin')
+    abi = Contract._load_abi(__name__, 'abi/GlobalSettlement.abi')
+    bin = Contract._load_bin(__name__, 'abi/GlobalSettlement.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -166,7 +166,7 @@ class GlobalSettlement(Contract):
                         'processCDP', [collateral_type.toBytes(), address.address])
 
     def free_collateral(self, collateral_type: CollateralType) -> Transact:
-        """Releases excess collateral after `skim`ming"""
+        """Releases excess collateral after `process_cdp`ing"""
         assert isinstance(collateral_type, CollateralType)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'freeCollateral', [collateral_type.toBytes()])
 
