@@ -288,32 +288,33 @@ class CollateralAuctionHouse(AuctionContract):
                            amount_to_raise=Rad(array[7]))
 
     def start_auction(self, forgone_collateral_receiver: Address, auction_income_recipient: Address,
-                      amount_to_raise: Rad, amount_to_sell: Wad, bid: Rad) -> Transact:
+                      amount_to_raise: Rad, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(forgoneCollateralReceiver, Address))
         assert(isinstance(auction_income_recipient, Address))
         assert(isinstance(amount_to_raise, Rad))
         assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid, Rad))
+        assert(isinstance(bid_amount, Rad))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [forgone_collateral_receiver.address,
                                                                                           auction_income_recipient.address,
                                                                                           amount_to_raise.value,
                                                                                           amount_to_sell.value,
-                                                                                          bid.value])
+                                                                                          bid_amount.value])
 
-    def increaseBidSize(self, id: int, amount_to_sell: Wad, bid: Rad) -> Transact:
+    def increaseBidSize(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid, Rad))
+        assert(isinstance(bid_amount, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid_amount.value])
 
-    def decreaseSoldAmount(self, id: int, amount_to_sell: Wad, bid: Rad) -> Transact:
+    def decreaseSoldAmount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid, Rad))
+        assert(isinstance(bid_amount, Rad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount', [id, amount_to_sell.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount',
+                        [id, amount_to_sell.value, bid_amount.value])
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
@@ -380,7 +381,7 @@ class SurplusAuctionHouse(AuctionContract):
             assert(isinstance(auction_deadline, int))
 
             self.id = id
-            self.bid = bid
+            self.bid_amount = bid_amount
             self.amount_to_sell = amount_to_sell
             self.high_bidder = high_bidder
             self.bid_expiry = bid_expiry
@@ -394,7 +395,7 @@ class SurplusAuctionHouse(AuctionContract):
             args = log['args']
             self.id = args['id']
             self.amount_to_sell = Rad(args['amountToSell'])
-            self.bid = Wad(args['bid'])
+            self.bid_amount = Wad(args['bidAmount'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
@@ -406,7 +407,7 @@ class SurplusAuctionHouse(AuctionContract):
             self.high_bidder = Address(lognote.forgone_collateral_receiver)
             self.id = Web3.toInt(lognote.arg1)
             self.amount_to_sell = Rad(Web3.toInt(lognote.arg2))
-            self.bid = Wad(Web3.toInt(lognote.get_bytes_at_index(2)))
+            self.bid_amount = Wad(Web3.toInt(lognote.get_bytes_at_index(2)))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
 
@@ -449,19 +450,20 @@ class SurplusAuctionHouse(AuctionContract):
                            bid_expiry=int(array[3]),
                            auction_deadline=int(array[4]))
 
-    def start_auction(self, amount_to_sell: Rad, bid: Wad) -> Transact:
+    def start_auction(self, amount_to_sell: Rad, bid_amount: Wad) -> Transact:
         assert(isinstance(amount_to_sell, Rad))
-        assert(isinstance(bid, Wad))
+        assert(isinstance(bid_amount, Wad))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [amount_to_sell.value,
-                                                                                          bid.value])
+                                                                                          bid_amount.value])
 
-    def increase_bid_size(self, id: int, amount_to_sell: Rad, bid: Wad) -> Transact:
+    def increase_bid_size(self, id: int, amount_to_sell: Rad, bid_amount: Wad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(amount_to_sell, Rad))
-        assert(isinstance(bid, Wad))
+        assert(isinstance(bid_amount, Wad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize',
+                        [id, amount_to_sell.value, bid_amount.value])
 
     def restart_auction(self, id: int) -> Transact:
         """Resurrect an auction which expired without any bids."""
@@ -552,7 +554,7 @@ class DebtAuctionHouse(AuctionContract):
             args = log['args']
             self.id = args['id']
             self.amount_to_sell = Wad(args['amountToSell'])
-            self.bid = Rad(args['bidAmount'])
+            self.bid_amount = Rad(args['bidAmount'])
             self.auction_income_recipient = Address(args['auctionIncomeRecipient'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
@@ -621,7 +623,7 @@ class DebtAuctionHouse(AuctionContract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [initial_bidder.address,
                                                                                           amount_to_sell.value,
-                                                                                          bid.value])
+                                                                                          bid_amount.value])
 
     def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(id, int))

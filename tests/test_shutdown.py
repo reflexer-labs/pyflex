@@ -111,7 +111,6 @@ class TestShutdownModule:
         assert geb.esm.fired()
         assert not geb.global_settlement.contract_enabled()
 
-
 class TestGlobalSettlement:
     """This test must be run after TestShutdownModule, which calls `esm.fire`."""
 
@@ -162,7 +161,7 @@ class TestGlobalSettlement:
         collateral_type = geb.collaterals['ETH-A'].collateral_type
 
         cdp = geb.cdp_engine.cdp(collateral_type, our_address)
-        owe = Ray(cdp.cdp_debt) * geb.cdp_engine.collateral_type(collateral_type.name).accumulate_rates * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
+        owe = Ray(cdp.cdp_debt) * geb.cdp_engine.collateral_type(collateral_type.name).accumulated_rates * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
         assert owe > Ray(0)
         wad = min(Ray(cdp.locked_collateral), owe)
         print(f"owe={owe} wad={wad}")
