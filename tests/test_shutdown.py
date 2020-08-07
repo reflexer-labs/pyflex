@@ -115,7 +115,6 @@ class TestShutdownModule:
         assert geb.esm.settled()
         assert not geb.global_settlement.contract_enabled()
 
-@pytest.mark.skip(reason="temp")
 class TestGlobalSettlement:
     """This test must be run after TestShutdownModule, which calls `esm.shutdown`."""
 
