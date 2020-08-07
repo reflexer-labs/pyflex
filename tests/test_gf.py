@@ -61,7 +61,6 @@ def mint_gov(gov: DSToken, recipient_address: Address, amount: Wad):
     assert gov.approve(recipient_address).transact(from_address=deployment_address)
     assert gov.transfer(recipient_address, amount).transact(from_address=deployment_address)
 
-
 def get_collateral_price(collateral: Collateral):
     assert isinstance(collateral, Collateral)
     return Wad(Web3.toInt(collateral.pip.read()))

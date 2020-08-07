@@ -69,6 +69,89 @@ def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None)
     receipt = web3.eth.getTransactionReceipt(tx_hash)
     return Address(receipt['contractAddress'])
 
+'''
+class Deployment:
+    """Represents a test deployment of the Maker smart contract ecosystem for single collateral Dai (SCD).
+
+    Creating an instance of this class creates a testrpc web3 provider with the entire set
+    of Maker smart contracts deployed to it. It is used in unit tests of PyMaker, and also in
+    unit tests for individual keepers.
+    """
+    def __init__(self):
+        web3 = Web3(HTTPProvider("http://localhost:8555"))
+        web3.eth.defaultAccount = web3.eth.accounts[0]
+        our_address = Address(web3.eth.defaultAccount)
+        sai = DSToken.deploy(web3, 'DAI')
+        sin = DSToken.deploy(web3, 'SIN')
+        skr = DSToken.deploy(web3, 'PETH')
+        gem = DSToken.deploy(web3, 'WETH')
+        gov = DSToken.deploy(web3, 'FLX')
+        pip = DSValue.deploy(web3)
+        pep = DSValue.deploy(web3)
+        pit = DSVault.deploy(web3)
+
+        vox = Vox.deploy(web3, per=Ray.from_number(1))
+        tub = Tub.deploy(web3, sai=sai.address, sin=sin.address, skr=skr.address, gem=gem.address, gov=gov.address,
+                         pip=pip.address, pep=pep.address, vox=vox.address, pit=pit.address)
+        tap = Tap.deploy(web3, tub.address)
+        top = Top.deploy(web3, tub.address, tap.address)
+
+        tub._contract.functions.turn(tap.address.address).transact()
+
+        otc = MatchingMarket.deploy(web3, 2600000000)
+        """
+        etherdelta = EtherDelta.deploy(web3,
+                                       admin=Address('0x1111100000999998888877777666665555544444'),
+                                       fee_account=Address('0x8888877777666665555544444111110000099999'),
+                                       account_levels_addr=Address('0x0000000000000000000000000000000000000000'),
+                                       fee_make=Wad.from_number(0.01),
+                                       fee_take=Wad.from_number(0.02),
+                                       fee_rebate=Wad.from_number(0.03))
+        """
+
+        # set permissions
+        dad = DSGuard.deploy(web3)
+        dad.permit(DSGuard.ANY, DSGuard.ANY, DSGuard.ANY).transact()
+        tub.set_authority(dad.address).transact()
+        for auth in [sai, sin, skr, gem, gov, pit, tap, top]:
+            auth.set_authority(dad.address).transact()
+
+        # whitelist pairs
+        otc.add_token_pair_whitelist(sai.address, gem.address).transact()
+
+        # approve
+        tub.approve(directly())
+        tap.approve(directly())
+
+        # mint some GEMs
+        gem.mint(Wad.from_number(1000000)).transact()
+
+        self.snapshot_id = web3.manager.request_blocking("evm_snapshot", [])
+
+        self.web3 = web3
+        self.our_address = our_address
+        self.sai = sai
+        self.sin = sin
+        self.skr = skr
+        self.gem = gem
+        self.gov = gov
+        self.vox = vox
+        self.tub = tub
+        self.tap = tap
+        self.top = top
+        self.otc = otc
+        #self.etherdelta = etherdelta
+
+    def reset(self):
+        """Rollbacks all changes made since the initial deployment."""
+        self.web3.manager.request_blocking("evm_revert", [self.snapshot_id])
+        self.snapshot_id = self.web3.manager.request_blocking("evm_snapshot", [])
+
+    def time_travel_by(self, seconds: int):
+        assert(isinstance(seconds, int))
+        self.web3.manager.request_blocking("evm_increaseTime", [seconds])
+
+'''
 class GfDeployment:
     """Represents a GEB Framework deployment.
 

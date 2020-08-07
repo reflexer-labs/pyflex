@@ -76,13 +76,14 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     set_collateral_price(geb, collateral, to_price)
     cdp = geb.cdp_engine.cdp(collateral.collateral_type, deployment_address)
     collateral_type = geb.cdp_engine.collateral_type(collateral_type.name)
-    safe = Ray(cdp.generated_debt) * geb.cdp_engine.collateral_type(collateral_type.name).rate <= Ray(cdp.locked_collateral) * collateral_type.safety_price
+    safe = Ray(cdp.generated_debt) * geb.cdp_engine.collateral_type(collateral_type.name).accumulated_rates <= Ray(cdp.locked_collateral) * collateral_type.safety_price
+
     assert not safe
     simulate_liquidate_cdp(geb, collateral, deployment_address)
     assert geb.liquidation_engine.liquidate_cdp(collateral.collateral_type, Urn(deployment_address)).transact()
     flip_start_auction = collateral.collateral_auction_house.auctions_started()
 
-    # Generate some Dai, bid on and win the flip auction without covering all the debt
+    # Generate some system coin, bid on and win the collateral auction without covering all the debt
     wrap_eth(geb, our_address, Wad.from_number(10))
     collateral.approve(our_address)
     assert collateral.adapter.join(our_address, Wad.from_number(10)).transact(from_address=our_address)
@@ -101,14 +102,14 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     # Raise debt from the queue (note that vow.wait is 0 on our testchain)
     liquidations = geb.liquidation_engine.past_liquidations(100)
     for liquidation in liquidations:
-        era_liquidation = bite.era(web3)
+        era_liquidation = liquidation.era(web3)
         assert era_liquidation > int(datetime.now().timestamp()) - 120
         assert geb.accounting_engine.debt_balance_of(era_liquidation) > Rad(0)
         assert geb.accounting_engine.pop_debt_from_queue(era_liquidation).transact()
         assert geb.accounting_engine.debt_balance_of(era_liquidation) == Rad(0)
     # Cancel out surplus and debt
     acct_engine_coin_balance = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
-    assert dai_vow <= geb.accounting_engine.unqueued_unauctioned_debt()
+    assert system_coin_vow <= geb.accounting_engine.unqueued_unauctioned_debt()
     assert geb.accounting_engine.settle_debt(acct_engine_coin_balance).transact()
     assert geb.accounting_engine.unqueued_unauctioned_debt() >= geb.accounting_engine.debt_auction_bid_size()
 
@@ -119,7 +120,6 @@ def check_active_auctions(auction: AuctionContract):
         assert auction.auctions_started() >= bid.id
         assert isinstance(bid.high_bidder, Address)
         assert bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
-
 
 class TestCollateralAuctionHouse:
     @pytest.fixture(scope="session")
@@ -188,20 +188,20 @@ class TestCollateralAuctionHouse:
         delta_debt = max_delta_debt(geb, collateral, deployment_address) - Wad(1)
         wrap_modify_CDP_collateralization(geb, collateral, deployment_address, delta_collateral=Wad(0), delta_debt=delta_debt)
 
-        # Mint and withdraw all the Dai
-        geb.approve_dai(deployment_address)
-        assert geb.dai_adapter.exit(deployment_address, delta_debt).transact(from_address=deployment_address)
-        assert geb.dai.balance_of(deployment_address) == delta_debt
-        assert geb.cdp_engine.dai(deployment_address) == Rad(0)
+        # Mint and withdraw all the system coin
+        geb.approve_system_coin(deployment_address)
+        assert geb.system_coin_adapter.exit(deployment_address, delta_debt).transact(from_address=deployment_address)
+        assert geb.system_coin.balance_of(deployment_address) == delta_debt
+        assert geb.cdp_engine.system_coin(deployment_address) == Rad(0)
 
         # Undercollateralize the CDP
         to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
         set_collateral_price(geb, collateral, to_price)
         cdp = geb.cdp_engine.cdp(collateral.collateral_type, deployment_address)
         collateral_type = geb.cdp_engine.collateral_type(collateral_type.name)
-        assert collateral_type.rate is not None
+        assert collateral_type.accumulated_rates is not None
         assert collateral_type.safety_price is not None
-        safe = Ray(cdp.generated_debt) * geb.cdp_engine.collateral_type(collateral_type.name).rate <= Ray(cdp.locked_collateral) * collateral_type.safety_price
+        safe = Ray(cdp.generated_debt) * geb.cdp_engine.collateral_type(collateral_type.name).accumulated_rates <= Ray(cdp.locked_collateral) * collateral_type.safety_price
         assert not safe
         assert len(collateral_auction_house.active_auctions()) == 0
 
@@ -210,7 +210,7 @@ class TestCollateralAuctionHouse:
         assert cdp.locked_collateral > Wad(0)
         amount_to_sell = min(cdp.locked_collateral, geb.liquidation_engine.lump(collateral_type))  # Wad
         generated_debt = min(cdp.generated_debt, (amount_to_sell * cdp.generated_debt) / cdp.locked_collateral)  # Wad
-        amount_to_raise = generated_debt * collateral_type.rate  # Wad
+        amount_to_raise = generated_debt * collateral_type.accumulated_rates  # Wad
         assert amount_to_raise == delta_debt
         simulate_liquidate_cdp(geb, collateral, deployment_address)
         assert geb.liquidation_engine.liquidate_cdp(collateral.collateral_type, Urn(deployment_address)).transact()
@@ -353,7 +353,7 @@ class TestSurplusAuctionHouse:
     def test_scenario(self, web3, geb, surplus_auction_house, our_address, other_address, deployment_address):
         create_surplus(geb, surplus_auction_house, deployment_address)
 
-        joy_before = geb.cdp_engine.dai(geb.accounting_engine.address)
+        joy_before = geb.cdp_engine.system_coin(geb.accounting_engine.address)
         # total surplus > total debt + surplus auction amount_to_sell size + surplus buffer
         assert joy_before > geb.cdp_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.sin()) - geb.accounting_engine.ash() == Rad(0)
@@ -368,7 +368,7 @@ class TestSurplusAuctionHouse:
         assert isinstance(log, SurplusAuctionHouse.KickLog)
         assert log.id == start_auction
         assert log.amount_to_sell == current_bid.amount_to_sell
-        assert log.bid == current_bid.bid
+        assert log.bid_amount == current_bid.bid_amount
 
         # Allow the auction to expire, and then resurrect it
         wait(geb, our_address, surplus_auction_house.total_auction_length()+1)
@@ -389,7 +389,7 @@ class TestSurplusAuctionHouse:
         now = datetime.now().timestamp()
         assert 0 < current_bid.bid_expiry < now or current_bid.auction_deadline < now
         assert surplus_auction_house.deal(start_auction).transact(from_address=our_address)
-        joy_after = geb.cdp_engine.dai(geb.accounting_engine.address)
+        joy_after = geb.cdp_engine.system_coin(geb.accounting_engine.address)
         print(f'joy_before={str(joy_before)}, joy_after={str(joy_after)}')
         assert joy_before - joy_after == geb.accounting_engine.surplus_auction_amount_to_sell()
         log = surplus_auction_house.past_logs(1)[0]
@@ -397,10 +397,10 @@ class TestSurplusAuctionHouse:
         assert log.usr == our_address
         assert log.id == start_auction
 
-        # Grab our dai
-        geb.approve_dai(our_address)
-        assert geb.dai_adapter.exit(our_address, Wad(current_bid.amount_to_sell)).transact(from_address=our_address)
-        assert geb.dai.balance_of(our_address) >= Wad(current_bid.amount_to_sell)
+        # Grab our system_coin
+        geb.approve_system_coin(our_address)
+        assert geb.system_coin_adapter.exit(our_address, Wad(current_bid.amount_to_sell)).transact(from_address=our_address)
+        assert geb.system_coin.balance_of(our_address) >= Wad(current_bid.amount_to_sell)
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.sin()) - geb.accounting_engine.ash() == Rad(0)
 
 
@@ -448,7 +448,7 @@ class TestDebtAuctionHouse:
         # start the debt auction
         assert debt_auction_house.auctions_started() == 0
         assert len(debt_auction_house.active_auctions()) == 0
-        assert geb.cdp_engine.dai(geb.accounting_engine.address) == Rad(0)
+        assert geb.cdp_engine.system_coin(geb.accounting_engine.address) == Rad(0)
         assert geb.accounting_engine.flop().transact()
         start_auction = debt_auction_house.auctions_started()
         assert start_auction == 1

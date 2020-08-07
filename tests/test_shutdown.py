@@ -66,7 +66,6 @@ def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_a
 
 nobody = Address("0x0000000000000000000000000000000000000000")
 
-
 class TestShutdownModule:
     """This test must be run after other GEB tests because it will leave the testchain `disabled`d."""
 
@@ -74,10 +73,8 @@ class TestShutdownModule:
         assert geb.esm is not None
         assert isinstance(geb.esm, ShutdownModule)
         assert isinstance(geb.esm.address, Address)
-        # These functions don't exist anymore
-        #assert geb.esm.sum() == Wad(0)
-        #assert geb.esm.min() > Wad(0)
-        #assert not geb.esm.fired()
+        assert geb.esm.trigger_threshold() > Wad(0)
+        assert not geb.esm.settled()
 
         coin_balance = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
         awe = geb.cdp_engine.debt_balance(geb.accounting_engine.address)
@@ -85,35 +82,42 @@ class TestShutdownModule:
         if coin_balance == Rad(0) and awe == Rad(0):
             create_surplus_auction(geb, deployment_address, our_address)
 
-    def test_join(self, geb, our_address):
+    def _test_burn_tokens(self, geb, our_address):
         assert geb.gov.approve(geb.esm.address).transact()
 
         # This should have no effect yet succeed regardless
-        assert geb.esm.join(Wad(0)).transact()
-        assert geb.esm.sum() == Wad(0)
-        assert geb.esm.sum_of(our_address) == Wad(0)
+        assert geb.esm.burn_tokens(Wad(0)).transact()
+        assert geb.esm.total_amount_burnt() == Wad(0)
+        assert geb.esm.burnt_tokens(our_address) == Wad(0)
 
-        # Ensure the appropriate amount of MKR can be joined
+        # Ensure the appropriate amount of MKR can be burn_tokensed
         mint_gov(geb.gov, our_address, geb.esm.min())
-        assert geb.esm.join(geb.esm.min()).transact()
-        assert geb.esm.sum() == geb.esm.min()
+        assert geb.esm.burn_tokens(geb.esm.min()).transact()
+        assert geb.esm.total_amount_burnt() == geb.esm.min()
 
         # Joining extra MKR should succeed yet have no effect
-        mint_gov(geb.gov, our_address, Wad(153))
-        assert geb.esm.join(Wad(153)).transact()
-        assert geb.esm.sum() == geb.esm.min() + Wad(153)
-        assert geb.esm.sum_of(our_address) == geb.esm.sum()
+        mint_gov(geb.gov, our_address, Wad(1))
+        assert geb.esm.burn_tokens(Wad(153)).transact()
+        assert geb.esm.total_amount_burnt() == geb.esm.trigger_threshold() + Wad(153)
+        assert geb.esm.burnt_tokens(our_address) == geb.esm.total_amount_burnt()
 
-    def test_fire(self, geb, our_address):
+    def test_shutdown(self, geb, our_address):
         open_cdp(geb, geb.collaterals['ETH-A'], our_address)
 
+        mint_gov(geb.gov, our_address, geb.esm.trigger_threshold()*2)
+        print(geb.gov.balance_of(our_address))
+        import sys
+
         assert geb.global_settlement.contract_enabled()
-        assert geb.esm.fire().transact()
-        assert geb.esm.fired()
+        assert not geb.esm.settled()
+        assert geb.esm.shutdown().transact()
+
+        assert geb.esm.settled()
         assert not geb.global_settlement.contract_enabled()
 
+@pytest.mark.skip(reason="temp")
 class TestGlobalSettlement:
-    """This test must be run after TestShutdownModule, which calls `esm.fire`."""
+    """This test must be run after TestShutdownModule, which calls `esm.shutdown`."""
 
     def test_init(self, geb):
         assert geb.global_settlement is not None

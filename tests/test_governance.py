@@ -56,11 +56,12 @@ class TestDSChief:
         isinstance(our_address, Address)
 
         prevBalance = geb.gov.balance_of(our_address)
-        amount = Wad.from_number(1000)
+        #amount = Wad.from_number(1000)
+        amount = Wad.from_number(1)
         mint_gov(geb.gov, our_address, amount)
         assert geb.gov.balance_of(our_address) == amount + prevBalance
 
-        # Lock MKR in DS-Chief
+        # Lock gov in DS-Chief
         assert geb.gov.approve(geb.ds_chief.address).transact(from_address=our_address)
         assert geb.ds_chief.lock(amount).transact(from_address=our_address)
         assert geb.gov.balance_of(our_address) == prevBalance

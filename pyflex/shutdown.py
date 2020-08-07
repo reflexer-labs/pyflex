@@ -51,33 +51,18 @@ class ShutdownModule(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
-    def sum(self) -> Wad:
-        """Total balance of Gov `join`ed to this contract"""
-        return Wad(self._contract.functions.Sum().call())
-
-    def sum_of(self, address: Address) -> Wad:
-        """Gov `join`ed to this contract by a specific account"""
-        assert isinstance(address, Address)
-
-        return Wad(self._contract.functions.sum(address.address).call())
-
-    def min(self) -> Wad:
+    def trigger_threshold(self) -> Wad:
         """Minimum amount of Gov required to call `fire`"""
-        return Wad(self._contract.functions.min().call())
+        return Wad(self._contract.functions.triggerThreshold().call())
 
-    def fired(self) -> bool:
-        """True if `fire` has been called"""
-        return bool(self._contract.functions.fired().call())
+    def settled(self) -> bool:
+        """True if `settle` has been called"""
+        return bool(self._contract.functions.settled().call())
 
-    def join(self, value: Wad) -> Transact:
-        """Before `fire` can be called, sufficient Gov must be `join`ed to this contract"""
-        assert isinstance(value, Wad)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'join', [value.value])
-
-    def fire(self):
+    def shutdown(self):
         """Calls `shutdown_system` on the `GlobalSettlement` contract, initiating a shutdown."""
-        logger.info("Calling fire to shutdown the global settlement")
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'fire', [])
+        logger.info("Calling shutdown to shutdown the global settlement")
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutdown', [])
 
 
 class GlobalSettlement(Contract):
@@ -150,7 +135,9 @@ class GlobalSettlement(Contract):
     def shutdown_system(self, collateral_type: CollateralType) -> Transact:
         """Set the `shutdownSystem` price for the collateral"""
         assert isinstance(collateral_type, CollateralType)
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutDownSystem(bytes32)', [collateral_type.toBytes()])
+        
+        self._contract.functions.freeCollateralType(collateral_type.toBytes()).call()
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutdownSystem(bytes32)', [collateral_type.toBytes()])
 
     def fast_track_auction(self, collateral_type: CollateralType, collateral_auction_id: int) -> Transact:
         """Cancel a flip auction and seize it's collateral"""
