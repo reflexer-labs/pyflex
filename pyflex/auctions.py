@@ -173,13 +173,6 @@ class CollateralAuctionHouse(AuctionContract):
         address: Ethereum address of the `CollateralAuctionHouse` contract.
 
     Event signatures:
-        0x65fae35e: (deployment-related)
-        0x9c52a7f1: (deployment-related)
-        0x29ae8114: file
-        0xc84ce3a1172f0dec3173f04caaa6005151a4bfe40d4c9f3ea28dba5f719b2a7a: kick
-        0x4b43ed12: tend
-        0x5ff3a382: dent
-        0xc959c42b: deal
     """
 
     abi = Contract._load_abi(__name__, 'abi/EnglishCollateralAuctionHouse.abi')
@@ -325,11 +318,11 @@ class CollateralAuctionHouse(AuctionContract):
                 continue
             elif isinstance(log, CollateralAuctionHouse.StartAuctionLog):
                 history.append(log)
-            elif log.sig == '0x4b43ed12':
+            elif log.sig == '0x30c34abb':
                 history.append(CollateralAuctionHouse.IncreaseBidSizeLog(log))
-            elif log.sig == '0x5ff3a382':
-                history.append(Flipper.DecreaseSoldAmountLog(log))
-            elif log.sig == '0xc959c42b':
+            elif log.sig == '0xff6b7b1c':
+                history.append(CollateralAuctionHouse.DecreaseSoldAmountLog(log))
+            elif log.sig == '0x2e993611':
                 history.append(AuctionContract.SettleAuctionLog(log))
         return history
 
