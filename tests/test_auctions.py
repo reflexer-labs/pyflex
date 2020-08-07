@@ -350,7 +350,7 @@ class TestSurplusAuctionHouse:
         assert surplus_auction_house.total_auction_length() > surplus_auction_house.bid_duration()
         assert surplus_auction_house.auctions_started() >= 0
 
-    def _test_scenario(self, web3, geb, surplus_auction_house, our_address, other_address, deployment_address):
+    def test_scenario(self, web3, geb, surplus_auction_house, our_address, other_address, deployment_address):
         create_surplus(geb, surplus_auction_house, deployment_address)
 
         joy_before = geb.cdp_engine.dai(geb.accounting_engine.address)
@@ -442,10 +442,10 @@ class TestDebtAuctionHouse:
         assert debt_auction_house.total_auction_length() > debt_auction_house.bid_duration()
         assert debt_auction_house.auctions_started() >= 0
 
-    def _test_scenario(self, web3, geb, debt_auction_house, our_address, other_address, deployment_address):
+    def test_scenario(self, web3, geb, debt_auction_house, our_address, other_address, deployment_address):
         create_debt(web3, geb, our_address, deployment_address)
 
-        # Kick off the flop auction
+        # start the debt auction
         assert debt_auction_house.auctions_started() == 0
         assert len(debt_auction_house.active_auctions()) == 0
         assert geb.cdp_engine.dai(geb.accounting_engine.address) == Rad(0)

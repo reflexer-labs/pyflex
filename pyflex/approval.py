@@ -71,10 +71,10 @@ def approve_cdp_modification_directly(**kwargs):
     of `Flipper` and `Flopper` and possibly others in the future.
     """
 
-    move_abi = [{'constant': False, 'inputs': [{'name': 'guy', 'type': 'address'}], 'name': 'approveCDPModification', 'outputs': [],
+    move_abi = [{'constant': False, 'inputs': [{'name': 'account', 'type': 'address'}], 'name': 'approveCDPModification', 'outputs': [],
                  'payable': False, 'stateMutability': 'nonpayable', 'type': 'function'},
                 {'constant': True, 'inputs': [{'name': '', 'type': 'address'}, {'name': '', 'type': 'address'}],
-                 'name': 'can', 'outputs': [{'name': '', 'type': 'bool'}], 'payable': False, 'stateMutability': 'view',
+                 'name': 'cdpRights', 'outputs': [{'name': '', 'type': 'bool'}], 'payable': False, 'stateMutability': 'view',
                  'type': 'function'}]
 
     def approval_function(token: ERC20Token, spender_address: Address, spender_name: str):
@@ -82,7 +82,7 @@ def approve_cdp_modification_directly(**kwargs):
             token.web3.eth.defaultAccount)
 
         move_contract = Contract._get_contract(web3=token.web3, abi=move_abi, address=token.address)
-        if move_contract.functions.can(address_to_check.address, spender_address.address).call() is False:
+        if move_contract.functions.cdpRights(address_to_check.address, spender_address.address).call() is False:
             logger = logging.getLogger()
             logger.info(f"Approving {spender_name} ({spender_address}) to move our {token.address} directly")
 

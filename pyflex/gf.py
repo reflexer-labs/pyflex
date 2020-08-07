@@ -117,16 +117,16 @@ class CDP:
     """
 
     def __init__(self, address: Address, collateral_type: CollateralType = None,
-                 cdp_collateral: Wad = None, cdp_debt: Wad = None):
+                 locked_collateral: Wad = None, generated_debt: Wad = None):
         assert isinstance(address, Address)
         assert isinstance(collateral_type, CollateralType) or (collateral_type is None)
-        assert isinstance(cdp_collateral, Wad) or (cdp_collateral is None)
-        assert isinstance(cdp_debt, Wad) or (cdp_debt is None)
+        assert isinstance(locked_collateral, Wad) or (locked_collateral is None)
+        assert isinstance(generated_debt, Wad) or (generated_debt is None)
 
         self.address = address
         self.collateral_type = collateral_type
-        self.cdp_collateral = cdp_collateral
-        self.cdp_debt = cdp_debt
+        self.locked_collateral = locked_collateral
+        self.generated_debt = generated_debt
 
     def toBytes(self):
         addr_str = self.address.address
@@ -148,10 +148,10 @@ class CDP:
         repr = ''
         if self.collateral_type:
             repr += f'[{self.collateral_type.name}]'
-        if self.cdp_collateral:
-            repr += f' cdp_collateral={self.cdp_collateral}'
-        if self.cdp_debt:
-            repr += f' cdp_debt={self.cdp_debt}'
+        if self.locked_collateral:
+            repr += f' locked_collateral={self.locked_collateral}'
+        if self.generated_debt:
+            repr += f' generated_debt={self.generated_debt}'
         if repr:
             repr = f'[{repr.strip()}]'
         return f"CDP('{self.address}'){repr}"
@@ -344,7 +344,7 @@ class CDPEngine(Contract):
         b32_collateral_type = CollateralType(name).toBytes()
         (cdp_debt, rate, safety_price, d_ceiling, d_floor, liq_price) = self._contract.functions.collateralTypes(b32_collateral_type).call()
 
-        # We could get "cdp_collateral" from the CDP, but caller must provide an address.
+        # We could get "locked_collateral" from the CDP, but caller must provide an address.
 
         return CollateralType(name, accumulated_rates=Ray(rate), cdp_collateral=Wad(0), cdp_debt=Wad(cdp_debt),
                 safety_price=Ray(safety_price), debt_ceiling=Rad(d_ceiling), debt_floor=Rad(d_floor))
@@ -492,8 +492,8 @@ class CDPEngine(Contract):
         collateral_type = self.collateral_type(collateral_type.name)
         assert collateral_type.accumulated_rates != Ray(0)  # collateral_type has been initialised
 
-        cdp_collateral = cdp.cdp_collateral + delta_collateral
-        cdp_debt = cdp.cdp_debt + delta_debt
+        locked_collateral = cdp.locked_collateral + delta_collateral
+        generated_debt = cdp.generated_debt + delta_debt
         collateral_type_cdp_debt = collateral_type.cdp_debt + delta_debt
 
         logger.debug(f"System     | debt {f(self.global_debt())} | ceiling {f(self.global_debt_ceiling())}")
@@ -501,10 +501,10 @@ class CDPEngine(Contract):
                      f"| ceiling {f(collateral_type.debt_ceiling)}")
 
         dtab = Rad(collateral_type.accumulated_rates * Ray(delta_debt))
-        tab = collateral_type.accumulated_rates * cdp_debt
+        tab = collateral_type.accumulated_rates * generated_debt
         debt = self.global_debt() + dtab
         logger.debug(f"Modifying CDP collateralization debt={r(collateral_type_cdp_debt)}, "
-                     f"cdp_collateral={r(cdp_collateral)}, delta_collateral={r(delta_collateral)}, "
+                     f"locked_collateral={r(locked_collateral)}, delta_collateral={r(delta_collateral)}, "
                      f"delta_debt={r(delta_debt)}, " f"collateral_type.rate={r(collateral_type.accumulated_rates,8)}, "
                      f"tab={r(tab)}, safety_price={r(collateral_type.safety_price, 4)}, debt={r(debt)}")
 
@@ -515,10 +515,10 @@ class CDPEngine(Contract):
 
         # cdp is either less risky than before, or it is safe
         safe = (delta_debt <= Wad(0) and delta_collateral >= Wad(0)) or \
-                tab <= Ray(cdp_collateral) * collateral_type.safety_price
+                tab <= Ray(locked_collateral) * collateral_type.safety_price
 
         # cdp has no debt, or a non-dusty amount
-        neat = cdp_debt == Wad(0) or Rad(tab) >= collateral_type.debt_floor
+        neat = generated_debt == Wad(0) or Rad(tab) >= collateral_type.debt_floor
 
         if not under_collateral_debt_ceiling:
             logger.warning("collateral debt ceiling would be exceeded")
@@ -574,9 +574,8 @@ class CDPEngine(Contract):
             logs = self.web3.eth.getLogs(filter_params)
 
             lognotes = list(map(lambda l: LogNote.from_event(l, CDPEngine.abi), logs))
-            # TODO fix this
-            # '0x7cdd3fde' is Vat.slip (from CollateralJoin.join) and '0x76088703' is Vat.frob
-            log_modifications = list(filter(lambda l: l.sig == '0x76088703', lognotes))
+            # '0x6f1493f7' is CDPEngine.modifyCDPCollateralization
+            log_modifications = list(filter(lambda l: l.sig == '0x6f1493f7', lognotes))
             log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization(l), log_modifications))
             if collateral_type is not None:
                 log_modifications = list(filter(lambda l: l.collateral_type == collateral_type.name, log_modifications))
@@ -854,8 +853,8 @@ class LiquidationEngine(Contract):
         collateral_type = self.cdp_engine.collateral_type(collateral_type.name)
         cdp = self.cdp_engine.cdp(collateral_type, cdp.address)
         rate = self.cdp_engine.collateral_type(collateral_type.name).accumulated_rates
-        logger.info(f'Liquidating {collateral_type.name} CDP {cdp.address.address} with cdp_collateral={cdp.cdp_collateral} safety_price={collateral_type.safety_price} '
-                    f'generated_debt={cdp.cdp_debt} accumulatedRates={rate}')
+        logger.info(f'Liquidating {collateral_type.name} CDP {cdp.address.address} with locked_collateral={cdp.locked_collateral} safety_price={collateral_type.safety_price} '
+                    f'generated_debt={cdp.generated_debt} accumulatedRates={rate}')
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
                         'liquidateCDP', [collateral_type.toBytes(), cdp.address.address])

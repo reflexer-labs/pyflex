@@ -41,7 +41,7 @@ def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     assert collateral.adapter.join(address, Wad.from_number(10)).transact(from_address=address)
     wrap_modify_CDP_collateralization(geb, collateral, address, Wad.from_number(10), Wad.from_number(15))
 
-    assert geb.cdp_engine.debt() >= Rad(Wad.from_number(15))
+    assert geb.cdp_engine.global_debt() >= Rad(Wad.from_number(15))
     assert geb.cdp_engine.coin_balance(address) >= Rad.from_number(10)
 
 
@@ -162,7 +162,7 @@ class TestGlobalSettlement:
         collateral_type = geb.collaterals['ETH-A'].collateral_type
 
         cdp = geb.cdp_engine.cdp(collateral_type, our_address)
-        owe = Ray(cdp.cdp_debt) * geb.cdp_engine.collateral_type(collateral_type.name).accumulated_rates * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
+        owe = Ray(cdp.generated_debt) * geb.cdp_engine.collateral_type(collateral_type.name).accumulated_rates * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
         assert owe > Ray(0)
         wad = min(Ray(cdp.locked_collateral), owe)
         print(f"owe={owe} wad={wad}")
