@@ -136,7 +136,7 @@ class GlobalSettlement(Contract):
         """Set the `shutdownSystem` price for the collateral"""
         assert isinstance(collateral_type, CollateralType)
         
-        self._contract.functions.freeCollateralType(collateral_type.toBytes()).call()
+        self._contract.functions.freezeCollateralType(collateral_type.toBytes()).call()
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutdownSystem(bytes32)', [collateral_type.toBytes()])
 
     def fast_track_auction(self, collateral_type: CollateralType, collateral_auction_id: int) -> Transact:

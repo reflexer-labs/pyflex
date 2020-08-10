@@ -414,7 +414,7 @@ class CDPEngine(Contract):
         move_args = [src.address, dst.address, rad.value]
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferInternalCoins', move_args)
 
-    def transfer_CDP_collateral_and_debt(self, collateral_type: CollateralType, src: Address, dst: Address, delta_collateral: Wad, delta_debt: Wad) -> Transact:
+    def transfer_cdp_collateral_and_debt(self, collateral_type: CollateralType, src: Address, dst: Address, delta_collateral: Wad, delta_debt: Wad) -> Transact:
         """Split a Vault - binary approval or splitting/merging Vault's
 
         Args:
@@ -433,7 +433,7 @@ class CDPEngine(Contract):
         transfer_args = [collateral_type.toBytes(), src.address, dst.address, delta_collateral.value, delta_debt.value]
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferCDPCollateralAndDebt', transfer_args)
 
-    def modify_CDP_collateralization(self, collateral_type: CollateralType, cdp_address: Address, delta_collateral: Wad, delta_debt: Wad,
+    def modify_cdp_collateralization(self, collateral_type: CollateralType, cdp_address: Address, delta_collateral: Wad, delta_debt: Wad,
                                    collateral_owner=None, system_coin_recipient=None):
         """Adjust amount of collateral and reserved amount of system coin for the CDP
 
@@ -563,7 +563,7 @@ class CDPEngine(Contract):
             chunks_queried += 1
             end = min(to_block, start+chunk_size)
 
-            filter_params = {
+            filter_param = {
                 'address': self.address.address,
                 'fromBlock': start,
                 'toBlock': end
@@ -572,6 +572,7 @@ class CDPEngine(Contract):
                          f"accumulated {len(retval)} cdp modification in {chunks_queried-1} requests")
 
             logs = self.web3.eth.getLogs(filter_params)
+            logger.debug(logs)
 
             lognotes = list(map(lambda l: LogNote.from_event(l, CDPEngine.abi), logs))
             # '0x6f1493f7' is CDPEngine.modifyCDPCollateralization
@@ -600,7 +601,7 @@ class CDPEngine(Contract):
 
 
 class OracleRelayer(Contract):
-    """A client for the `Spotter` contract, which interacts with CDPEngine for the purpose of managing collateral prices.
+    """A client for the `OracleRelayer` contract, which interacts with CDPEngine for the purpose of managing collateral prices.
     Users generally have no need to interact with this contract; it is included for unit testing purposes.
 
     Ref. <https://github.com/makerdao/dss-deploy/blob/master/src/poke.sol>
@@ -633,6 +634,12 @@ class OracleRelayer(Contract):
         (orcl, safety_c_ratio, liquidation_c_ratio) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
 
         return Ray(safety_c_ratio)
+
+    def liquidation_c_ratio(self, collateral_type: CollateralType) -> Ray:
+        assert isinstance(collateral_type, CollateralType)
+        (orcl, safety_c_ratio, liquidation_c_ratio) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
+
+        return Ray(liquidation_c_ratio)
 
     def __repr__(self):
         return f"OracleRelayer('{self.address}')"

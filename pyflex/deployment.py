@@ -37,13 +37,10 @@ from pyflex.gas import DefaultGasPrice
 from pyflex.governance import DSPause, DSChief
 from pyflex.numeric import Wad, Ray
 from pyflex.oracles import OSM
-#from pyflex.sai import Tub, Tap, Top, Vox
 from pyflex.shutdown import ShutdownModule, GlobalSettlement
 from pyflex.token import DSToken, DSEthToken
 from pyflex.vault import DSVault
 from pyflex.cdpmanager import CdpManager
-#from pyflex.dsrmanager import DsrManager
-
 
 def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None) -> Address:
     """Deploys a new contract.
@@ -69,89 +66,6 @@ def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None)
     receipt = web3.eth.getTransactionReceipt(tx_hash)
     return Address(receipt['contractAddress'])
 
-'''
-class Deployment:
-    """Represents a test deployment of the Maker smart contract ecosystem for single collateral Dai (SCD).
-
-    Creating an instance of this class creates a testrpc web3 provider with the entire set
-    of Maker smart contracts deployed to it. It is used in unit tests of PyMaker, and also in
-    unit tests for individual keepers.
-    """
-    def __init__(self):
-        web3 = Web3(HTTPProvider("http://localhost:8555"))
-        web3.eth.defaultAccount = web3.eth.accounts[0]
-        our_address = Address(web3.eth.defaultAccount)
-        sai = DSToken.deploy(web3, 'DAI')
-        sin = DSToken.deploy(web3, 'SIN')
-        skr = DSToken.deploy(web3, 'PETH')
-        gem = DSToken.deploy(web3, 'WETH')
-        gov = DSToken.deploy(web3, 'FLX')
-        pip = DSValue.deploy(web3)
-        pep = DSValue.deploy(web3)
-        pit = DSVault.deploy(web3)
-
-        vox = Vox.deploy(web3, per=Ray.from_number(1))
-        tub = Tub.deploy(web3, sai=sai.address, sin=sin.address, skr=skr.address, gem=gem.address, gov=gov.address,
-                         pip=pip.address, pep=pep.address, vox=vox.address, pit=pit.address)
-        tap = Tap.deploy(web3, tub.address)
-        top = Top.deploy(web3, tub.address, tap.address)
-
-        tub._contract.functions.turn(tap.address.address).transact()
-
-        otc = MatchingMarket.deploy(web3, 2600000000)
-        """
-        etherdelta = EtherDelta.deploy(web3,
-                                       admin=Address('0x1111100000999998888877777666665555544444'),
-                                       fee_account=Address('0x8888877777666665555544444111110000099999'),
-                                       account_levels_addr=Address('0x0000000000000000000000000000000000000000'),
-                                       fee_make=Wad.from_number(0.01),
-                                       fee_take=Wad.from_number(0.02),
-                                       fee_rebate=Wad.from_number(0.03))
-        """
-
-        # set permissions
-        dad = DSGuard.deploy(web3)
-        dad.permit(DSGuard.ANY, DSGuard.ANY, DSGuard.ANY).transact()
-        tub.set_authority(dad.address).transact()
-        for auth in [sai, sin, skr, gem, gov, pit, tap, top]:
-            auth.set_authority(dad.address).transact()
-
-        # whitelist pairs
-        otc.add_token_pair_whitelist(sai.address, gem.address).transact()
-
-        # approve
-        tub.approve(directly())
-        tap.approve(directly())
-
-        # mint some GEMs
-        gem.mint(Wad.from_number(1000000)).transact()
-
-        self.snapshot_id = web3.manager.request_blocking("evm_snapshot", [])
-
-        self.web3 = web3
-        self.our_address = our_address
-        self.sai = sai
-        self.sin = sin
-        self.skr = skr
-        self.gem = gem
-        self.gov = gov
-        self.vox = vox
-        self.tub = tub
-        self.tap = tap
-        self.top = top
-        self.otc = otc
-        #self.etherdelta = etherdelta
-
-    def reset(self):
-        """Rollbacks all changes made since the initial deployment."""
-        self.web3.manager.request_blocking("evm_revert", [self.snapshot_id])
-        self.snapshot_id = self.web3.manager.request_blocking("evm_snapshot", [])
-
-    def time_travel_by(self, seconds: int):
-        assert(isinstance(seconds, int))
-        self.web3.manager.request_blocking("evm_increaseTime", [seconds])
-
-'''
 class GfDeployment:
     """Represents a GEB Framework deployment.
 
@@ -168,7 +82,7 @@ class GfDeployment:
         def __init__(self, pause: DSPause, cdp_engine: CDPEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
                      liquidation_engine: LiquidationEngine, surplus_auction_house: DebtAuctionHouse,
                      debt_auction_house: DebtAuctionHouse, coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
-                     gov: DSToken, oracle_relayer: OracleRelayer, ds_chief: DSChief, esm: ShutdownModule, global_settlement: GlobalSettlement,
+                     gov: DSToken, oracle_relayer: OracleRelayer, esm: ShutdownModule, global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, cdp_manager: CdpManager,
                      collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
@@ -183,7 +97,7 @@ class GfDeployment:
             self.coin_join = coin_join
             self.gov = gov
             self.oracle_relayer = oracle_relayer
-            self.ds_chief = ds_chief
+            #self.ds_chief = ds_chief
             self.esm = esm
             self.global_settlement = global_settlement
             self.proxy_registry = proxy_registry
@@ -207,7 +121,8 @@ class GfDeployment:
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
             gov = DSToken(web3, Address(conf['GEB_GOV']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
-            ds_chief = DSChief(web3, Address(conf['GEB_COIN']))
+            #ds_chief = DSChief(web3, Address(conf['GEB_VOTE_QUORUM']))
+            #ds_chief = None
             esm = ShutdownModule(web3, Address(conf['GEB_ESM']))
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
@@ -243,7 +158,7 @@ class GfDeployment:
 
             return GfDeployment.Config(pause, cdp_engine, accounting_engine, tax_collector, liquidation_engine,
                                         surplus_auction_house, debt_auction_house, coin_savings_acct,
-                                        system_coin, system_coin_adapter, gov, oracle_relayer, ds_chief, esm, global_settlement,
+                                        system_coin, system_coin_adapter, gov, oracle_relayer, esm, global_settlement,
                                         proxy_registry, proxy_actions, cdp_manager,
                                         collaterals)
 
@@ -275,7 +190,7 @@ class GfDeployment:
                 'GEB_COIN_JOIN': self.coin_join.address.address,
                 'GEB_GOV': self.gov.address.address,
                 'GEB_ORACLE_RELAYER': self.oracle_relayer.address.address,
-                'MCD_ADM': self.ds_chief.address.address,
+                #'MCD_ADM': self.ds_chief.address.address,
                 'GEB_ESM': self.esm.address.address,
                 'GEB_GLOBAL_SETTLEMENT': self.global_settlement.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
@@ -317,7 +232,7 @@ class GfDeployment:
         self.gov = config.gov
         self.collaterals = config.collaterals
         self.oracle_relayer = config.oracle_relayer
-        self.ds_chief = config.ds_chief
+        #self.ds_chief = config.ds_chief
         self.esm = config.esm
         self.global_settlement = config.global_settlement
         self.proxy_registry = config.proxy_registry

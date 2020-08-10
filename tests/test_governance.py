@@ -50,6 +50,7 @@ class TestDSPause:
         # assert self.ds_pause.plot(self.plan).transact()
         assert self.ds_pause.exec(self.plan).transact()
 
+@pytest.mark.skip(reason="soon to be deprecated")
 class TestDSChief:
     def test_scenario(self, geb: GfDeployment, our_address: Address, other_address: Address):
         isinstance(geb, GfDeployment)

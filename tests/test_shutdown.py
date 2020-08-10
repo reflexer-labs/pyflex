@@ -28,7 +28,7 @@ from pyflex.shutdown import ShutdownModule, GlobalSettlement
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
-from tests.test_gf import mint_gov, wrap_eth, wrap_modify_CDP_collateralization
+from tests.test_gf import mint_gov, wrap_eth, wrap_modify_cdp_collateralization
 
 
 def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
@@ -39,7 +39,7 @@ def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     collateral.approve(address)
     wrap_eth(geb, address, Wad.from_number(10))
     assert collateral.adapter.join(address, Wad.from_number(10)).transact(from_address=address)
-    wrap_modify_CDP_collateralization(geb, collateral, address, Wad.from_number(10), Wad.from_number(15))
+    wrap_modify_cdp_collateralization(geb, collateral, address, Wad.from_number(10), Wad.from_number(15))
 
     assert geb.cdp_engine.global_debt() >= Rad(Wad.from_number(15))
     assert geb.cdp_engine.coin_balance(address) >= Rad.from_number(10)
