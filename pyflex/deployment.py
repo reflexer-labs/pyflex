@@ -37,7 +37,7 @@ from pyflex.gas import DefaultGasPrice
 from pyflex.governance import DSPause, DSChief
 from pyflex.numeric import Wad, Ray
 from pyflex.oracles import OSM
-from pyflex.shutdown import ShutdownModule, GlobalSettlement
+from pyflex.shutdown import ESM, GlobalSettlement
 from pyflex.token import DSToken, DSEthToken
 from pyflex.vault import DSVault
 from pyflex.cdpmanager import CdpManager
@@ -82,7 +82,7 @@ class GfDeployment:
         def __init__(self, pause: DSPause, cdp_engine: CDPEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
                      liquidation_engine: LiquidationEngine, surplus_auction_house: DebtAuctionHouse,
                      debt_auction_house: DebtAuctionHouse, coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
-                     gov: DSToken, oracle_relayer: OracleRelayer, esm: ShutdownModule, global_settlement: GlobalSettlement,
+                     gov: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, cdp_manager: CdpManager,
                      collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
@@ -123,7 +123,7 @@ class GfDeployment:
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
             #ds_chief = DSChief(web3, Address(conf['GEB_VOTE_QUORUM']))
             #ds_chief = None
-            esm = ShutdownModule(web3, Address(conf['GEB_ESM']))
+            esm = ESM(web3, Address(conf['GEB_ESM']))
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))

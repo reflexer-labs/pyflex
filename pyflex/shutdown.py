@@ -31,7 +31,7 @@ from pyflex.token import DSToken, ERC20Token
 logger = logging.getLogger()
 
 
-class ShutdownModule(Contract):
+class ESM(Contract):
     """A client for the `ESM` contract, which allows users to call `global_settlement.shutdown_system()` and thereby trigger a shutdown.
 
     Ref. <https://github.com/makerdao/esm/blob/master/src/ESM.sol>
@@ -60,8 +60,9 @@ class ShutdownModule(Contract):
         return bool(self._contract.functions.settled().call())
 
     def shutdown(self):
-        """Calls `shutdown_system` on the `GlobalSettlement` contract, initiating a shutdown."""
+        """Calls `shutdownSystem` on the `GlobalSettlement` contract, initiating a shutdown."""
         logger.info("Calling shutdown to shutdown the global settlement")
+
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutdown', [])
 
 
