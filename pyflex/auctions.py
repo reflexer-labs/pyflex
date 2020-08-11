@@ -52,7 +52,7 @@ class AuctionContract(Contract):
 
     def __init__(self, web3: Web3, address: Address, abi: list, bids: callable):
         if self.__class__ == AuctionContract:
-            raise NotImplemented('Abstract class; please call CollateralAuctionHouse, SurplusAuctionHouse, or DebtAuctionHouse')
+            raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, SurplusAuctionHouse, or DebtAuctionHouse')
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
         assert isinstance(abi, list)
@@ -91,7 +91,7 @@ class AuctionContract(Contract):
 
         Args:
             source: Address of the contract or token relevant to the auction 
-                    (for CollateralAuctionHouse and DebtAuctionHouse pass CDPEngine address,
+                    (for EnglishCollateralAuctionHouse and DebtAuctionHouse pass CDPEngine address,
                     for SurplusAuctionHouse pass FLX token address)
             approval_function: Approval function (i.e. approval mode)
         """
@@ -162,15 +162,15 @@ class AuctionContract(Contract):
         raise NotImplemented()
 
 
-class CollateralAuctionHouse(AuctionContract):
-    """A client for the `CollateralAuctionHouse` contract, used to interact with collateral auctions.
+class EnglishCollateralAuctionHouse(AuctionContract):
+    """A client for the `EnglishCollateralAuctionHouse` contract, used to interact with collateral auctions.
 
-    You can find the source code of the `CollateralAuctionHouse` contract here:
+    You can find the source code of the `EnglishCollateralAuctionHouse` contract here:
     <https://github.com/makerdao/dss/blob/master/src/flip.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
-        address: Ethereum address of the `CollateralAuctionHouse` contract.
+        address: Ethereum address of the `EnglishCollateralAuctionHouse` contract.
 
     Event signatures:
     """
@@ -202,7 +202,7 @@ class CollateralAuctionHouse(AuctionContract):
             self.amount_to_raise = amount_to_raise
 
         def __repr__(self):
-            return f"CollateralAuctionHouse.Bid({pformat(vars(self))})"
+            return f"EnglishCollateralAuctionHouse.Bid({pformat(vars(self))})"
 
     class StartAuctionLog:
         def __init__(self, log):
@@ -217,7 +217,7 @@ class CollateralAuctionHouse(AuctionContract):
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
-            return f"CollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+            return f"EnglishCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
     class IncreaseBidSizeLog:
         def __init__(self, lognote: LogNote):
@@ -229,7 +229,7 @@ class CollateralAuctionHouse(AuctionContract):
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"CollateralAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
+            return f"EnglishCollateralAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
 
     class DecreaseSoldAmountLog:
         def __init__(self, lognote: LogNote):
@@ -241,12 +241,12 @@ class CollateralAuctionHouse(AuctionContract):
             self.tx_hash = lognote.tx_hash
 
         def __repr__(self):
-            return f"CollateralAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
+            return f"EnglishCollateralAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
-        super(CollateralAuctionHouse, self).__init__(web3, address, CollateralAuctionHouse.abi, self.bids)
+        super(EnglishCollateralAuctionHouse, self).__init__(web3, address, EnglishCollateralAuctionHouse.abi, self.bids)
 
     def bid_increase(self) -> Wad:
         """Returns the percentage minimum bid increase.
@@ -269,7 +269,7 @@ class CollateralAuctionHouse(AuctionContract):
 
         array = self._contract.functions.bids(id).call()
 
-        return CollateralAuctionHouse.Bid(id=id,
+        return EnglishCollateralAuctionHouse.Bid(id=id,
                            bid_amount=Rad(array[0]),
                            amount_to_sell=Wad(array[1]),
                            high_bidder=Address(array[2]),
@@ -293,14 +293,14 @@ class CollateralAuctionHouse(AuctionContract):
                                                                                           amount_to_sell.value,
                                                                                           bid_amount.value])
 
-    def increaseBidSize(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+    def increase_bid_size(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid_amount, Rad))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid_amount.value])
 
-    def decreaseSoldAmount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+    def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(amount_to_sell, Wad))
         assert(isinstance(bid_amount, Rad))
@@ -310,18 +310,18 @@ class CollateralAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, CollateralAuctionHouse.abi)
+        logs = super().get_past_lognotes(number_of_past_blocks, EnglishCollateralAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
-            elif isinstance(log, CollateralAuctionHouse.StartAuctionLog):
+            elif isinstance(log, EnglishCollateralAuctionHouse.StartAuctionLog):
                 history.append(log)
             elif log.sig == '0x30c34abb':
-                history.append(CollateralAuctionHouse.IncreaseBidSizeLog(log))
+                history.append(EnglishCollateralAuctionHouse.IncreaseBidSizeLog(log))
             elif log.sig == '0xff6b7b1c':
-                history.append(CollateralAuctionHouse.DecreaseSoldAmountLog(log))
+                history.append(EnglishCollateralAuctionHouse.DecreaseSoldAmountLog(log))
             elif log.sig == '0x2e993611':
                 history.append(AuctionContract.SettleAuctionLog(log))
         return history
@@ -331,13 +331,13 @@ class CollateralAuctionHouse(AuctionContract):
         codec = ABICodec(default_registry)
         if signature == "0xc84ce3a1172f0dec3173f04caaa6005151a4bfe40d4c9f3ea28dba5f719b2a7a":
             event_data = get_event_data(codec, self.start_auction_abi, event)
-            return CollateralAuctionHouse.StartAuctionLog(event_data)
+            return EnglishCollateralAuctionHouse.StartAuctionLog(event_data)
         else:
             event_data = get_event_data(codec, self.log_note_abi, event)
             return LogNote(event_data)
 
     def __repr__(self):
-        return f"CollateralAuctionHouse('{self.address}')"
+        return f"EnglishCollateralAuctionHouse('{self.address}')"
 
 
 class SurplusAuctionHouse(AuctionContract):

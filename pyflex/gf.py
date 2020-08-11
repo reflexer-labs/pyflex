@@ -32,7 +32,7 @@ from eth_abi.registry import registry as default_registry
 from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_cdp_modification_directly
 #from pyflex.auctions import Flapper, Flipper, Flopper
-from pyflex.auctions import SurplusAuctionHouse, CollateralAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import SurplusAuctionHouse, EnglishCollateralAuctionHouse, DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
 from pyflex.logging import LogNote
 from pyflex.token import DSToken, ERC20Token
@@ -254,11 +254,11 @@ class Collateral:
     """
 
     def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: CollateralJoin,
-                 collateral_auction_house: CollateralAuctionHouse, pip):
+                 collateral_auction_house: EnglishCollateralAuctionHouse, pip):
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, CollateralJoin)
-        assert isinstance(collateral_auction_house, CollateralAuctionHouse)
+        assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse)
 
         self.collateral_type = collateral_type
         self.collateral = collateral
@@ -563,7 +563,7 @@ class CDPEngine(Contract):
             chunks_queried += 1
             end = min(to_block, start+chunk_size)
 
-            filter_param = {
+            filter_params = {
                 'address': self.address.address,
                 'fromBlock': start,
                 'toBlock': end
@@ -572,11 +572,16 @@ class CDPEngine(Contract):
                          f"accumulated {len(retval)} cdp modification in {chunks_queried-1} requests")
 
             logs = self.web3.eth.getLogs(filter_params)
+            logger.debug(f"Found {len(logs)} total logs from block {start} to {end}")
             logger.debug(logs)
 
             lognotes = list(map(lambda l: LogNote.from_event(l, CDPEngine.abi), logs))
-            # '0x6f1493f7' is CDPEngine.modifyCDPCollateralization
+            # Have to filter out non-LogNote events now. Why?
+            lognotes = [l for l in lognotes if l is not None]
+            logger.debug(f"Found {len(lognotes)} total non null logs from block {start} to {end}")
+            # '0xfea5633f' is CDPEngine.modifyCDPCollateralization
             log_modifications = list(filter(lambda l: l.sig == '0x6f1493f7', lognotes))
+            logger.debug(f"Found {len(log_modifications)} total sig matching logs from block {start} to {end}")
             log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization(l), log_modifications))
             if collateral_type is not None:
                 log_modifications = list(filter(lambda l: l.collateral_type == collateral_type.name, log_modifications))
@@ -790,7 +795,7 @@ class TaxCollector(Contract):
 
 class LiquidationEngine(Contract):
     """A client for the `LiquidationEngine` contract, used to liquidate unsafe CDPs (CDPs).
-    Specifically, this contract is useful for CollateralAuctionHouse auctions.
+    Specifically, this contract is useful for EnglishCollateralAuctionHouse auctions.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/cat.sol>
     """
@@ -799,11 +804,11 @@ class LiquidationEngine(Contract):
     class LogLiquidate:
         def __init__(self, log):
             self.collateral_type = CollateralType.fromBytes(log['args']['collateralType'])
-            self.cdp = CDP(Address(log['args']['CDP']))
-            self.cdp_collateral = Wad(log['args']['cdpCollateral'])
-            self.cdp_debt = Wad(log['args']['cdpDebt'])
-            self.tab = Rad(log['args']['amountToRaise'])
-            self.flip = Address(log['args']['collateralAuctionHouse'])
+            self.cdp = CDP(Address(log['args']['cdp']))
+            self.collateral_amount = Wad(log['args']['collateralAmount'])
+            self.debt_amount = Wad(log['args']['debtAmount'])
+            self.amount_to_raise = Rad(log['args']['amountToRaise'])
+            self.collateral_auctioneer = Address(log['args']['collateralAuctioneer'])
             self.raw = log
 
         @classmethod
