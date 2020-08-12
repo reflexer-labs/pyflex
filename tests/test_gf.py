@@ -155,9 +155,8 @@ def cleanup_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     collateral_type = geb.cdp_engine.collateral_type(collateral.collateral_type.name)
 
     # If tax_collector.tax_single has been called, we won't have sufficient system_coin to repay the CDP
-    if collateral_type.accumulated_rates > Ray.from_number(1):
-        print("Accumulated_rates > 1. We won't have sufficient system_coin to repay the CDP")
-        return
+    #if collateral_type.accumulated_rates > Ray.from_number(1):
+    #    return
 
     # Repay borrowed system coin
     geb.approve_system_coin(address)
@@ -268,7 +267,6 @@ class TestConfig:
             assert collateral.pip is not None
 
     def test_account_transfers(self, web3: Web3, geb, our_address, other_address):
-        print(geb.collaterals)
         collateral = geb.collaterals['ETH-A']
         token = collateral.collateral
         amount = Wad(10)
@@ -343,9 +341,6 @@ class TestCDPEngine:
         #assert isinstance(collateral_bat.adapter, CollateralJoin)
         #assert collateral_bat.adapter.dec() == 18
 
-        #collateral_usdc = geb.collaterals['USDC-A']
-        #assert isinstance(collateral_usdc.adapter, CollateralJoin5)
-        #assert collateral_usdc.adapter.dec() == 6
 
     def test_coin_balance(self, geb, cdp):
         coin_balance = geb.cdp_engine.coin_balance(cdp.address)
@@ -430,8 +425,6 @@ class TestCDPEngine:
         # rollback
         cleanup_cdp(geb, collateral, other_address)
 
-    # Failing
-    #@pytest.mark.skip(reason="temporary")
     def test_past_modify_cdp_collateralization(self, geb, our_address, other_address):
         # given
         collateral0 = geb.collaterals['ETH-B']
@@ -475,20 +468,19 @@ class TestCDPEngine:
             assert mods[2].delta_collateral == Wad.from_number(-30)
             assert mods[2].delta_debt == Wad(0)
             assert mods[3].cdp == our_address
-            assert mods[3].collateral_owner == other_address
+            assert mods[3].collateral_source == other_address
             assert mods[3].delta_collateral == Wad.from_number(30)
             assert mods[3].delta_debt == Wad(0)
 
             assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=collateral_type0)) == 1
             assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=collateral_type1)) == 3
-            #assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=geb.collaterals['USDC-A'].collateral_type)) == 0
 
         finally:
             # teardown
             cleanup_cdp(geb, collateral0, our_address)
             TestCDPEngine.ensure_clean_cdp(geb, collateral0, our_address)
             cleanup_cdp(geb, collateral1, other_address)
-            TestCDPEngine.ensure_clean_cdp(geb, collateral1, our_address)
+            TestCDPEngine.ensure_clean_cdp(geb, collateral1, other_address)
 
     def test_settle_debt(self, geb):
         assert geb.cdp_engine.settle_debt(Rad(0)).transact()
@@ -615,7 +607,6 @@ class TestTaxCollector:
         assert isinstance(geb.tax_collector.stability_fee(c.collateral_type), Ray)
         assert isinstance(geb.tax_collector.update_time(c.collateral_type), int)
 
-    @pytest.mark.skip(reason="temporary")
     def test_tax_single(self, geb):
         # given
         c = geb.collaterals['ETH-A']
@@ -635,8 +626,6 @@ class TestOsm:
 
 
 class TestGeb:
-
-    @pytest.mark.skip(reason="temporary")
     def test_healthy_cdp(self, web3, geb, our_address):
         collateral = geb.collaterals['ETH-B']
         collateral_type = collateral.collateral_type

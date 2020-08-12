@@ -119,7 +119,8 @@ class GfDeployment:
             surplus_auction_house = SurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
-            gov = DSToken(web3, Address(conf['GEB_GOV']))
+            #gov = DSToken(web3, Address(conf['GEB_GOV']))
+            gov = DSToken(web3, Address(conf['GEB_GOVERNANCE_AGGREGATION']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
             #ds_chief = DSChief(web3, Address(conf['GEB_VOTE_QUORUM']))
             #ds_chief = None

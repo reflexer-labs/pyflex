@@ -21,10 +21,10 @@ import os
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
-from pyflex.deployment import DssDeployment
+from pyflex.deployment import GfDeployment
 from pyflex.keys import register_keys
 from pyflex.numeric import Wad
-from pyflex.dsr import Dsr
+#from pyflex.dsr import Dsr
 
 endpoint_uri = f"{os.environ['SERVER_ETH_RPC_HOST']}:{os.environ['SERVER_ETH_RPC_PORT']}"
 web3 = Web3(HTTPProvider(endpoint_uri=endpoint_uri,
@@ -33,9 +33,9 @@ web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000a
 register_keys(web3, [sys.argv[2]])      # ex: key_file=~keys/default-account.json,pass_file=~keys/default-account.pass
 cdpid = int(sys.argv[3])
 
-mcd = DssDeployment.from_network(web3, "kovan")
+geb = GfDeployment.from_network(web3, "kovan")
 our_address = Address(web3.eth.defaultAccount)
-dsr_client = Dsr(mcd, our_address)
+#dsr_client = Dsr(mcd, our_address)
 print(our_address)
 
 print(f"Default account: {our_address.address}")

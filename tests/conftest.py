@@ -22,7 +22,7 @@ from web3 import Web3, HTTPProvider
 
 from pyflex import Address
 #from pyflex.auctions import Flipper, Flapper, Flopper
-from pyflex.auctions import CollateralAuctionHouse, SurplusAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import EnglishCollateralAuctionHouse, SurplusAuctionHouse, DebtAuctionHouse
 #from pyflex.deployment import Deployment, DssDeployment
 from pyflex.deployment import GfDeployment
 #from pyflex.dss import Vat, Vow, Cat, Jug, Pot

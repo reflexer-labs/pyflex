@@ -286,8 +286,9 @@ class CDPEngine(Contract):
     Ref. <https://github.com/makerdao/dss/blob/master/src/vat.sol>
     """
 
+    '''
     # Identifies CDP holders and collateral types they have frobbed
-    class LogModifyCDPCollateralization():
+    class LogModifyCDPCollateralizationOld():
         def __init__(self, lognote: LogNote):
             assert isinstance(lognote, LogNote)
 
@@ -299,6 +300,59 @@ class CDPEngine(Contract):
             self.delta_debt = Wad(int.from_bytes(lognote.get_bytes_at_index(5), byteorder="big", signed=True))
             self.block = lognote.block
             self.tx_hash = lognote.tx_hash
+
+        def __repr__(self):
+            return f"LogModifyCDPCollateralizationOld({pformat(vars(self))})"
+    '''
+
+
+    # This information is read from the `LogModifyCDPCollateralization` event emitted from `CDPEngine.modifyCDPCollateralization`
+    class LogModifyCDPCollateralization:
+        """
+            event ModifyCDPCollateralization(
+            bytes32 collateralType,
+            address cdp,
+            address collateralSource,
+            address debtDestination,
+            int deltaCollateral,
+            int deltaDebt,
+            uint lockedCollateral,
+            uint generatedDebt,
+            uint globalDebt
+        );"""
+        def __init__(self, log):
+            self.collateral_type = CollateralType.fromBytes(log['args']['collateralType']).name
+            self.cdp = Address(log['args']['cdp'])
+            self.collateral_source = Address(log['args']['collateralSource'])
+            self.debt_destination = Address(log['args']['debtDestination'])
+            self.delta_collateral = Wad(log['args']['deltaCollateral'])
+            self.delta_debt = Wad(log['args']['deltaDebt'])
+            self.locked_collateral = Wad(log['args']['lockedCollateral'])
+            self.generated_debt = Wad(log['args']['generatedDebt'])
+            # Not sure here TODO Verify
+            self.global_debt = Wad(log['args']['globalDebt'])
+
+            #self.debt_amount = Wad(log['args']['debtAmount'])
+            #self.amount_to_raise = Rad(log['args']['amountToRaise'])
+            self.raw = log
+
+        @classmethod
+        def from_event(cls, event: dict):
+            assert isinstance(event, dict)
+
+            topics = event.get('topics')
+            if topics and topics[0] == HexBytes('0xa14f3fdc5acb5eabb83dd585b63d8a914644435bdc0895c66e3c724dac497b9f'):
+                log_abi = [abi for abi in CDPEngine.abi if abi.get('name') == 'ModifyCDPCollateralization'][0]
+                codec = ABICodec(default_registry)
+                event_data = get_event_data(codec, log_abi, event)
+
+                return CDPEngine.LogModifyCDPCollateralization(event_data)
+            else:
+                logging.warning(f'[from_event] Invalid topic in {event}')
+
+        def __eq__(self, other):
+            assert isinstance(other, CDPEngine.LogModifyCDPCollateralization)
+            return self.__dict__ == other.__dict__
 
         def __repr__(self):
             return f"LogModifyCDPCollateralization({pformat(vars(self))})"
@@ -414,7 +468,8 @@ class CDPEngine(Contract):
         move_args = [src.address, dst.address, rad.value]
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferInternalCoins', move_args)
 
-    def transfer_cdp_collateral_and_debt(self, collateral_type: CollateralType, src: Address, dst: Address, delta_collateral: Wad, delta_debt: Wad) -> Transact:
+    def transfer_cdp_collateral_and_debt(self, collateral_type: CollateralType, src: Address,
+                                        dst: Address, delta_collateral: Wad, delta_debt: Wad) -> Transact:
         """Split a Vault - binary approval or splitting/merging Vault's
 
         Args:
@@ -575,14 +630,15 @@ class CDPEngine(Contract):
             logger.debug(f"Found {len(logs)} total logs from block {start} to {end}")
             logger.debug(logs)
 
-            lognotes = list(map(lambda l: LogNote.from_event(l, CDPEngine.abi), logs))
-            # Have to filter out non-LogNote events now. Why?
-            lognotes = [l for l in lognotes if l is not None]
-            logger.debug(f"Found {len(lognotes)} total non null logs from block {start} to {end}")
-            # '0xfea5633f' is CDPEngine.modifyCDPCollateralization
-            log_modifications = list(filter(lambda l: l.sig == '0x6f1493f7', lognotes))
-            logger.debug(f"Found {len(log_modifications)} total sig matching logs from block {start} to {end}")
-            log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization(l), log_modifications))
+            log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization.from_event(l), logs))
+
+            log_modifications = [l for l in log_modifications if l is not None]
+
+            logger.debug(f"Found {len(log_modifications)} total mod cdp logs from block {start} to {end}")
+            # '0x6f1493f7' is CDPEngine.modifyCDPCollateralization
+            #log_modifications = list(filter(lambda l: l.sig == '0x6f1493f7', lognotes))
+            #logger.debug(f"Found {len(log_modifications)} total sig matching logs from block {start} to {end}")
+            #log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization(l), log_modifications))
             if collateral_type is not None:
                 log_modifications = list(filter(lambda l: l.collateral_type == collateral_type.name, log_modifications))
 

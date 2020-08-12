@@ -248,6 +248,14 @@ class EnglishCollateralAuctionHouse(AuctionContract):
         assert isinstance(address, Address)
         super(EnglishCollateralAuctionHouse, self).__init__(web3, address, EnglishCollateralAuctionHouse.abi, self.bids)
 
+    def bid_to_market_price_ratio(self) -> Wad:
+        """Returns the minimum bid to market price ratio for new bids.
+
+        Returns:
+            The minimum bid to market price ratio
+        """
+        return Ray(self._contract.functions.bidToMarketPriceRatio().call())
+
     def bid_increase(self) -> Wad:
         """Returns the percentage minimum bid increase.
 
