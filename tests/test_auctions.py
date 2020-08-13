@@ -105,20 +105,33 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     assert Rad(cdp.generated_debt) > current_bid.amount_to_raise
 
     bid_amount = Rad.from_number(90)
+    print("create_debt(): before TestEnglish increase_bid_size")
     TestEnglishCollateralAuctionHouse.increase_bid_size(collateral.collateral_auction_house, geb.oracle_relayer,
                                                         collateral, auction_id, our_address,
                                                         current_bid.amount_to_sell, bid_amount)
-    geb.cdp_engine.cdp_rights(our_address, collateral.collateral_auction_house.address)
-    wait(geb, our_address, collateral.collateral_auction_house.bid_duration()+1)
-    assert collateral.collateral_auction_house.settle_auction(auction_id).transact()
+    print("create_debt(): after TestEnglish increase_bid_size")
 
+    geb.cdp_engine.cdp_rights(our_address, collateral.collateral_auction_house.address)
+    print("waiting for bid_duration: %d" % collateral.collateral_auction_house.bid_duration())
+    wait(geb, our_address, collateral.collateral_auction_house.bid_duration()+1)
+    print("create_debt(): before settleAuction")
+    assert collateral.collateral_auction_house.settle_auction(auction_id).transact()
+    print("create_debt(): after settleAuction")
+
+    print("raising debt from queue")
     # Raise debt from the queue (note that vow.wait is 0 on our testchain)
     liquidations = geb.liquidation_engine.past_liquidations(100)
     for liquidation in liquidations:
         era_liquidation = liquidation.era(web3)
-        assert era_liquidation > int(datetime.now().timestamp()) - 120
+        liquidation_age = int(datetime.now().timestamp()) - era_liquidation
+        print("liquidation age: %d", liquidation_age)
+        #assert era_liquidation > int(datetime.now().timestamp()) - 120
+        assert era_liquidation > int(datetime.now().timestamp()) - \
+                                 ((collateral.collateral_auction_house.bid_duration() + geb.accounting_engine.pop_debt_delay()) * 2)
         assert geb.accounting_engine.debt_balance_of(era_liquidation) > Rad(0)
+        print("before pop debt from queue")
         assert geb.accounting_engine.pop_debt_from_queue(era_liquidation).transact()
+        print("after pop debt from queue")
         assert geb.accounting_engine.debt_balance_of(era_liquidation) == Rad(0)
 
     # Cancel out surplus and debt
@@ -167,25 +180,18 @@ class TestEnglishCollateralAuctionHouse:
         assert (bid_amount >= Rad(collateral_auction_house.bid_increase()) * current_bid.bid_amount) or (bid_amount == current_bid.amount_to_raise)
 
         #require(rad >= multiply(wmultiply(rdivide(uint256(priceFeedValue), redemptionPrice), amountToBuy), bidToMarketPriceRatio),
+
         price_feed = Wad(Web3.toInt(collateral.pip.read()))
         redemption_price = Wad(Ray(oracle_relayer.redemption_price()))
         bid_to_market_price_ratio = collateral_auction_house.bid_to_market_price_ratio()
 
         min_bid = Rad((price_feed / redemption_price) * amount_to_sell * bid_to_market_price_ratio)
 
-        print(price_feed)
-        print(redemption_price)
-        print(amount_to_sell)
-        print(bid_to_market_price_ratio)
-        print(bid_amount)
-        print(min_bid)
-
         assert bid_amount >= min_bid
-
         assert collateral_auction_house.increase_bid_size(id, amount_to_sell, bid_amount).transact(from_address=address)
 
     @staticmethod
-    def dent(collateral_auction_house: EnglishCollateralAuctionHouse, id: int, address: Address, amount_to_sell: Wad, bid: Rad):
+    def decrease_sold_amount(collateral_auction_house: EnglishCollateralAuctionHouse, id: int, address: Address, amount_to_sell: Wad, bid: Rad):
         assert (isinstance(collateral_auction_house, EnglishCollateralAuctionHouse))
         assert (isinstance(id, int))
         assert (isinstance(amount_to_sell, Wad))
@@ -201,7 +207,7 @@ class TestEnglishCollateralAuctionHouse:
         assert amount_to_sell < current_bid.amount_to_sell
         assert collateral_auction_house.bid_increase() * amount_to_sell <= current_bid.amount_to_sell
 
-        assert collateral_auction_house.dent(id, amount_to_sell, bid).transact(from_address=address)
+        assert collateral_auction_house.decrease_sold_amount(id, amount_to_sell, bid).transact(from_address=address)
 
     def test_getters(self, geb, collateral_auction_house):
         assert collateral_auction_house.cdp_engine() == geb.cdp_engine.address
@@ -212,7 +218,7 @@ class TestEnglishCollateralAuctionHouse:
 
     # failing assertion 194
     # NOTE some assertions are commented out
-    @pytest.mark.skip(reason="temporary")
+    #@pytest.mark.skip(reason="temporary")
     def test_scenario(self, web3, geb, collateral, collateral_auction_house, our_address, other_address, deployment_address):
         #prev_balance = geb.system_coin.balance_of(deployment_address)
         #prev_coin_balance = geb.cdp_engine.coin_balance(deployment_address)
@@ -235,16 +241,7 @@ class TestEnglishCollateralAuctionHouse:
         # Mint and withdraw all the system coin
         geb.approve_system_coin(deployment_address)
 
-        print("balance 2")
-        print(geb.system_coin.balance_of(deployment_address))
-        print(geb.cdp_engine.coin_balance(deployment_address))
-
         assert geb.system_coin_adapter.exit(deployment_address, delta_debt).transact(from_address=deployment_address)
-
-        print("balance 3")
-        print(geb.system_coin.balance_of(deployment_address))
-        print(geb.cdp_engine.coin_balance(deployment_address))
-
 
         #assert geb.system_coin.balance_of(deployment_address) == prev_balance + delta_debt
         #assert geb.cdp_engine.coin_balance(deployment_address) == prev_coin_balance + Rad(0)
@@ -287,6 +284,7 @@ class TestEnglishCollateralAuctionHouse:
         assert current_bid.amount_to_sell > Wad(0)
         assert current_bid.amount_to_raise > Rad(0)
         assert current_bid.bid_amount == Rad(0)
+
         # Cat doesn't incorporate the liquidation penalty (chop), but the start_auctioner includes it.
         # Awaiting word from @dc why this is so.
         #assert last_liquidation.amount_to_raise == current_bid.amount_to_raise
@@ -372,6 +370,7 @@ class TestEnglishCollateralAuctionHouse:
         cleanup_cdp(geb, collateral, other_address)
 
 
+@pytest.mark.skip(reason="temporary")
 class TestSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def surplus_auction_house(self, geb: GfDeployment) -> SurplusAuctionHouse:
@@ -465,7 +464,7 @@ class TestSurplusAuctionHouse:
         assert geb.system_coin.balance_of(our_address) >= Wad(current_bid.amount_to_sell)
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.sin()) - geb.accounting_engine.ash() == Rad(0)
 
-
+@pytest.mark.skip(reason="temporary")
 class TestDebtAuctionHouse:
     @pytest.fixture(scope="session")
     def debt_auction_house(self, geb: GfDeployment) -> DebtAuctionHouse:
@@ -535,7 +534,7 @@ class TestDebtAuctionHouse:
         bid_amount = Wad.from_number(0.000005)
         debt_auction_house.approve(geb.cdp_engine.address, approve_cdp_modification_directly())
         assert geb.cdp_engine.can(our_address, debt_auction_house.address)
-        TestDebtAuctionHouse.dent(debt_auction_house, start_auction, our_address, bid_amount, current_bid.bid_amount)
+        TestDebtAuctionHouse.decrease_sold_amount(debt_auction_house, start_auction, our_address, bid_amount, current_bid.bid_amount)
         current_bid = debt_auction_house.bids(start_auction)
         assert current_bid.high_bidder == our_address
 

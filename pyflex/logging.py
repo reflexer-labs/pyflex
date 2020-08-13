@@ -47,13 +47,6 @@ class LogNote:
             event_data = get_event_data(codec, log_note_abi, event)
             return LogNote(event_data)
         except ValueError as e:
-            '''
-            print(event)
-            print(e)
-            print("log_note_abi")
-            print(log_note_abi)
-            import sys; sys.exit()
-            '''
             # event is not a LogNote
             return None
 

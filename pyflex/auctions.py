@@ -35,7 +35,6 @@ def toBytes(string: str):
     assert(isinstance(string, str))
     return string.encode('utf-8').ljust(32, bytes(1))
 
-
 class AuctionContract(Contract):
     """Abstract baseclass shared across all three auction contracts."""
 
@@ -50,6 +49,31 @@ class AuctionContract(Contract):
         def __repr__(self):
             return f"AuctionContract.SettleAuctionLog({pformat(vars(self))})"
 
+    class AddAuthorizationLog:
+        def __init__(self, log):
+            args = log['args']
+            self.address = Address(args['address'])
+
+        def __repr__(self):
+            return f"AuctionContract.AddAuthorizationLog({pformat(vars(self))})"
+
+    class RemoveAuthorizationLog:
+        def __init__(self, log):
+            args = log['args']
+            self.address = Address(args['address'])
+
+        def __repr__(self):
+            return f"AuctionContract.RemoveAuthorizationLog({pformat(vars(self))})"
+
+    class ModifyParametersLog:
+        def __init__(self, log):
+            args = log['args']
+            self.parameter = args['parameter']
+            self.data = args['data']
+
+        def __repr__(self):
+            return f"AuctionContract.ModifyParametersLog({pformat(vars(self))})"
+
     def __init__(self, web3: Web3, address: Address, abi: list, bids: callable):
         if self.__class__ == AuctionContract:
             raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, SurplusAuctionHouse, or DebtAuctionHouse')
@@ -63,13 +87,25 @@ class AuctionContract(Contract):
         self._contract = self._get_contract(web3, abi, address)
         self._bids = bids
 
-        self.log_note_abi = None
+        self.add_auth_abi = None
+        self.remove_auth_abi = None
         self.start_auction_abi = None
+        self.mod_params_int_abi = None
+        self.mod_params_address_abi = None
+
         for member in abi:
-            if not self.log_note_abi and member.get('name') == 'LogNote':
-                self.log_note_abi = member
+            if not self.add_auth_abi and member.get('name') == 'AddAuthorization':
+                self.add_auth_abi = member
+            elif not self.remove_auth_abi and member.get('name') == 'RemoveAuthorization':
+                self.remove_auth_abi = member
             elif not self.start_auction_abi and member.get('name') == 'StartAuction':
                 self.start_auction_abi = member
+            elif not self.mod_params_int_abi and member.get('name') == 'ModifyParameters' and \
+                    (member.get('inputs')[0].get('type') == 'uint256' or member.get('inputs')[1].get('type') == 'uint256':
+                self.mod_params_int_abi = member
+            elif not self.mod_params_address_abi and member.get('name') == 'ModifyParameters' and \
+                    (member.get('inputs')[0].get('type') == 'address' or member.get('inputs')[1].get('type') == 'address':
+                self.mod_params_address_abi = member
 
     def authorized_accounts(self, address: Address) -> bool:
         assert isinstance(address, Address)
@@ -138,7 +174,7 @@ class AuctionContract(Contract):
         """
         return int(self._contract.functions.auctionsStarted().call())
 
-    def settle_auctions(self, id: int) -> Transact:
+    def settle_auction(self, id: int) -> Transact:
         assert(isinstance(id, int))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
