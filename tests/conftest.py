@@ -21,11 +21,8 @@ import pytest
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
-#from pyflex.auctions import Flipper, Flapper, Flopper
-from pyflex.auctions import EnglishCollateralAuctionHouse, SurplusAuctionHouse, DebtAuctionHouse
-#from pyflex.deployment import Deployment, DssDeployment
+from pyflex.auctions import EnglishCollateralAuctionHouse, PreSettlementSurplusAuctionHouse, DebtAuctionHouse
 from pyflex.deployment import GfDeployment
-#from pyflex.dss import Vat, Vow, Cat, Jug, Pot
 from pyflex.gf import CDPEngine, AccountingEngine, LiquidationEngine, TaxCollector, CoinSavingsAccount
 from pyflex.keys import register_keys
 
@@ -93,7 +90,7 @@ def validate_contracts_loaded(deployment: GfDeployment):
     assert deployment.liquidation_engine.address is not None
     assert isinstance(deployment.tax_collector, TaxCollector)
     assert deployment.tax_collector.address is not None
-    assert isinstance(deployment.surplus_auction_house, SurplusAuctionHouse)
+    assert isinstance(deployment.surplus_auction_house, PreSettlementSurplusAuctionHouse)
     assert deployment.surplus_auction_house.address is not None
     assert isinstance(deployment.debt_auction_house, DebtAuctionHouse)
     assert deployment.debt_auction_house.address is not None

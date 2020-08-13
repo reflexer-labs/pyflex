@@ -21,7 +21,7 @@ import re
 from typing import Dict, List, Optional
 
 import pkg_resources
-from pyflex.auctions import SurplusAuctionHouse, DebtAuctionHouse, EnglishCollateralAuctionHouse
+from pyflex.auctions import PreSettlementSurplusAuctionHouse, DebtAuctionHouse, EnglishCollateralAuctionHouse
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
@@ -116,7 +116,7 @@ class GfDeployment:
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
             system_coin = DSToken(web3, Address(conf['GEB_COIN']))#
             system_coin_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))#
-            surplus_auction_house = SurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
+            surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
             #gov = DSToken(web3, Address(conf['GEB_GOV']))

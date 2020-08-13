@@ -32,7 +32,7 @@ from eth_abi.registry import registry as default_registry
 from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_cdp_modification_directly
 #from pyflex.auctions import Flapper, Flipper, Flopper
-from pyflex.auctions import SurplusAuctionHouse, EnglishCollateralAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import PreSettlementSurplusAuctionHouse, EnglishCollateralAuctionHouse, DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
 from pyflex.logging import LogNote
 from pyflex.token import DSToken, ERC20Token
@@ -708,7 +708,7 @@ class OracleRelayer(Contract):
 
 class AccountingEngine(Contract):
     """A client for the `AccountingEngine` contract, which manages liquidation of surplus systemc coin and settlement of collateral debt.
-    Specifically, this contract is useful for SurplusAuctionHouse and DebtAuctionHouse auctions.
+    Specifically, this contract is useful for PreSettlementSurplusAuctionHouse and DebtAuctionHouse auctions.
 
     Ref. <https://github.com/makerdao/dss/blob/master/src/heal.sol>
     """

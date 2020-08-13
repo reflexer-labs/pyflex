@@ -38,45 +38,10 @@ def toBytes(string: str):
 class AuctionContract(Contract):
     """Abstract baseclass shared across all three auction contracts."""
 
-    class SettleAuctionLog:
-        def __init__(self, lognote: LogNote):
-            # This is whoever called `settle_auction`, which could differ from the `high_bidder` who won the auction
-            self.forgone_collateral_receiver = Address(lognote.forgone_collateral_receiver)
-            self.id = Web3.toInt(lognote.arg1)
-            self.block = lognote.block
-            self.tx_hash = lognote.tx_hash
-
-        def __repr__(self):
-            return f"AuctionContract.SettleAuctionLog({pformat(vars(self))})"
-
-    class AddAuthorizationLog:
-        def __init__(self, log):
-            args = log['args']
-            self.address = Address(args['address'])
-
-        def __repr__(self):
-            return f"AuctionContract.AddAuthorizationLog({pformat(vars(self))})"
-
-    class RemoveAuthorizationLog:
-        def __init__(self, log):
-            args = log['args']
-            self.address = Address(args['address'])
-
-        def __repr__(self):
-            return f"AuctionContract.RemoveAuthorizationLog({pformat(vars(self))})"
-
-    class ModifyParametersLog:
-        def __init__(self, log):
-            args = log['args']
-            self.parameter = args['parameter']
-            self.data = args['data']
-
-        def __repr__(self):
-            return f"AuctionContract.ModifyParametersLog({pformat(vars(self))})"
-
     def __init__(self, web3: Web3, address: Address, abi: list, bids: callable):
         if self.__class__ == AuctionContract:
-            raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, SurplusAuctionHouse, or DebtAuctionHouse')
+            raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, FixedDiscountAuctionHouse, \
+                                 PreSettlementSurplusAuctionHouse, or DebtAuctionHouse')
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
         assert isinstance(abi, list)
@@ -87,25 +52,14 @@ class AuctionContract(Contract):
         self._contract = self._get_contract(web3, abi, address)
         self._bids = bids
 
-        self.add_auth_abi = None
-        self.remove_auth_abi = None
+        # Set ABIs for event names that are present in all auctions 
         self.start_auction_abi = None
-        self.mod_params_int_abi = None
-        self.mod_params_address_abi = None
-
+        self.settle_auction_abi = None
         for member in abi:
-            if not self.add_auth_abi and member.get('name') == 'AddAuthorization':
-                self.add_auth_abi = member
-            elif not self.remove_auth_abi and member.get('name') == 'RemoveAuthorization':
-                self.remove_auth_abi = member
-            elif not self.start_auction_abi and member.get('name') == 'StartAuction':
+            if not self.start_auction_abi and member.get('name') == 'StartAuction':
                 self.start_auction_abi = member
-            elif not self.mod_params_int_abi and member.get('name') == 'ModifyParameters' and \
-                    (member.get('inputs')[0].get('type') == 'uint256' or member.get('inputs')[1].get('type') == 'uint256':
-                self.mod_params_int_abi = member
-            elif not self.mod_params_address_abi and member.get('name') == 'ModifyParameters' and \
-                    (member.get('inputs')[0].get('type') == 'address' or member.get('inputs')[1].get('type') == 'address':
-                self.mod_params_address_abi = member
+            elif not self.settle_auction_abi and member.get('name') == 'SettleAuction':
+                self.settle_auction_abi = member
 
     def authorized_accounts(self, address: Address) -> bool:
         assert isinstance(address, Address)
@@ -128,7 +82,7 @@ class AuctionContract(Contract):
         Args:
             source: Address of the contract or token relevant to the auction 
                     (for EnglishCollateralAuctionHouse and DebtAuctionHouse pass CDPEngine address,
-                    for SurplusAuctionHouse pass FLX token address)
+                    for PreSettlementSurplusAuctionHouse pass FLX token address)
             approval_function: Approval function (i.e. approval mode)
         """
         assert isinstance(source, Address)
@@ -179,7 +133,7 @@ class AuctionContract(Contract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
 
-    def get_past_lognotes(self, number_of_past_blocks: int, abi: list) -> List[LogNote]:
+    def get_past_logs(self, number_of_past_blocks: int, abi: list) -> List:
         assert isinstance(number_of_past_blocks, int)
         assert isinstance(abi, list)
 
@@ -243,9 +197,9 @@ class EnglishCollateralAuctionHouse(AuctionContract):
     class StartAuctionLog:
         def __init__(self, log):
             args = log['args']
-            self.id = args['id']
+            self.id = int(args['id'])
             self.amount_to_sell = Wad(args['amountToSell'])
-            self.bid_amount = Rad(args['bidAmount'])
+            self.bid_amount = Rad(args['initialBid'])
             self.amount_to_raise = Rad(args['amountToRaise'])
             self.forgone_collateral_receiver = Address(args['forgoneCollateralReceiver'])
             self.auction_income_recipient = Address(args['auctionIncomeRecipient'])
@@ -256,33 +210,308 @@ class EnglishCollateralAuctionHouse(AuctionContract):
             return f"EnglishCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
     class IncreaseBidSizeLog:
-        def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.forgone_collateral_receiver)
-            self.id = Web3.toInt(lognote.arg1)
-            self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
-            self.bid_amount = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
-            self.block = lognote.block
-            self.tx_hash = lognote.tx_hash
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.high_bidder = Address(args['highBidder'])
+            self.amount_to_buy = Wad(args['amountToBuy'])
+            self.rad = Rad(args['rad'])
+            self.bid_expiry = int(args['bidExpiry'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
             return f"EnglishCollateralAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
 
     class DecreaseSoldAmountLog:
-        def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.forgone_collateral_receiver)
-            self.id = Web3.toInt(lognote.arg1)
-            self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
-            self.bid_amount = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
-            self.block = lognote.block
-            self.tx_hash = lognote.tx_hash
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.high_bidder = Address(args['highBidder'])
+            self.amount_to_buy = Wad(args['amountToBuy'])
+            self.rad = Rad(args['rad'])
+            self.bid_expiry = int(args['bidExpiry'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
             return f"EnglishCollateralAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
 
+    class SettleAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"EnglishCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
+
+        # Set ABIs for event names that are not in AuctionContract
+        self.increase_bid_size_abi = None
+        self.decrease_sold_amount_abi = None
+
+        for member in EnglishCollateralAuctionHouse.abi:
+            if not self.increase_bid_size_abi and member.get('name') == 'IncreaseBidSize':
+                self.increase_bid_size_abi = member
+            elif not self.decrease_sold_amount_abi and member.get('name') == 'DecreaseSoldAmount':
+                self.decrease_sold_amount_abi = member
+
         super(EnglishCollateralAuctionHouse, self).__init__(web3, address, EnglishCollateralAuctionHouse.abi, self.bids)
+
+    def bid_to_market_price_ratio(self) -> Wad:
+        """Returns the minimum bid to market price ratio for new bids.
+
+        Returns:
+            The minimum bid to market price ratio
+        """
+        return Ray(self._contract.functions.bidToMarketPriceRatio().call())
+
+    def bid_increase(self) -> Wad:
+        """Returns the percentage minimum bid increase.
+
+        Returns:
+            The percentage minimum bid increase.
+        """
+        return Wad(self._contract.functions.bidIncrease().call())
+
+    def bids(self, id: int) -> Bid:
+        """Returns the auction details.
+
+        Args:
+            id: Auction identifier.
+
+        Returns:
+            The auction details.
+        """
+        assert(isinstance(id, int))
+
+        array = self._contract.functions.bids(id).call()
+        '''
+        struct Bid {
+        // Bid size (how many coins are offered per collateral sold)
+        uint256 bidAmount;
+        // How much collateral is sold in an auction
+        uint256 amountToSell;
+        // Who the high bidder is
+        address highBidder;
+        // When the latest bid expires and the auction can be settled
+        uint48  bidExpiry;
+        // Hard deadline for the auction after which no more bids can be placed
+        uint48  auctionDeadline;
+        // Who (which CDP) receives leftover collateral that is not sold in the auction; usually the liquidated CDP
+        address forgoneCollateralReceiver;
+        // Who receives the coins raised from the auction; usually the accounting engine
+        address auctionIncomeRecipient;
+        // Total/max amount of coins to raise
+        uint256 amountToRaise;
+    }
+        '''
+        return EnglishCollateralAuctionHouse.Bid(id=id,
+                           bid_amount=Rad(array[0]),
+                           amount_to_sell=Wad(array[1]),
+                           high_bidder=Address(array[2]),
+                           bid_expiry=int(array[3]),
+                           auction_deadline=int(array[4]),
+                           forgone_collateral_receiver=Address(array[5]),
+                           auction_income_recipient=Address(array[6]),
+                           amount_to_raise=Rad(array[7]))
+
+    def start_auction(self, forgone_collateral_receiver: Address, auction_income_recipient: Address,
+                      amount_to_raise: Rad, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+        assert(isinstance(forgoneCollateralReceiver, Address))
+        assert(isinstance(auction_income_recipient, Address))
+        assert(isinstance(amount_to_raise, Rad))
+        assert(isinstance(amount_to_sell, Wad))
+        assert(isinstance(bid_amount, Rad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [forgone_collateral_receiver.address,
+                                                                                          auction_income_recipient.address,
+                                                                                          amount_to_raise.value,
+                                                                                          amount_to_sell.value,
+                                                                                          bid_amount.value])
+
+    def increase_bid_size(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+        assert(isinstance(id, int))
+        assert(isinstance(amount_to_sell, Wad))
+        assert(isinstance(bid_amount, Rad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid_amount.value])
+
+    def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+        assert(isinstance(id, int))
+        assert(isinstance(amount_to_sell, Wad))
+        assert(isinstance(bid_amount, Rad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount',
+                        [id, amount_to_sell.value, bid_amount.value])
+
+    def past_logs(self, number_of_past_blocks: int):
+        assert isinstance(number_of_past_blocks, int)
+
+        logs = super().get_past_logs(number_of_past_blocks, EnglishCollateralAuctionHouse.abi)
+
+        history = []
+        for log in logs:
+            if log is None:
+                continue
+            if isinstance(log, EnglishCollateralAuctionHouse.StartAuctionLog) or \
+               isinstance(log, EnglishCollateralAuctionHouse.IncreaseBidSizeLog) or \
+               isinstance(log, EnglishCollateralAuctionHouse.DecreaseSoldAmountLog) or \
+               isinstance(log, EnglishCollateralAuctionHouse.SettleAuctionLog):
+               history.append(log)
+
+        return history
+
+    def parse_event(self, event):
+        signature = Web3.toHex(event['topics'][0])
+        codec = ABICodec(default_registry)
+        if signature == "0xdf7b5cd0ee6547c7389d2ac00ee0c1cd3439542399d6c8c520cc69c7409c0990":
+            event_data = get_event_data(codec, self.start_auction_abi, event)
+            return EnglishCollateralAuctionHouse.StartAuctionLog(event_data)
+        elif signature == "0xd87c815d5a67c2e130ad04b714d87a6fb69d5a6df0dbb0f1639cd9fe292201f9":
+            event_data = get_event_data(codec, self.increase_bid_size_abi, event)
+            return EnglishCollateralAuctionHouse.IncreaseBidSizeLog(event_data)
+        elif signature == "0x8c63feacc784a7f735e454365ba433f17d17293b02c57d98dad113977dbf0f13":
+            event_data = get_event_data(codec, self.decrease_sold_amount_abi, event)
+            return EnglishCollateralAuctionHouse.DecreaseSoldAmountLog(event_data)
+        elif signature == "0x03af424b0e12d91ea31fe7f2c199fc02c9ede38f9aa1bdc019a8087b41445f7a":
+            event_data = get_event_data(codec, self.settle_auction_abi, event)
+            return EnglishCollateralAuctionHouse.SettleAuctionLog(event_data)
+
+    def __repr__(self):
+        return f"EnglishCollateralAuctionHouse('{self.address}')"
+
+
+class FixedDiscountCollateralAuctionHouse(AuctionContract):
+    """A client for the `FixedDiscountCollateralAuctionHouse` contract, used to interact with collateral auctions.
+
+    You can find the source code of the `FixedDiscountCollateralAuctionHouse` contract here:
+    <https://github.com/makerdao/dss/blob/master/src/flip.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `FixedDiscountCollateralAuctionHouse` contract.
+
+    Event signatures:
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/FixedDiscountCollateralAuctionHouse.abi')
+    bin = Contract._load_bin(__name__, 'abi/FixedDiscountCollateralAuctionHouse.bin')
+
+    """ DONT need this in FixedDiscout ? """
+    class Bid:
+        def __init__(self, id: int, bid_amount: Rad, amount_to_sell: Wad, high_bidder: Address, bid_expiry: int, auction_deadline: int,
+                     forgone_collateral_receiver: Address, auction_income_recipient: Address, amount_to_raise: Rad):
+            assert(isinstance(id, int))
+            assert(isinstance(bid_amount, Rad))
+            assert(isinstance(amount_to_sell, Wad))
+            assert(isinstance(high_bidder, Address))
+            assert(isinstance(bid_expiry, int))
+            assert(isinstance(auction_deadline, int))
+            assert(isinstance(forgone_collateral_receiver, Address))
+            assert(isinstance(auction_income_recipient, Address))
+            assert(isinstance(amount_to_raise, Rad))
+
+            self.id = id
+            self.bid_amount = bid_amount
+            self.amount_to_sell = amount_to_sell
+            self.high_bidder = high_bidder
+            self.bid_expiry = bid_expiry
+            self.auction_deadline = auction_deadline
+            self.forgone_collateral_receiver = forgone_collateral_receiver
+            self.auction_income_recipient = auction_income_recipient
+            self.amount_to_raise = amount_to_raise
+
+
+    '''
+        event StartAuction(
+        uint256 id,
+        uint256 auctionsStarted,
+        uint256 amountToSell,
+        uint256 initialBid,
+        uint256 amountToRaise,
+        address indexed forgoneCollateralReceiver,
+        address indexed auctionIncomeRecipient,
+        uint256 auctionDeadline
+    );
+    '''
+    class StartAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.auctions_started = int(args['auctionsStarted'])
+            self.amount_to_sell = Wad(args['amountToSell'])
+            self.initial_bid = Rad(args['initialBid'])
+            self.amount_to_raise = Rad(args['amountToRaise'])
+            self.forgone_collateral_receiver = Address(args['forgoneCollateralReceiver'])
+            self.auction_income_recipient = Address(args['auctionIncomeRecipient'])
+            self.auction_deadline = int(args['auctionDeadline'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"FixedDiscountCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+
+    class BuyCollateralLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.wad = Wad(args['wad'])
+            self.bought_collateral = Wad(args['boughtCollateral'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"FixedDiscountCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+
+    class SettleAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.leftover_collateral = Wad(args['leftoverCollateral'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"FixedDiscountCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+
+    def active_auctions(self) -> list:
+        """ TODO Change this for FixedDiscount """
+        active_auctions = []
+        auction_count = self.auctions_started() + 1
+        for index in range(1, auction_count):
+            bid = self._bids(index)
+            if bid.high_bidder != Address("0x0000000000000000000000000000000000000000"):
+                now = datetime.now().timestamp()
+                if (bid.bid_expiry == 0 or now < bid.bid_expiry) and now < bid.auction_deadline:
+                    active_auctions.append(bid)
+            index += 1
+        return active_auctions
+
+        def __repr__(self):
+            return f"FixedDiscountCollateralAuctionHouse.Bid({pformat(vars(self))})"
+
+    def settle_auction(self, id: int) -> Transact:
+        assert(isinstance(id, int))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        # Set ABIs for event names that are not in AuctionContract
+        self.buy_collateral_abi = None
+        for member in FixedCollateralAuctionHouse.abi:
+            if not self.buy_collateral_abi and member.get('name') == 'BuyCollateral':
+                self.buy_collateral_abi = member
+
+        super(FixedCollateralAuctionHouse, self).__init__(web3, address, FixedCollateralAuctionHouse.abi, self.bids)
 
     def bid_to_market_price_ratio(self) -> Wad:
         """Returns the minimum bid to market price ratio for new bids.
@@ -354,53 +583,46 @@ class EnglishCollateralAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, EnglishCollateralAuctionHouse.abi)
+        logs = super().get_past_lognotes(number_of_past_blocks, FixedDiscountCollateralAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
-            elif isinstance(log, EnglishCollateralAuctionHouse.StartAuctionLog):
-                history.append(log)
-            elif log.sig == '0x30c34abb':
-                history.append(EnglishCollateralAuctionHouse.IncreaseBidSizeLog(log))
-            elif log.sig == '0xff6b7b1c':
-                history.append(EnglishCollateralAuctionHouse.DecreaseSoldAmountLog(log))
-            elif log.sig == '0x2e993611':
-                history.append(AuctionContract.SettleAuctionLog(log))
+            if isinstance(log, FixedDiscountCollateralAuctionHouse.StartAuctionLog) or \
+               isinstance(log, FixedDiscountCollateralAuctionHouse.BuyCollateralLog) or \
+               isinstance(log, FixedDiscountCollateralAuctionHouse.SettleAuctionLog):
+               history.append(log)
+
         return history
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
-        if signature == "0xc84ce3a1172f0dec3173f04caaa6005151a4bfe40d4c9f3ea28dba5f719b2a7a":
+        if signature == "0xdf7b5cd0ee6547c7389d2ac00ee0c1cd3439542399d6c8c520cc69c7409c0990":
             event_data = get_event_data(codec, self.start_auction_abi, event)
-            return EnglishCollateralAuctionHouse.StartAuctionLog(event_data)
-        else:
-            event_data = get_event_data(codec, self.log_note_abi, event)
-            return LogNote(event_data)
+            return FixedDiscountCollateralAuctionHouse.StartAuctionLog(event_data)
+        elif signature == "0xa4a1133e32fac37643a1fe1db4631daadb462c8662ae16004e67f0b8bb608383":
+            event_data = get_event_data(codec, self.buy_collateral_abi, event)
+            return FixedDiscountCollateralAuctionHouse.BuyCollateralLog(event_data)
+        elif signature == "0xef063949eb6ef5abef19139d9c75a558424ffa759302cfe445f8d2d327376fe4":
+            event_data = get_event_data(codec, self.settle_auction_abi, event)
+            return FixedDiscountCollateralAuctionHouse.SettleAuctionLog(event_data)
 
     def __repr__(self):
-        return f"EnglishCollateralAuctionHouse('{self.address}')"
+        return f"FixedDiscountCollateralAuctionHouse('{self.address}')"
 
 
-class SurplusAuctionHouse(AuctionContract):
-    """A client for the `SurplusAuctionHouse` contract, used to interact with surplus auctions.
+class PreSettlementSurplusAuctionHouse(AuctionContract):
+    """A client for the `PreSettlementSurplusAuctionHouse` contract, used to interact with surplus auctions.
 
-    You can find the source code of the `SurplusAuctionHouse` contract here:
+    You can find the source code of the `PreSettlementSurplusAuctionHouse` contract here:
     <https://github.com/makerdao/dss/blob/master/src/flap.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
-        address: Ethereum address of the `SurplusAuctionHouse` contract.
+        address: Ethereum address of the `PreSettlementSurplusAuctionHouse` contract.
 
-    Event signatures:
-        0x65fae35e: (deployment-related)
-        0x9c52a7f1: (deployment-related)
-        0xe6dde59cbc017becba89714a037778d234a84ce7f0a137487142a007e580d609: kick
-        0x29ae8114: file
-        0x4b43ed12: tend
-        0xc959c42b: deal
     """
 
     abi = Contract._load_abi(__name__, 'abi/PreSettlementSurplusAuctionHouse.abi')
@@ -424,36 +646,57 @@ class SurplusAuctionHouse(AuctionContract):
             self.auction_deadline = auction_deadline
 
         def __repr__(self):
-            return f"SurplusAuctionHouse.Bid({pformat(vars(self))})"
+            return f"PreSettlementSurplusAuctionHouse.Bid({pformat(vars(self))})"
 
     class StartAuctionLog:
         def __init__(self, log):
             args = log['args']
-            self.id = args['id']
+            self.id = int(args['id'])
+            self.auctions_started = int(args['auctionsStarted'])
             self.amount_to_sell = Rad(args['amountToSell'])
-            self.bid_amount = Wad(args['bidAmount'])
+            self.initial_bid = Wad(args['initialBid'])
+            self.auction_deadline = int(args['auctionDeadline'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
-            return f"SurplusAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+            return f"PreSettlementSurplusAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
     class IncreaseBidSizeLog:
-        def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.forgone_collateral_receiver)
-            self.id = Web3.toInt(lognote.arg1)
-            self.amount_to_sell = Rad(Web3.toInt(lognote.arg2))
-            self.bid_amount = Wad(Web3.toInt(lognote.get_bytes_at_index(2)))
-            self.block = lognote.block
-            self.tx_hash = lognote.tx_hash
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.high_bidder = Address(args['highBidder'])
+            self.amount_to_buy = Rad(args['amountToBuy'])
+            self.bid = args['bid']
+            self.bid_expiry = int(args['bidExpiry'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
-            return f"SurplusAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
+            return f"PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
+
+    class SettleAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"EnglishCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
-        super(SurplusAuctionHouse, self).__init__(web3, address, SurplusAuctionHouse.abi, self.bids)
+
+        # Set ABIs for event names that are not in AuctionContract
+        self.increase_bid_size_abi = None
+        for member in PreSettlementSurplusAuctionHouse.abi:
+            if not self.increase_bid_size_abi and member.get('name') == 'IncreaseBidSize':
+                self.increase_bid_size_abi = member
+
+        super(PreSettlementSurplusAuctionHouse, self).__init__(web3, address, PreSettlementSurplusAuctionHouse.abi, self.bids)
 
     def bid_increase(self) -> Wad:
         """Returns the percentage minimum bid increase.
@@ -479,7 +722,7 @@ class SurplusAuctionHouse(AuctionContract):
 
         array = self._contract.functions.bids(id).call()
 
-        return SurplusAuctionHouse.Bid(id=id,
+        return PreSettlementSurplusAuctionHouse.Bid(id=id,
                            bid_amount=Wad(array[0]),
                            amount_to_sell=Rad(array[1]),
                            high_bidder=Address(array[2]),
@@ -508,39 +751,39 @@ class SurplusAuctionHouse(AuctionContract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
 
     def terminate_auction_prematurely(self, id: int) -> Transact:
-        """While `cage`d, refund current bid to the bidder"""
+        """While `disableContract`d, refund current bid to the bidder"""
         assert (isinstance(id, int))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'yank', [id])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'terminateAuctionPrematurely', [id])
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, SurplusAuctionHouse.abi)
+        logs = super().get_past_lognotes(number_of_past_blocks, PreSettlementSurplusAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
-            elif isinstance(log, SurplusAuctionHouse.StartAuctionLog):
-                history.append(log)
-            elif log.sig == '0x4b43ed12':
-                history.append(SurplusAuctionHouse.IncreaseBidSizeLog(log))
-            elif log.sig == '0xc959c42b':
-                history.append(AuctionContract.SettleAuctionLog(log))
+            if isinstance(log, PreSettlementSurplusAuctionHouse.StartAuctionLog) or \
+               isinstance(log, PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog):
+               history.append(log)
         return history
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
-        if signature == "0xe6dde59cbc017becba89714a037778d234a84ce7f0a137487142a007e580d609":
+        if signature == "0xa4863af70e77aecfe2769e0569806782ba7c6f86fc9a307290a3816fb8a563e5":
             event_data = get_event_data(codec, self.start_auction_abi, event)
-            return SurplusAuctionHouse.StartAuctionLog(event_data)
-        else:
-            event_data = get_event_data(codec, self.log_note_abi, event)
-            return LogNote(event_data)
+            return PreSettlementSurplusAuctionHouse.StartAuctionLog(event_data)
+        elif signature == "0x70ac434e56b2c48625d9cc719bb7d833750e254293bc6c30d913e154e3b0ec33":
+            event_data = get_event_data(codec, self.increase_bid_size_abi, event)
+            return PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog(event_data)
+        elif signature == "0x03af424b0e12d91ea31fe7f2c199fc02c9ede38f9aa1bdc019a8087b41445f7a":
+            event_data = get_event_data(codec, self.settle_auction_abi, event)
+            return EnglishCollateralAuctionHouse.SettleAuctionLog(event_data)
 
     def __repr__(self):
-        return f"SurplusAuctionHouse('{self.address}')"
+        return f"PreSettlementSurplusAuctionHouse('{self.address}')"
 
 
 class DebtAuctionHouse(AuctionContract):
@@ -553,13 +796,6 @@ class DebtAuctionHouse(AuctionContract):
         web3: An instance of `Web` from `web3.py`.
         address: Ethereum address of the `DebtAuctionHouse` contract.
 
-    Event signatures:
-        0x65fae35e: (deployment-related)
-        0x9c52a7f1: (deployment-related)
-        0x29ae8114: file
-        0x7e8881001566f9f89aedb9c5dc3d856a2b81e5235a8196413ed484be91cc0df6: kick
-        0x5ff3a382: dent
-        0xc959c42b: deal
     """
 
     abi = Contract._load_abi(__name__, 'abi/DebtAuctionHouse.abi')
@@ -597,15 +833,17 @@ class DebtAuctionHouse(AuctionContract):
 
         def __repr__(self):
             return f"DebtAuctionHouse.StartAuctionLog({pformat(vars(self))})"
-
+    ''' event DecreaseSoldAmount(uint id, address highBidder, uint amountToBuy, uint bid, uint bidExpiry);'''
     class DecreaseSoldAmountLog:
-        def __init__(self, lognote: LogNote):
-            self.high_bidder = Address(lognote.forgone_collateral_receiver)
-            self.id = Web3.toInt(lognote.arg1)
-            self.amount_to_sell = Wad(Web3.toInt(lognote.arg2))
-            self.bid_amount = Rad(Web3.toInt(lognote.get_bytes_at_index(2)))
-            self.block = lognote.block
-            self.tx_hash = lognote.tx_hash
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.high_bidder = Address(args['highBidder'])
+            self.amount_to_buy = Wad(args['amountToBuy'])
+            self.bid = Rad(args['rad'])
+            self.bid_expiry = int(args['bidExpiry'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
             return f"DebtAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
@@ -613,6 +851,12 @@ class DebtAuctionHouse(AuctionContract):
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
+
+        # Set ABIs for event names that are not in AuctionContract
+        self.decrease_sold_amount_abi = None
+        for member in DebtAuctionHouse.abi:
+            if not self.decrease_sold_amount_abi and member.get('name') == 'DecreaseSoldAmount':
+                self.decrease_sold_amount_abi = member
 
         super(DebtAuctionHouse, self).__init__(web3, address, DebtAuctionHouse.abi, self.bids)
 
@@ -688,23 +932,21 @@ class DebtAuctionHouse(AuctionContract):
         for log in logs:
             if log is None:
                 continue
-            elif isinstance(log, DebtAuctionHouse.StartAuctionLog):
+            if isinstance(log, DebtAuctionHouse.StartAuctionLog) or \
+               isinstance(log, DebtAuctionHouse.DecreaseSoldAmountLog):
                 history.append(log)
-            elif log.sig == '0x5ff3a382':
-                history.append(DebtAuctionHouse.DecreaseSoldAmountLog(log))
-            elif log.sig == '0xc959c42b':
-                history.append(AuctionContract.SettleAuctionLog(log))
+
         return history
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
-        if signature == "0x7e8881001566f9f89aedb9c5dc3d856a2b81e5235a8196413ed484be91cc0df6":
+        if signature == "0x9102bd0b66dcb83f469f1122a583dc797657b114141460c59230fc1b41f48229":
             event_data = get_event_data(codec, self.start_auction_abi, event)
             return DebtAuctionHouse.StartAuctionLog(event_data)
-        else:
-            event_data = get_event_data(codec, self.log_note_abi, event)
-            return LogNote(event_data)
+        elif signature == "0x8c63feacc784a7f735e454365ba433f17d17293b02c57d98dad113977dbf0f13":
+            event_data = get_event_data(codec, self.decrease_sold_amount_abi, event)
+            return DebtAuctionHouse.DecreaseSoldAmountLog(event_data)
 
     def __repr__(self):
         return f"DebtAuctionHouse('{self.address}')"
