@@ -65,7 +65,7 @@ def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_a
 
 
 nobody = Address("0x0000000000000000000000000000000000000000")
-
+@pytest.mark.skip(reason="temporary")
 class TestESM:
     """This test must be run after other GEB tests because it will leave the testchain `disabled`d."""
 
@@ -81,25 +81,6 @@ class TestESM:
         # If `test_shutdown.py` is run in isolation, create a surplus auction to exercise `terminate_auction_prematurely`
         if coin_balance == Rad(0) and awe == Rad(0):
             create_surplus_auction(geb, deployment_address, our_address)
-
-    def _test_burn_tokens(self, geb, our_address):
-        assert geb.gov.approve(geb.esm.address).transact()
-
-        # This should have no effect yet succeed regardless
-        assert geb.esm.burn_tokens(Wad(0)).transact()
-        assert geb.esm.total_amount_burnt() == Wad(0)
-        assert geb.esm.burnt_tokens(our_address) == Wad(0)
-
-        # Ensure the appropriate amount of MKR can be burn_tokensed
-        mint_gov(geb.gov, our_address, geb.esm.min())
-        assert geb.esm.burn_tokens(geb.esm.min()).transact()
-        assert geb.esm.total_amount_burnt() == geb.esm.min()
-
-        # Joining extra MKR should succeed yet have no effect
-        mint_gov(geb.gov, our_address, Wad(1))
-        assert geb.esm.burn_tokens(Wad(153)).transact()
-        assert geb.esm.total_amount_burnt() == geb.esm.trigger_threshold() + Wad(153)
-        assert geb.esm.burnt_tokens(our_address) == geb.esm.total_amount_burnt()
 
     def test_shutdown(self, geb, our_address):
         open_cdp(geb, geb.collaterals['ETH-A'], our_address)

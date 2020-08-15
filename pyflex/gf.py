@@ -561,6 +561,7 @@ class CDPEngine(Contract):
         logger.debug(f"Modifying CDP collateralization debt={r(collateral_type_cdp_debt)}, "
                      f"locked_collateral={r(locked_collateral)}, delta_collateral={r(delta_collateral)}, "
                      f"delta_debt={r(delta_debt)}, " f"collateral_type.rate={r(collateral_type.accumulated_rates,8)}, "
+                     f"rhs={r(Ray(locked_collateral) * collateral_type.safety_price)}, "
                      f"tab={r(tab)}, safety_price={r(collateral_type.safety_price, 4)}, debt={r(debt)}")
 
         # either debt has decreased, or debt ceilings are not exceeded
@@ -790,7 +791,7 @@ class AccountingEngine(Contract):
 
     def auction_surplus(self) -> Transact:
         """Initiate a surplus auction"""
-        logger.info(f"Initiating a surplus auction with joy={self.cdp_engine.coinBalance(self.address)}")
+        logger.info(f"Initiating a surplus auction with joy={self.cdp_engine.coin_balance(self.address)}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionSurplus', [])
 

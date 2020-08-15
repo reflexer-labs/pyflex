@@ -247,7 +247,7 @@ class TestConfig:
     def test_to_json(self, web3: Web3, geb: GfDeployment):
         config_out = geb.to_json()
         dict = json.loads(config_out)
-        assert "GEB_GOV" in dict
+        assert "GEB_PROT" in dict
         assert "GEB_COIN" in dict
         assert len(dict) > 20
 
@@ -367,7 +367,7 @@ class TestCDPEngine:
         # then
         assert geb.cdp_engine.cdp(collateral.collateral_type, our_address) == our_cdp
 
-    @pytest.mark.skip('temp')
+    #@pytest.mark.skip('temp')
     def test_modify_cdp_collateralization_add_collateral(self, geb, our_address):
         # given
         collateral = geb.collaterals['ETH-A']
@@ -385,7 +385,7 @@ class TestCDPEngine:
         # rollback
         cleanup_cdp(geb, collateral, our_address)
 
-    @pytest.mark.skip('temp')
+    #@pytest.mark.skip('temp')
     def test_modify_cdp_collateralization_add_debt(self, geb, our_address: Address):
         # given
         collateral = geb.collaterals['ETH-A']
@@ -404,7 +404,7 @@ class TestCDPEngine:
         # rollback
         cleanup_cdp(geb, collateral, our_address)
 
-    @pytest.mark.skip('temp')
+    #@pytest.mark.skip('temp')
     def test_modify_cdp_collateralization_other_account(self, web3, geb, other_address):
         # given
         collateral = geb.collaterals['ETH-A']

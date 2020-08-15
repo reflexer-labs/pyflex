@@ -19,9 +19,9 @@ import pytest
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
-from pyflex.vault import DSVault
+#from pyflex.vault import DSVault
 
-
+@pytest.mark.skip("deprecated")
 class TestDSVault:
     def setup_method(self):
         self.web3 = Web3(HTTPProvider("http://localhost:8555"))

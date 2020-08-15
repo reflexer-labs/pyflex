@@ -27,19 +27,18 @@ from web3 import Web3, HTTPProvider
 from pyflex import Address
 from pyflex.approval import directly, approve_cdp_modification_directly
 from pyflex.auth import DSGuard
-from pyflex.etherdelta import EtherDelta
 #from pyflex.dss import Cat, Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Jug, Pot, Spotter, Vat, Vow
 # removed CollateralJoin5
 from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, CollateralJoin, CollateralType, TaxCollector, CoinSavingsAccount, OracleRelayer, CDPEngine, AccountingEngine
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
-from pyflex.governance import DSPause, DSChief
+from pyflex.governance import DSPause#, DSChief
 from pyflex.numeric import Wad, Ray
 from pyflex.oracles import OSM
 from pyflex.shutdown import ESM, GlobalSettlement
 from pyflex.token import DSToken, DSEthToken
-from pyflex.vault import DSVault
+#from pyflex.vault import DSVault
 from pyflex.cdpmanager import CdpManager
 
 def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None) -> Address:
@@ -97,13 +96,12 @@ class GfDeployment:
             self.coin_join = coin_join
             self.gov = gov
             self.oracle_relayer = oracle_relayer
-            #self.ds_chief = ds_chief
+            #self.vote_quorum = vote_quorum
             self.esm = esm
             self.global_settlement = global_settlement
             self.proxy_registry = proxy_registry
             self.proxy_actions = proxy_actions
             self.cdp_manager = cdp_manager
-            #self.dsr_manager = dsr_manager
             self.collaterals = collaterals or {}
 
         @staticmethod
@@ -119,11 +117,9 @@ class GfDeployment:
             surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
-            #gov = DSToken(web3, Address(conf['GEB_GOV']))
-            gov = DSToken(web3, Address(conf['GEB_GOVERNANCE_AGGREGATION']))
+            gov = DSToken(web3, Address(conf['GEB_PROT']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
-            #ds_chief = DSChief(web3, Address(conf['GEB_VOTE_QUORUM']))
-            #ds_chief = None
+            #vote_quorum = DSVoteQuorum(web3, Address(conf['GEB_VOTE_QUORUM']))
             esm = ESM(web3, Address(conf['GEB_ESM']))
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
@@ -189,9 +185,9 @@ class GfDeployment:
                 #'MCD_POT': self.pot.address.address,
                 'GEB_COIN': self.system_coin.address.address,
                 'GEB_COIN_JOIN': self.coin_join.address.address,
-                'GEB_GOV': self.gov.address.address,
+                'GEB_PROT': self.gov.address.address,
                 'GEB_ORACLE_RELAYER': self.oracle_relayer.address.address,
-                #'MCD_ADM': self.ds_chief.address.address,
+                #'GEB_VOTE_QUORUM': self.vote_quorum.address.address,
                 'GEB_ESM': self.esm.address.address,
                 'GEB_GLOBAL_SETTLEMENT': self.global_settlement.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
@@ -233,7 +229,7 @@ class GfDeployment:
         self.gov = config.gov
         self.collaterals = config.collaterals
         self.oracle_relayer = config.oracle_relayer
-        #self.ds_chief = config.ds_chief
+        #self.vote_quorum = config.vote_quorum
         self.esm = config.esm
         self.global_settlement = config.global_settlement
         self.proxy_registry = config.proxy_registry

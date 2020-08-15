@@ -196,6 +196,14 @@ class DSToken(ERC20Token):
         assert(isinstance(symbol, str))
         return DSToken(web3=web3, address=Contract._deploy(web3, DSToken.abi, DSToken.bin, [bytes(symbol, "utf-8")]))
 
+    def owner(self) -> Address:
+        """Return the current `authority` of a `DSAuth`-ed contract.
+
+        Returns:
+            The address of the current `authority`.
+        """
+        return Address(self._contract.functions.owner().call())
+
     def authority(self) -> Address:
         """Return the current `authority` of a `DSAuth`-ed contract.
 

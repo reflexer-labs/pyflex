@@ -37,13 +37,12 @@ class TestCdpManager:
         collateral_type = geb.collaterals['ETH-A'].collateral_type
         assert geb.cdp_manager.open_cdp(collateral_type, our_address).transact()
 
-        # 3 cdps are opened on deployment so the first one here is id 4
-        assert geb.cdp_manager.last_cdp_id(our_address) == 4
-        assert geb.cdp_manager.collateral_type(4).name == collateral_type.name
-        assert geb.cdp_manager.owns_cdp(4) == our_address
-        assert isinstance(geb.cdp_manager.cdp(4), CDP)
+        assert geb.cdp_manager.last_cdp_id(our_address) == 1
+        assert geb.cdp_manager.collateral_type(1).name == collateral_type.name
+        assert geb.cdp_manager.owns_cdp(1) == our_address
+        assert isinstance(geb.cdp_manager.cdp(1), CDP)
 
     def test_one(self, our_address: Address, geb: GfDeployment):
-        assert geb.cdp_manager.first_cdp_id(our_address) == 4
-        assert geb.cdp_manager.last_cdp_id(our_address) == 4
+        assert geb.cdp_manager.first_cdp_id(our_address) == 1
+        assert geb.cdp_manager.last_cdp_id(our_address) == 1
         assert geb.cdp_manager.cdp_count(our_address) == 1

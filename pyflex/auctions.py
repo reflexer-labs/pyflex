@@ -583,7 +583,7 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, FixedDiscountCollateralAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks, FixedDiscountCollateralAuctionHouse.abi)
 
         history = []
         for log in logs:
@@ -668,7 +668,7 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
             self.id = int(args['id'])
             self.high_bidder = Address(args['highBidder'])
             self.amount_to_buy = Rad(args['amountToBuy'])
-            self.bid = args['bid']
+            self.bid = Wad(args['bid'])
             self.bid_expiry = int(args['bidExpiry'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
@@ -684,7 +684,7 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
-            return f"EnglishCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+            return f"PreSettlementSurplusAuctionHouse.SettleAuctionLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -758,15 +758,18 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, PreSettlementSurplusAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks, PreSettlementSurplusAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
+
             if isinstance(log, PreSettlementSurplusAuctionHouse.StartAuctionLog) or \
-               isinstance(log, PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog):
-               history.append(log)
+               isinstance(log, PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog) or \
+               isinstance(log, PreSettlementSurplusAuctionHouse.SettleAuctionLog):
+                history.append(log)
+
         return history
 
     def parse_event(self, event):
@@ -775,12 +778,12 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
         if signature == "0xa4863af70e77aecfe2769e0569806782ba7c6f86fc9a307290a3816fb8a563e5":
             event_data = get_event_data(codec, self.start_auction_abi, event)
             return PreSettlementSurplusAuctionHouse.StartAuctionLog(event_data)
-        elif signature == "0x70ac434e56b2c48625d9cc719bb7d833750e254293bc6c30d913e154e3b0ec33":
+        elif signature == "0xd87c815d5a67c2e130ad04b714d87a6fb69d5a6df0dbb0f1639cd9fe292201f9":
             event_data = get_event_data(codec, self.increase_bid_size_abi, event)
             return PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog(event_data)
         elif signature == "0x03af424b0e12d91ea31fe7f2c199fc02c9ede38f9aa1bdc019a8087b41445f7a":
             event_data = get_event_data(codec, self.settle_auction_abi, event)
-            return EnglishCollateralAuctionHouse.SettleAuctionLog(event_data)
+            return PreSettlementSurplusAuctionHouse.SettleAuctionLog(event_data)
 
     def __repr__(self):
         return f"PreSettlementSurplusAuctionHouse('{self.address}')"
@@ -826,27 +829,40 @@ class DebtAuctionHouse(AuctionContract):
             args = log['args']
             self.id = args['id']
             self.amount_to_sell = Wad(args['amountToSell'])
-            self.bid_amount = Rad(args['bidAmount'])
-            self.auction_income_recipient = Address(args['auctionIncomeRecipient'])
+            self.initial_bid = Rad(args['initialBid'])
+            self.income_receiver = Address(args['incomeReceiver'])
+            self.auction_deadline = int(args['auctionDeadline'])
+            self.active_debt_auctions = int(args['activeDebtAuctions'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
             return f"DebtAuctionHouse.StartAuctionLog({pformat(vars(self))})"
-    ''' event DecreaseSoldAmount(uint id, address highBidder, uint amountToBuy, uint bid, uint bidExpiry);'''
+
     class DecreaseSoldAmountLog:
         def __init__(self, log):
             args = log['args']
             self.id = int(args['id'])
             self.high_bidder = Address(args['highBidder'])
             self.amount_to_buy = Wad(args['amountToBuy'])
-            self.bid = Rad(args['rad'])
+            self.bid = Rad(args['bid'])
             self.bid_expiry = int(args['bidExpiry'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
 
         def __repr__(self):
             return f"DebtAuctionHouse.DecreaseSoldAmountLog({pformat(vars(self))})"
+
+    class SettleAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.active_debt_auctions = int(args['id'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"DebtAuctionHouse.SettleAuctionLog({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -869,7 +885,7 @@ class DebtAuctionHouse(AuctionContract):
         return Wad(self._contract.functions.bidDecrease().call())
 
     def contract_enabled(self) -> bool:
-        return self._contract.functions.contract_enabled().call() > 0
+        return self._contract.functions.contractEnabled().call() > 0
 
     def amount_sold_increase(self) -> Wad:
         """Returns the amount_to_sell increase applied after an auction has been `restartAuction`ed."""
@@ -926,14 +942,15 @@ class DebtAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_lognotes(number_of_past_blocks, DebtAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks, DebtAuctionHouse.abi)
 
         history = []
         for log in logs:
             if log is None:
                 continue
             if isinstance(log, DebtAuctionHouse.StartAuctionLog) or \
-               isinstance(log, DebtAuctionHouse.DecreaseSoldAmountLog):
+               isinstance(log, DebtAuctionHouse.DecreaseSoldAmountLog) or \
+               isinstance(log, DebtAuctionHouse.SettleAuctionLog):
                 history.append(log)
 
         return history
@@ -947,6 +964,9 @@ class DebtAuctionHouse(AuctionContract):
         elif signature == "0x8c63feacc784a7f735e454365ba433f17d17293b02c57d98dad113977dbf0f13":
             event_data = get_event_data(codec, self.decrease_sold_amount_abi, event)
             return DebtAuctionHouse.DecreaseSoldAmountLog(event_data)
+        elif signature == "0xef063949eb6ef5abef19139d9c75a558424ffa759302cfe445f8d2d327376fe4":
+            event_data = get_event_data(codec, self.settle_auction_abi, event)
+            return DebtAuctionHouse.SettleAuctionLog(event_data)
 
     def __repr__(self):
         return f"DebtAuctionHouse('{self.address}')"
