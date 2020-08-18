@@ -24,9 +24,9 @@ from pyflex.numeric import Wad
 
 
 class CdpManager(Contract):
-    """A client for the `DSCdpManger` contract, which is a wrapper around the cdp system, for easier use.
+    """A client for the `GebCdpManger` contract, which is a wrapper around the cdp system, for easier use.
 
-    Ref. <https://github.com/makerdao/dss-cdp-manager/blob/master/src/DssCdpManager.sol>
+    Ref. <https://github.com/reflexer-labs/geb-cdp-manager/blob/master/src/GebCdpManager.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/GebCdpManager.abi')
@@ -87,7 +87,7 @@ class CdpManager(Contract):
         return int(cdpid)
 
     def cdp_count(self, address: Address) -> int:
-        '''Returns number of CDP's created using the DS-Cdp-Manager contract specifically'''
+        '''Returns number of CDP's created using the Geb-Cdp-Manager contract specifically'''
         assert isinstance(address, Address)
 
         count = int(self._contract.functions.cdpCount(address.address).call())

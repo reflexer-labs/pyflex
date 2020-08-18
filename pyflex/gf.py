@@ -194,7 +194,7 @@ class BasicTokenAdapter(Contract):
 class CoinJoin(BasicTokenAdapter):
     """A client for the `CoinJoin` contract, which allows the CDP holder to draw Dai from their CDP and repay it.
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/join.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/BasicTokenAdapters.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/CoinJoin.abi')
@@ -212,7 +212,7 @@ class CoinJoin(BasicTokenAdapter):
 class CollateralJoin(BasicTokenAdapter):
     """A client for the `CollateralJoin` contract, which allows the user to deposit collateral into a new or existing vault.
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/join.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/BasicTokenAdapters.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/BasicCollateralJoin.abi')
@@ -231,21 +231,6 @@ class CollateralJoin(BasicTokenAdapter):
 
     def decimals(self) -> int:
         return 18
-
-class CollateralJoin5(CollateralJoin):
-    """A client for the `CollateralJoin5` contract, which allows the user to deposit collateral into a new or existing vault.
-
-    Ref. <https://github.com/makerdao/dss-deploy/blob/master/src/join.sol#L274>
-    """
-    abi = Contract._load_abi(__name__, 'abi/CollateralJoin5.abi')
-    bin = Contract._load_bin(__name__, 'abi/CollateralJoin5.bin')
-
-    def __init__(self, web3: Web3, address: Address):
-        super(CollateralJoin5, self).__init__(web3, address)
-        self._token = self.collateral()
-
-    def dec(self) -> int:
-        return int(self._contract.functions.dec().call())
 
 class Collateral:
     """The `Collateral` object wraps accounting information in the CollateralType with token-wide artifacts shared across
@@ -283,43 +268,11 @@ class Collateral:
 class CDPEngine(Contract):
     """A client for the `CDPEngine` contract, which manages accounting for all CDPs (CDPs).
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/vat.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/CDPEngine.sol>
     """
-
-    '''
-    # Identifies CDP holders and collateral types they have frobbed
-    class LogModifyCDPCollateralizationOld():
-        def __init__(self, lognote: LogNote):
-            assert isinstance(lognote, LogNote)
-
-            self.collateral_type = str(Web3.toText(lognote.arg1)).replace('\x00', '')
-            self.cdp = Address(Web3.toHex(lognote.arg2)[26:])
-            self.collateral_owner = Address(Web3.toHex(lognote.arg3)[26:])
-            self.system_coin_recipient = Address(Web3.toHex(lognote.get_bytes_at_index(3))[26:])
-            self.delta_collateral = Wad(int.from_bytes(lognote.get_bytes_at_index(4), byteorder="big", signed=True))
-            self.delta_debt = Wad(int.from_bytes(lognote.get_bytes_at_index(5), byteorder="big", signed=True))
-            self.block = lognote.block
-            self.tx_hash = lognote.tx_hash
-
-        def __repr__(self):
-            return f"LogModifyCDPCollateralizationOld({pformat(vars(self))})"
-    '''
-
 
     # This information is read from the `LogModifyCDPCollateralization` event emitted from `CDPEngine.modifyCDPCollateralization`
     class LogModifyCDPCollateralization:
-        """
-            event ModifyCDPCollateralization(
-            bytes32 collateralType,
-            address cdp,
-            address collateralSource,
-            address debtDestination,
-            int deltaCollateral,
-            int deltaDebt,
-            uint lockedCollateral,
-            uint generatedDebt,
-            uint globalDebt
-        );"""
         def __init__(self, log):
             self.collateral_type = CollateralType.fromBytes(log['args']['collateralType']).name
             self.cdp = Address(log['args']['cdp'])
@@ -331,9 +284,6 @@ class CDPEngine(Contract):
             self.generated_debt = Wad(log['args']['generatedDebt'])
             # Not sure here TODO Verify
             self.global_debt = Wad(log['args']['globalDebt'])
-
-            #self.debt_amount = Wad(log['args']['debtAmount'])
-            #self.amount_to_raise = Rad(log['args']['amountToRaise'])
             self.raw = log
 
         @classmethod
@@ -666,7 +616,7 @@ class OracleRelayer(Contract):
     """A client for the `OracleRelayer` contract, which interacts with CDPEngine for the purpose of managing collateral prices.
     Users generally have no need to interact with this contract; it is included for unit testing purposes.
 
-    Ref. <https://github.com/makerdao/dss-deploy/blob/master/src/poke.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/OracleRelayer.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/OracleRelayer.abi')
@@ -679,6 +629,19 @@ class OracleRelayer(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
+
+    def collateral_type(self, name: str) -> CollateralType:
+        assert isinstance(name, str)
+
+        b32_collateral_type = CollateralType(name).toBytes()
+        oracle, safety_c_ratio, liquidation_c_ratio = self._contract.functions.collateralTypes(b32_collateral_type).call()
+
+        return oracle, safety_c_ratio, liquidation_c_ratio
+
+    def authorized_accounts(self, address: Address):
+        assert isinstance(address, Address)
+
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
     def update_collateral_price(self, collateral_type: CollateralType) -> Transact:
         assert isinstance(collateral_type, CollateralType)
@@ -711,7 +674,7 @@ class AccountingEngine(Contract):
     """A client for the `AccountingEngine` contract, which manages liquidation of surplus systemc coin and settlement of collateral debt.
     Specifically, this contract is useful for PreSettlementSurplusAuctionHouse and DebtAuctionHouse auctions.
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/heal.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/AccountingEngine.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/AccountingEngine.abi')
@@ -730,6 +693,16 @@ class AccountingEngine(Contract):
         assert isinstance(guy, Address)
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'addAuthorization', [guy.address])
+
+    def authorized_accounts(self, address: Address):
+        assert isinstance(address, Address)
+
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
+
+    def authorized_accounts(self, address: Address):
+        assert isinstance(address, Address)
+
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
     def contract_enabled(self) -> bool:
         return self._contract.functions.contractEnabled().call() > 0
@@ -802,7 +775,7 @@ class AccountingEngine(Contract):
 class TaxCollector(Contract):
     """A client for the `TaxCollector` contract, which manages stability fees.
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/jug.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/TaxCollector.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/TaxCollector.abi')
@@ -854,7 +827,7 @@ class LiquidationEngine(Contract):
     """A client for the `LiquidationEngine` contract, used to liquidate unsafe CDPs (CDPs).
     Specifically, this contract is useful for EnglishCollateralAuctionHouse auctions.
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/cat.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/LiquidationEngine.sol>
     """
 
     # This information is read from the `Liquidate` event emitted from `LiquidationEngine.liquidateCDP`
@@ -908,6 +881,11 @@ class LiquidationEngine(Contract):
 
     def contract_enabled(self) -> bool:
         return self._contract.functions.contractEnabled().call() > 0
+
+    def authorized_accounts(self, address: Address):
+        assert isinstance(address, Address)
+
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
     def liquidate_cdp(self, collateral_type: CollateralType, cdp: CDP) -> Transact:
         """ Initiate liquidation of a CDP, kicking off a collateral auction
@@ -976,9 +954,9 @@ class LiquidationEngine(Contract):
 
 
 class CoinSavingsAccount(Contract):
-    """A client for the `CoinSavingsAccount` contract, which implements the DSR.
+    """A client for the `CoinSavingsAccount` contract, which implements the coin savings rate.
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/pot.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/CoinSavingsAccount.sol>
     """
 
     abi = Contract._load_abi(__name__, 'abi/CoinSavingsAccount.abi')

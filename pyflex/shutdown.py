@@ -34,7 +34,7 @@ logger = logging.getLogger()
 class ESM(Contract):
     """A client for the `ESM` contract, which allows users to call `global_settlement.shutdown_system()` and thereby trigger a shutdown.
 
-    Ref. <https://github.com/makerdao/esm/blob/master/src/ESM.sol>
+    Ref. <https://github.com/reflexer-labs/esm/blob/master/src/ESM.sol>
 
     Attributes:
       web3: An instance of `Web` from `web3.py`.
@@ -51,8 +51,18 @@ class ESM(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
+    def authorized_accounts(self, address: Address) -> bool:
+        """True if address is authorized"""
+
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
+
+    def token_burner(self) -> Address:
+        """ Return tokenBurner """
+
+        return Address(self._contract.functions.tokenBurner().call())
+
     def trigger_threshold(self) -> Wad:
-        """Minimum amount of Gov required to call `fire`"""
+        """Minimum amount of Gov required to call `shutdown`"""
         return Wad(self._contract.functions.triggerThreshold().call())
 
     def settled(self) -> bool:
@@ -65,11 +75,10 @@ class ESM(Contract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutdown', [])
 
-
 class GlobalSettlement(Contract):
     """A client for the `GlobalSettlement` contract, used to orchestrate a shutdown.
 
-    Ref. <https://github.com/makerdao/dss/blob/master/src/end.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/GlobalSettlement.sol>
 
     Attributes:
       web3: An instance of `Web` from `web3.py`.
@@ -89,6 +98,16 @@ class GlobalSettlement(Contract):
     def contract_enabled(self) -> bool:
         """True when enabled, false when disabled"""
         return self._contract.functions.contractEnabled().call() > 0
+
+    def authorized_accounts(self, address: Address) -> bool:
+        """True if address is authorized"""
+
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
+
+    def stability_fee_treasury(self) -> Address:
+        """Return stabilityFeeTreasury"""
+
+        return Address(self._contract.functions.stabilityFeeTreasury().call())
 
     def shutdown_time(self) -> datetime:
         """Time of disable_contract"""
@@ -133,12 +152,11 @@ class GlobalSettlement(Contract):
         assert isinstance(address, Address)
         return Wad(self._contract.functions.coinsUsedToRedeem(collateral_type.toBytes(), address.address).call())
 
-    def shutdown_system(self, collateral_type: CollateralType) -> Transact:
+    def freeze_collateral_type(self, collateral_type: CollateralType) -> Transact:
         """Set the `shutdownSystem` price for the collateral"""
         assert isinstance(collateral_type, CollateralType)
         
-        self._contract.functions.freezeCollateralType(collateral_type.toBytes()).call()
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'shutdownSystem(bytes32)', [collateral_type.toBytes()])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'freezeCollateralType(bytes32)', [collateral_type.toBytes()])
 
     def fast_track_auction(self, collateral_type: CollateralType, collateral_auction_id: int) -> Transact:
         """Cancel a flip auction and seize it's collateral"""

@@ -617,6 +617,19 @@ class TestTaxCollector:
         # then
         assert geb.tax_collector.tax_single(c.collateral_type).transact()
 
+class TestPot:
+    def test_getters(self, mcd):
+        assert isinstance(mcd.pot.pie(), Wad)
+        assert isinstance(mcd.pot.dsr(), Ray)
+        assert isinstance(mcd.pot.rho(), datetime)
+
+        assert mcd.pot.pie() >= Wad(0)
+        assert mcd.pot.dsr() > Ray(0)
+        assert datetime.fromtimestamp(0) < mcd.pot.rho() < datetime.utcnow()
+
+    def test_drip(self, mcd):
+        assert mcd.pot.drip().transact()
+
 class TestOsm:
     def test_price(self, web3, geb):
         collateral = geb.collaterals['ETH-B']

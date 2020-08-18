@@ -26,7 +26,7 @@ class OSM(Contract):
     """A client for the `OSM` contract.
 
     You can find the source code of the `OSM` contract here:
-    <https://github.com/makerdao/osm>.
+    <https://github.com/reflexer-labs/geb-fsm/blob/master/src/OSM.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.

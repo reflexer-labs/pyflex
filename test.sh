@@ -19,6 +19,6 @@ py.test --cov=pyflex --cov-report=term --cov-append tests/$@
 TEST_RESULT=$?
 
 # Cleanup
-docker-compose down
+#docker-compose down
 
 exit $TEST_RESULT

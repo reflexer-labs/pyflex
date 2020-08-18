@@ -28,7 +28,7 @@ def directly(**kwargs):
     """Approval function: Approves the caller to access tokens directly.
 
     This function is meant to be passed as a parameter to the `approve(...)` method
-    of `Tub`, `SimpleMarket`, 'EtherDelta', 'TxManager', `ZrxExchange` and possibly
+    of `Tub`, `SimpleMarket`, 'TxManager' and possibly
     others in the future.
     """
 
@@ -48,7 +48,7 @@ def via_tx_manager(tx_manager: TxManager, **kwargs):
     """Approval function: Approves the caller to access tokens via the `TxManager`.
 
     This function is meant to be passed as a parameter to the `approve(...)` method
-    of `Tub`, `SimpleMarket`, 'EtherDelta', 'TxManager', `ZrxExchange` and possibly
+    of `Tub`, `SimpleMarket`, 'TxManager' and possibly
     others in the future.
     """
     assert(isinstance(tx_manager, TxManager))

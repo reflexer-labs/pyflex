@@ -61,11 +61,6 @@ class AuctionContract(Contract):
             elif not self.settle_auction_abi and member.get('name') == 'SettleAuction':
                 self.settle_auction_abi = member
 
-    def authorized_accounts(self, address: Address) -> bool:
-        assert isinstance(address, Address)
-
-        return bool(self._contract.functions.authorizedAccounts(address.address).call())
-
     def cdp_engine(self) -> Address:
         """Returns the `cdpEngine` address.
          Returns:
@@ -156,7 +151,7 @@ class EnglishCollateralAuctionHouse(AuctionContract):
     """A client for the `EnglishCollateralAuctionHouse` contract, used to interact with collateral auctions.
 
     You can find the source code of the `EnglishCollateralAuctionHouse` contract here:
-    <https://github.com/makerdao/dss/blob/master/src/flip.sol>.
+    <https://github.com/reflexer-labs/geb/blob/master/src/CollateralAuctionHouse.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
@@ -391,7 +386,7 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
     """A client for the `FixedDiscountCollateralAuctionHouse` contract, used to interact with collateral auctions.
 
     You can find the source code of the `FixedDiscountCollateralAuctionHouse` contract here:
-    <https://github.com/makerdao/dss/blob/master/src/flip.sol>.
+    <https://github.com/reflexer-labs/geb/blob/master/src/CollateralAuctionHouse.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
@@ -617,7 +612,7 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
     """A client for the `PreSettlementSurplusAuctionHouse` contract, used to interact with surplus auctions.
 
     You can find the source code of the `PreSettlementSurplusAuctionHouse` contract here:
-    <https://github.com/makerdao/dss/blob/master/src/flap.sol>.
+    <https://github.com/reflexer-labs/geb/blob/master/src/SurplusAuctionHouse.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
@@ -793,7 +788,7 @@ class DebtAuctionHouse(AuctionContract):
     """A client for the `DebtAuctionHouse` contract, used to interact with debt auctions.
 
     You can find the source code of the `DebtAuctionHouse` contract here:
-    <https://github.com/makerdao/dss/blob/master/src/flop.sol>.
+    <https://github.com/reflexer-labs/geb/blob/master/src/DebtAuctionHouse.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
@@ -935,7 +930,7 @@ class DebtAuctionHouse(AuctionContract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
 
     def terminate_auction_prematurely(self, id: int) -> Transact:
-        """While `cage`d, refund current bid to the bidder"""
+        """While `disableContract`d, refund current bid to the bidder"""
         assert (isinstance(id, int))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'terminateAuctionPrematurely', [id])

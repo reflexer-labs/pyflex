@@ -41,15 +41,18 @@ def create_surplus(geb: GfDeployment, surplus_auction_house: PreSettlementSurplu
         print('Creating a CDP with surplus')
         collateral = geb.collaterals['ETH-B']
         assert surplus_auction_house.auctions_started() == 0
-        wrap_eth(geb, deployment_address, Wad.from_number(30))
+        wrap_eth(geb, deployment_address, Wad.from_number(300))
         collateral.approve(deployment_address)
 
-        assert collateral.adapter.join(deployment_address, Wad.from_number(30)).transact(from_address=deployment_address)
+        assert collateral.adapter.join(deployment_address, Wad.from_number(300)).transact(from_address=deployment_address)
 
-        wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(30), delta_debt=Wad.from_number(100))
+        wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(300),
+                                          delta_debt=Wad.from_number(1000))
+
         assert geb.tax_collector.tax_single(collateral.collateral_type).transact(from_address=deployment_address)
           
         joy = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
+
         assert joy >= geb.accounting_engine.surplus_buffer() + geb.accounting_engine.surplus_auction_amount_to_sell()
     else:
         print(f'Surplus of {joy} already exists; skipping CDP creation')
@@ -104,7 +107,7 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
     assert Rad(cdp.generated_debt) > current_bid.amount_to_raise
 
-    bid_amount = Rad.from_number(4000)
+    bid_amount = Rad.from_number(3600)
     TestEnglishCollateralAuctionHouse.increase_bid_size(collateral.collateral_auction_house, geb.oracle_relayer,
                                                         collateral, auction_id, our_address,
                                                         current_bid.amount_to_sell, bid_amount)
