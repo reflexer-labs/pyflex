@@ -26,7 +26,7 @@ from pyflex.auctions import AuctionContract, EnglishCollateralAuctionHouse, PreS
 from pyflex.deployment import GfDeployment
 from pyflex.gf import Collateral, CDP, OracleRelayer
 from pyflex.numeric import Wad, Ray, Rad
-from tests.test_gf import wrap_eth, mint_gov, set_collateral_price, wait, wrap_modify_cdp_collateralization
+from tests.test_gf import wrap_eth, mint_prot, set_collateral_price, wait, wrap_modify_cdp_collateralization
 from tests.test_gf import cleanup_cdp, max_delta_debt, simulate_liquidate_cdp
 
 def create_surplus(geb: GfDeployment, surplus_auction_house: PreSettlementSurplusAuctionHouse, deployment_address: Address):
@@ -438,10 +438,10 @@ class TestPreSettlementSurplusAuctionHouse:
         assert surplus_auction_house.restart_auction(start_auction).transact()
 
         # Bid on the resurrected auction
-        mint_gov(geb.gov, our_address, Wad.from_number(10))
-        surplus_auction_house.approve(geb.gov.address, directly(from_address=our_address))
+        mint_prot(geb.prot, our_address, Wad.from_number(10))
+        surplus_auction_house.approve(geb.prot.address, directly(from_address=our_address))
         bid_amount = Wad.from_number(0.001)
-        assert geb.gov.balance_of(our_address) > bid_amount
+        assert geb.prot.balance_of(our_address) > bid_amount
         TestPreSettlementSurplusAuctionHouse.increase_bid_size(surplus_auction_house, start_auction, our_address, current_bid.amount_to_sell, bid_amount)
         current_bid = surplus_auction_house.bids(start_auction)
         assert current_bid.bid_amount == bid_amount
@@ -546,10 +546,10 @@ class TestDebtAuctionHouse:
         assert debt_auction_house.contract_enabled()
         now = int(datetime.now().timestamp())
         assert (current_bid.bid_expiry < now and current_bid.bid_expiry != 0) or current_bid.auction_deadline < now
-        gov_before = geb.gov.balance_of(our_address)
+        prot_before = geb.prot.balance_of(our_address)
         assert debt_auction_house.settle_auction(start_auction).transact(from_address=our_address)
-        gov_after = geb.gov.balance_of(our_address)
-        assert gov_after > gov_before
+        prot_after = geb.prot.balance_of(our_address)
+        assert prot_after > prot_before
         log = debt_auction_house.past_logs(1)[0]
         assert isinstance(log, DebtAuctionHouse.SettleAuctionLog)
         # Not present in SettleAuctionLog

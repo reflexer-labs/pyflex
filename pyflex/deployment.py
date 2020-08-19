@@ -81,7 +81,7 @@ class GfDeployment:
         def __init__(self, pause: DSPause, cdp_engine: CDPEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
                      liquidation_engine: LiquidationEngine, surplus_auction_house: DebtAuctionHouse,
                      debt_auction_house: DebtAuctionHouse, coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
-                     gov: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
+                     prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, cdp_manager: CdpManager,
                      collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
@@ -94,7 +94,7 @@ class GfDeployment:
             self.coin_savings_acct = coin_savings_acct
             self.system_coin = system_coin
             self.coin_join = coin_join
-            self.gov = gov
+            self.prot = prot
             self.oracle_relayer = oracle_relayer
             #self.vote_quorum = vote_quorum
             self.esm = esm
@@ -117,7 +117,7 @@ class GfDeployment:
             surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
-            gov = DSToken(web3, Address(conf['GEB_PROT']))
+            prot = DSToken(web3, Address(conf['GEB_PROT']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
             #vote_quorum = DSVoteQuorum(web3, Address(conf['GEB_VOTE_QUORUM']))
             esm = ESM(web3, Address(conf['GEB_ESM']))
@@ -155,7 +155,7 @@ class GfDeployment:
 
             return GfDeployment.Config(pause, cdp_engine, accounting_engine, tax_collector, liquidation_engine,
                                         surplus_auction_house, debt_auction_house, coin_savings_acct,
-                                        system_coin, system_coin_adapter, gov, oracle_relayer, esm, global_settlement,
+                                        system_coin, system_coin_adapter, prot, oracle_relayer, esm, global_settlement,
                                         proxy_registry, proxy_actions, cdp_manager,
                                         collaterals)
 
@@ -185,7 +185,7 @@ class GfDeployment:
                 #'MCD_POT': self.pot.address.address,
                 'GEB_COIN': self.system_coin.address.address,
                 'GEB_COIN_JOIN': self.coin_join.address.address,
-                'GEB_PROT': self.gov.address.address,
+                'GEB_PROT': self.prot.address.address,
                 'GEB_ORACLE_RELAYER': self.oracle_relayer.address.address,
                 #'GEB_VOTE_QUORUM': self.vote_quorum.address.address,
                 'GEB_ESM': self.esm.address.address,
@@ -226,7 +226,7 @@ class GfDeployment:
         self.coin_savings_acct = config.coin_savings_acct
         self.system_coin = config.system_coin
         self.system_coin_adapter = config.coin_join
-        self.gov = config.gov
+        self.prot = config.prot
         self.collaterals = config.collaterals
         self.oracle_relayer = config.oracle_relayer
         #self.vote_quorum = config.vote_quorum

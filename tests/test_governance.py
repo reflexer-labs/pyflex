@@ -25,7 +25,7 @@ from pyflex.numeric import Wad
 from pyflex.deployment import GfDeployment
 from datetime import datetime, timedelta
 
-from tests.test_gf import mint_gov
+from tests.test_gf import mint_prot
 
 
 @pytest.mark.skip(reason="not fully implemented")
@@ -56,16 +56,16 @@ class TestDSChief:
         isinstance(geb, GfDeployment)
         isinstance(our_address, Address)
 
-        prevBalance = geb.gov.balance_of(our_address)
+        prevBalance = geb.prot.balance_of(our_address)
         #amount = Wad.from_number(1000)
         amount = Wad.from_number(1)
-        mint_gov(geb.gov, our_address, amount)
-        assert geb.gov.balance_of(our_address) == amount + prevBalance
+        mint_prot(geb.prot, our_address, amount)
+        assert geb.prot.balance_of(our_address) == amount + prevBalance
 
-        # Lock gov in DS-Chief
-        assert geb.gov.approve(geb.ds_chief.address).transact(from_address=our_address)
+        # Lock prot in DS-Chief
+        assert geb.prot.approve(geb.ds_chief.address).transact(from_address=our_address)
         assert geb.ds_chief.lock(amount).transact(from_address=our_address)
-        assert geb.gov.balance_of(our_address) == prevBalance
+        assert geb.prot.balance_of(our_address) == prevBalance
 
         # Vote for our address
         assert geb.ds_chief.vote_yays([our_address.address]).transact(from_address=our_address)
@@ -96,4 +96,4 @@ class TestDSChief:
         # _past_events(self, contract, event, cls, number_of_past_blocks, event_filter)
 
         # assert geb.ds_chief.free(amount).transact(from_address=our_address)
-        # assert geb.gov.balance_of(our_address) == amount
+        # assert geb.prot.balance_of(our_address) == amount

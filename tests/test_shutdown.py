@@ -28,7 +28,7 @@ from pyflex.shutdown import ESM, GlobalSettlement
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
-from tests.test_gf import mint_gov, wrap_eth, wrap_modify_cdp_collateralization
+from tests.test_gf import mint_prot, wrap_eth, wrap_modify_cdp_collateralization
 
 
 def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
@@ -44,7 +44,6 @@ def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     assert geb.cdp_engine.global_debt() >= Rad(Wad.from_number(15))
     assert geb.cdp_engine.coin_balance(address) >= Rad.from_number(10)
 
-
 def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_address: Address):
     assert isinstance(geb, GfDeployment)
     assert isinstance(deployment_address, Address)
@@ -57,10 +56,10 @@ def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_a
     assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - geb.accounting_engine.total_on_auction_debt() == Rad(0)
     assert geb.accounting_engine.auction_surplus().transact()
 
-    mint_gov(geb.gov, our_address, Wad.from_number(10))
-    surplus_auction_house.approve(geb.gov.address, directly(from_address=our_address))
+    mint_prot(geb.prot, our_address, Wad.from_number(10))
+    surplus_auction_house.approve(geb.prot.address, directly(from_address=our_address))
     bid = Wad.from_number(0.001)
-    assert geb.gov.balance_of(our_address) > bid
+    assert geb.prot.balance_of(our_address) > bid
     assert surplus_auction_house.increase_bid_size(surplus_auction_house.auctions_started(), geb.accounting_engine.surplus_auction_amount_to_sell(), bid).transact(from_address=our_address)
 
 
@@ -85,15 +84,15 @@ class TestESM:
     def test_shutdown(self, geb, our_address, deployment_address):
         open_cdp(geb, geb.collaterals['ETH-A'], our_address)
 
-        mint_gov(geb.gov, deployment_address, geb.esm.trigger_threshold())
+        mint_prot(geb.prot, deployment_address, geb.esm.trigger_threshold())
 
         assert not geb.esm.settled()
 
-        assert geb.gov.balance_of(deployment_address) >= geb.esm.trigger_threshold()
-        assert geb.gov.approve(geb.esm.address).transact(from_address=deployment_address)
-        assert geb.gov.allowance_of(deployment_address, geb.esm.address) >= geb.esm.trigger_threshold()
+        assert geb.prot.balance_of(deployment_address) >= geb.esm.trigger_threshold()
+        assert geb.prot.approve(geb.esm.address).transact(from_address=deployment_address)
+        assert geb.prot.allowance_of(deployment_address, geb.esm.address) >= geb.esm.trigger_threshold()
 
-        assert geb.gov.address == Address(geb.esm._contract.functions.protocolToken().call())
+        assert geb.prot.address == Address(geb.esm._contract.functions.protocolToken().call())
 
         assert geb.global_settlement.contract_enabled()
         assert geb.cdp_engine.contract_enabled()
@@ -107,17 +106,20 @@ class TestESM:
         assert geb.accounting_engine.authorized_accounts(geb.global_settlement.address) == True
         assert geb.oracle_relayer.authorized_accounts(geb.global_settlement.address) == True
 
-
         assert geb.esm.shutdown().transact(from_address=deployment_address)
 
         assert geb.esm.settled()
         assert not geb.global_settlement.contract_enabled()
+        assert not geb.cdp_engine.contract_enabled()
+        assert not geb.liquidation_engine.contract_enabled()
+        assert not geb.accounting_engine.contract_enabled()
+        assert not geb.oracle_relayer.contract_enabled()
 
 #@pytest.mark.skip(reason="temporary")
 class TestGlobalSettlement:
     """This test must be run after TestESM, which calls `esm.shutdown`."""
 
-    @pytest.mark.skip(reason="temporary")
+    #@pytest.mark.skip(reason="temporary")
     def test_init(self, geb):
         assert geb.global_settlement is not None
         assert isinstance(geb.global_settlement, GlobalSettlement)
@@ -138,25 +140,34 @@ class TestGlobalSettlement:
             assert geb.global_settlement.collateral_cash_price(collateral_type) == Ray(0)
 
     #@pytest.mark.skip(reason="temporary")
-    def test_freeze_collateral_type(self, geb, deployment_address):
-        collateral = geb.collaterals['ETH-A']
-        collateral_type = collateral.collateral_type
+    def test_freeze_collateral_type(self, geb, our_address, deployment_address):
+        open_cdp(geb, geb.collaterals['ETH-A'], our_address)
+        collateral_type = geb.collaterals['ETH-A'].collateral_type
+        cdp_collateral_type = geb.cdp_engine.collateral_type('ETH-A')
 
+        # Mint and shutdown
+        mint_prot(geb.prot, deployment_address, geb.esm.trigger_threshold())
+        assert geb.prot.approve(geb.esm.address).transact(from_address=deployment_address)
+        assert geb.esm.shutdown().transact(from_address=deployment_address)
+
+        # Should be shutdown
         assert not geb.global_settlement.contract_enabled()
         assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) == Ray(0)
 
+        # check oracle relayer
         assert geb.oracle_relayer.address == Address(geb.global_settlement._contract.functions.oracleRelayer().call())
+        orcl, safe_ratio, liq_ratio = geb.oracle_relayer.collateral_type('ETH-A');
+        assert Address(orcl) == geb.collaterals['ETH-A'].pip.address
 
-
+        # Make sure read() will work in freezeCollateralType
+        assert geb.collaterals['ETH-A'].pip.has_value()# getResultWithValidity().call()[1]
+        price = Wad(geb.collaterals['ETH-A'].pip.read())
+        assert price > Wad(0)
+      
+        print(geb.oracle_relayer.redemption_price())
+        print(price)
         assert geb.global_settlement.freeze_collateral_type(collateral_type).transact()
-        t = geb.cdp_engine.collateral_type('ETH-A');
-        orcl, s_ratio, l_ratio = geb.oracle_relayer.collateral_type('ETH-A');
-        assert geb.oracle_relayer.redemption_price() == 1
-        assert geb.collaterals['ETH-A'].pip.read_as_int() == 1
 
-
-        #finalCoinPerCollateralPrice[collateralType] = wdivide(oracleRelayer.redemptionPrice(), uint(orcl.read()));
-        assert geb.global_settlement.freeze_collateral_type(collateral_type).transact()
         assert geb.global_settlement.collateral_total_debt(collateral_type) > Wad(0)
         assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) > Ray(0)
 

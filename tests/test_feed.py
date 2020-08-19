@@ -41,26 +41,16 @@ class TestDSValue:
         assert self.dsvalue.has_value() is False
         with pytest.raises(Exception):
             self.dsvalue.read()
-        with pytest.raises(Exception):
-            self.dsvalue.read_as_int()
-        with pytest.raises(Exception):
-            self.dsvalue.read_as_hex()
 
     def test_update_result(self):
         # when
-        self.dsvalue.update_result(bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4])).transact()
+        self.dsvalue.update_result(500).transact()
 
         # then
         assert self.dsvalue.has_value() is True
-        assert self.dsvalue.read_as_int() == 500
-        assert self.dsvalue.read() == bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4])
+        assert self.dsvalue.read() == 500
 
+    """
     def test_update_result_with_int(self):
         # when
         self.dsvalue.update_result_with_int(500).transact()
@@ -72,10 +62,11 @@ class TestDSValue:
                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4])
+    """
 
     def test_restart_value(self):
         # given
-        self.dsvalue.update_result_with_int(250).transact()
+        self.dsvalue.update_result(250).transact()
         assert self.dsvalue.has_value() is True
 
         # when

@@ -630,6 +630,9 @@ class OracleRelayer(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
+    def contract_enabled(self) -> bool:
+        return self._contract.functions.contractEnabled().call() > 0
+
     def collateral_type(self, name: str) -> CollateralType:
         assert isinstance(name, str)
 
