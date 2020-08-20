@@ -9,7 +9,7 @@ Python API for Maker contracts.
 
 ## Introduction
 
-The _Generalized Ethereum Bonds_  system incentivizes external agents, called _keepers_,
+The _GEB_  system incentivizes external agents, called _keepers_,
 to automate certain operations around the Ethereum blockchain. In order to ease their
 development, an API around most of the Reflexer contracts has been created. It can be used
 not only by keepers, but may also be found useful by authors of some other, unrelated
@@ -89,7 +89,7 @@ Contributions from the community are appreciated.
 ## Code samples
 
 Below you can find some code snippets demonstrating how the API can be used both for developing
-your own keepers and for creating some other utilities interacting with the _DAI Stablecoin_
+your own keepers and for creating some other utilities interacting with the _GEB_
 ecosystem contracts.
 
 ### Token transfer

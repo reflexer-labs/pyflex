@@ -70,7 +70,7 @@ class DSPause(Contract):
         return DSPause(web3=web3, address=Contract._deploy(web3, DSPause.abi, DSPause.bin,
                                                            [delay, owner.address, ds_auth.address.address]))
 
-    # TODO: Awaiting updated ABI/BIN from dss-deploy
+    # TODO: Awaiting updated ABI/BIN from geb-deploy
     # def plot(self, plan: Plan):
     #     return self._transact(plan, "plot")
 
@@ -149,7 +149,6 @@ class Etch:
     def __repr__(self):
         return pformat(vars(self))
 
-'''
 class DSChief(Contract):
     """A client for the `DSChief` contract, which manages lists of user roles and capabilities.
 
@@ -255,4 +254,3 @@ class DSChief(Contract):
         assert(isinstance(event_filter, dict) or (event_filter is None))
 
         return self._past_events_in_block_range(self._contract, 'Etch', Etch, from_block, to_block, event_filter)
-'''

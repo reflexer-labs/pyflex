@@ -20,7 +20,7 @@ from web3 import Web3, HTTPProvider
 
 from pyflex import Address
 from pyflex.auth import DSAuth
-from pyflex.governance import DSPause#, DSChief
+from pyflex.governance import DSPause, VoteQuorum
 from pyflex.numeric import Wad
 from pyflex.deployment import GfDeployment
 from datetime import datetime, timedelta
@@ -50,8 +50,8 @@ class TestDSPause:
         # assert self.ds_pause.plot(self.plan).transact()
         assert self.ds_pause.exec(self.plan).transact()
 
-@pytest.mark.skip(reason="soon to be deprecated")
-class TestDSChief:
+@pytest.mark.skip(reason="TODO")
+class TestVoteQuorum:
     def test_scenario(self, geb: GfDeployment, our_address: Address, other_address: Address):
         isinstance(geb, GfDeployment)
         isinstance(our_address, Address)

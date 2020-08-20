@@ -31,7 +31,6 @@ from eth_abi.registry import registry as default_registry
 
 from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_cdp_modification_directly
-#from pyflex.auctions import Flapper, Flipper, Flopper
 from pyflex.auctions import PreSettlementSurplusAuctionHouse, EnglishCollateralAuctionHouse, DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
 from pyflex.logging import LogNote
@@ -937,7 +936,7 @@ class LiquidationEngine(Contract):
             event_filter: Filter which will be applied to returned events.
 
         Returns:
-            List of past `LogLiquidate` events represented as :py:class:`pyflex.dss.LiquidationEngine.LogLiquidate` class.
+            List of past `LogLiquidate` events represented as :py:class:`pyflex.gf.LiquidationEngine.LogLiquidate` class.
         """
         assert isinstance(number_of_past_blocks, int)
         assert isinstance(event_filter, dict) or (event_filter is None)

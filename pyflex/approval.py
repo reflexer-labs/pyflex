@@ -68,7 +68,7 @@ def approve_cdp_modification_directly(**kwargs):
     """Approval function: Approves the caller to access tokens directly.
 
     This function is meant to be passed as a parameter to the `approve(...)` method
-    of `Flipper` and `Flopper` and possibly others in the future.
+    of `CollateralAuctionHouse` and `PreSettlementSurplusAuctionHouse` and possibly others in the future.
     """
 
     move_abi = [{'constant': False, 'inputs': [{'name': 'account', 'type': 'address'}], 'name': 'approveCDPModification', 'outputs': [],
