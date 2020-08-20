@@ -1,6 +1,6 @@
-# This file is part of Maker Keeper Framework.
+# This file is part of GEB Framework.
 #
-# Copyright (C) 2019 grandizzy
+# Copyright (C) 2019 bkellerman
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by

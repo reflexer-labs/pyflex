@@ -20,7 +20,7 @@ import pytest
 from datetime import datetime, timedelta
 
 from pyflex import Address
-from pyflex.approval import directly, approve_cdp_modification_directly
+from pyflex.approval import directly
 from pyflex.deployment import GfDeployment
 from pyflex.gf import Collateral
 from pyflex.numeric import Wad, Ray, Rad
@@ -29,7 +29,6 @@ from pyflex.shutdown import ESM, GlobalSettlement
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
 from tests.test_gf import mint_prot, wrap_eth, wrap_modify_cdp_collateralization
-
 
 def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     assert isinstance(geb, GfDeployment)
@@ -64,7 +63,6 @@ def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_a
 
 
 nobody = Address("0x0000000000000000000000000000000000000000")
-@pytest.mark.skip(reason="temporary")
 class TestESM:
     """This test must be run after other GEB tests because it will leave the testchain `disabled`d."""
 
@@ -115,17 +113,14 @@ class TestESM:
         assert not geb.accounting_engine.contract_enabled()
         assert not geb.oracle_relayer.contract_enabled()
 
-#@pytest.mark.skip(reason="temporary")
 class TestGlobalSettlement:
     """This test must be run after TestESM, which calls `esm.shutdown`."""
 
-    #@pytest.mark.skip(reason="temporary")
     def test_init(self, geb):
         assert geb.global_settlement is not None
         assert isinstance(geb.global_settlement, GlobalSettlement)
         assert isinstance(geb.esm.address, Address)
 
-    @pytest.mark.skip(reason="temporary")
     def test_getters(self, geb):
         assert not geb.global_settlement.contract_enabled()
         assert datetime.utcnow() - timedelta(minutes=5) < geb.global_settlement.shutdown_time() < datetime.utcnow()
@@ -139,39 +134,14 @@ class TestGlobalSettlement:
             assert geb.global_settlement.collateral_total_debt(collateral_type) == Wad(0)
             assert geb.global_settlement.collateral_cash_price(collateral_type) == Ray(0)
 
-    #@pytest.mark.skip(reason="temporary")
-    def test_freeze_collateral_type(self, geb, our_address, deployment_address):
-        open_cdp(geb, geb.collaterals['ETH-A'], our_address)
+    def test_freeze_collateral_type(self, geb):
         collateral_type = geb.collaterals['ETH-A'].collateral_type
-        cdp_collateral_type = geb.cdp_engine.collateral_type('ETH-A')
 
-        # Mint and shutdown
-        mint_prot(geb.prot, deployment_address, geb.esm.trigger_threshold())
-        assert geb.prot.approve(geb.esm.address).transact(from_address=deployment_address)
-        assert geb.esm.shutdown().transact(from_address=deployment_address)
-
-        # Should be shutdown
-        assert not geb.global_settlement.contract_enabled()
-        assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) == Ray(0)
-
-        # check oracle relayer
-        assert geb.oracle_relayer.address == Address(geb.global_settlement._contract.functions.oracleRelayer().call())
-        orcl, safe_ratio, liq_ratio = geb.oracle_relayer.collateral_type('ETH-A');
-        assert Address(orcl) == geb.collaterals['ETH-A'].pip.address
-
-        # Make sure read() will work in freezeCollateralType
-        assert geb.collaterals['ETH-A'].pip.has_value()# getResultWithValidity().call()[1]
-        price = Wad(geb.collaterals['ETH-A'].pip.read())
-        assert price > Wad(0)
-      
-        print(geb.oracle_relayer.redemption_price())
-        print(price)
         assert geb.global_settlement.freeze_collateral_type(collateral_type).transact()
 
         assert geb.global_settlement.collateral_total_debt(collateral_type) > Wad(0)
         assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) > Ray(0)
 
-    @pytest.mark.skip(reason="temporary")
     def test_terminate_auction_prematurely(self, geb):
         last_surplus_auction = geb.surplus_auction_house.bids(geb.surplus_auction_house.auctions_started())
         last_collateral_auction = geb.debt_auction_house.bids(geb.debt_auction_house.auctions_started())
@@ -189,7 +159,6 @@ class TestGlobalSettlement:
             assert auction.terminate_auction_prematurely(auction_id).transact()
             assert auction.bids(auction_id).high_bidder == nobody
 
-    @pytest.mark.skip(reason="temporary")
     def test_process_cdp(self, geb, our_address):
         collateral_type = geb.collaterals['ETH-A'].collateral_type
 
@@ -212,7 +181,6 @@ class TestGlobalSettlement:
         assert geb.cdp_engine.global_debt() > Rad(0)
         assert geb.cdp_engine.global_unbacked_debt() > Rad(0)
 
-    @pytest.mark.skip(reason="temporary")
     def test_close_cdp(self, web3, geb, our_address):
         collateral = geb.collaterals['ETH-A']
         collateral_type = collateral.collateral_type
@@ -222,7 +190,7 @@ class TestGlobalSettlement:
         assert geb.cdp_engine.token_collateral(collateral_type, our_address) > Wad(0)
         assert collateral.adapter.exit(our_address, geb.cdp_engine.token_collateral(collateral_type, our_address)).transact()
 
-        assert geb.global_settlement.shutdown_cooldown() == 5
+        assert geb.global_settlement.shutdown_cooldown() == 0
         time_travel_by(web3, 5)
         assert geb.global_settlement.set_outstanding_coin_supply().transact()
         assert geb.global_settlement.calculate_cash_price(collateral_type).transact()
@@ -234,6 +202,6 @@ class TestGlobalSettlement:
         assert geb.global_settlement.outstanding_coin_supply() > Rad(0)
         assert geb.system_coin.approve(geb.global_settlement.address).transact()
         assert geb.cdp_engine.coin_balance(our_address) >= Rad.from_number(10)
-        # FIXME: `pack` fails, possibly because we're passing 0 to `cdpEngine.transfer_collateral`
+        # FIXME: `prepareCoinsForRedeeming` fails, possibly because we're passing 0 to `cdpEngine.transfer_collateral`
         assert geb.global_settlement.prepare_coins_for_redeeming(Wad.from_number(10)).transact()
         assert geb.global_settlement.coin_bag(our_address) == Wad.from_number(10)

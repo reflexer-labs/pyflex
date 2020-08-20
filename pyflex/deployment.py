@@ -27,18 +27,15 @@ from web3 import Web3, HTTPProvider
 from pyflex import Address
 from pyflex.approval import directly, approve_cdp_modification_directly
 from pyflex.auth import DSGuard
-#from pyflex.dss import Cat, Collateral, DaiJoin, GemJoin, GemJoin5, Ilk, Jug, Pot, Spotter, Vat, Vow
-# removed CollateralJoin5
-from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, CollateralJoin, CollateralType, TaxCollector, CoinSavingsAccount, OracleRelayer, CDPEngine, AccountingEngine
+from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, BasicCollateralJoin, CollateralType, TaxCollector, CoinSavingsAccount, OracleRelayer, CDPEngine, AccountingEngine
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
-from pyflex.governance import DSPause#, DSChief
+from pyflex.governance import DSPause
 from pyflex.numeric import Wad, Ray
 from pyflex.oracles import OSM
 from pyflex.shutdown import ESM, GlobalSettlement
 from pyflex.token import DSToken, DSEthToken
-#from pyflex.vault import DSVault
 from pyflex.cdpmanager import CdpManager
 
 def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None) -> Address:
@@ -136,9 +133,9 @@ class GfDeployment:
                     collateral = DSToken(web3, Address(conf[name[1]]))
 
                 if name[1] in ['USDC', 'WBTC', 'TUSD']:
-                    adapter = CollateralJoin5(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
+                    adapter = BasicCollateralJoin5(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
                 else:
-                    adapter = CollateralJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
+                    adapter = BasicCollateralJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
 
                 # PIP contract may be a DSValue, OSM, or bogus address.
                 pip_address = Address(conf[f'ORACLE_SECURITY_MODULE_{name[1]}'])

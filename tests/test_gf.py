@@ -24,8 +24,7 @@ from web3 import Web3
 from pyflex import Address
 from pyflex.approval import approve_cdp_modification_directly
 from pyflex.deployment import GfDeployment
-#from pyflex.gf import Collateral, CoinJoin, CollateralJoin, CollateralJoin5, CollateralType, CDP, CDPEngine, AccountingEngine
-from pyflex.gf import Collateral, CoinJoin, CollateralJoin, CollateralType, CDP, CDPEngine, AccountingEngine
+from pyflex.gf import Collateral, CoinJoin, BasicCollateralJoin, CollateralType, CDPEngine, AccountingEngine
 from pyflex.feed import DSValue
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.oracles import OSM
@@ -317,7 +316,7 @@ class TestCDPEngine:
         amount_to_join = Wad(10)
         our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
         assert isinstance(collateral.collateral_type, CollateralType)
-        assert isinstance(collateral.adapter, CollateralJoin)
+        assert isinstance(collateral.adapter, BasicCollateralJoin)
         assert collateral.collateral_type == collateral.adapter.collateral_type()
         assert our_cdp.address == our_address
         wrap_eth(geb, our_address, amount_to_join)
@@ -338,7 +337,7 @@ class TestCDPEngine:
     def test_collateral_join(self, geb: GfDeployment):
         pass
         #collateral_bat = geb.collaterals['BAT-A']
-        #assert isinstance(collateral_bat.adapter, CollateralJoin)
+        #assert isinstance(collateral_bat.adapter, BasicCollateralJoin)
         #assert collateral_bat.adapter.dec() == 18
 
 
@@ -367,7 +366,6 @@ class TestCDPEngine:
         # then
         assert geb.cdp_engine.cdp(collateral.collateral_type, our_address) == our_cdp
 
-    #@pytest.mark.skip('temp')
     def test_modify_cdp_collateralization_add_collateral(self, geb, our_address):
         # given
         collateral = geb.collaterals['ETH-A']
@@ -385,7 +383,6 @@ class TestCDPEngine:
         # rollback
         cleanup_cdp(geb, collateral, our_address)
 
-    #@pytest.mark.skip('temp')
     def test_modify_cdp_collateralization_add_debt(self, geb, our_address: Address):
         # given
         collateral = geb.collaterals['ETH-A']
@@ -404,7 +401,6 @@ class TestCDPEngine:
         # rollback
         cleanup_cdp(geb, collateral, our_address)
 
-    #@pytest.mark.skip('temp')
     def test_modify_cdp_collateralization_other_account(self, web3, geb, other_address):
         # given
         collateral = geb.collaterals['ETH-A']
@@ -565,7 +561,8 @@ class TestLiquidationEngine:
 
 
 class TestOracleRelayer:
-    def test_safety_c_ratio(self, geb):
+    @pytest.mark.skip('redemption price changes between update_collateral_price() and following redemption_price()')
+    def test_exact_safety_c_ratio(self, geb):
         collateral_type = geb.collaterals['ETH-A'].collateral_type
         #set_collateral_price(geb, coll, Wad.from_number(250))
         collateral_price = Wad(geb.collaterals['ETH-A'].pip.read())
@@ -578,12 +575,7 @@ class TestOracleRelayer:
         safe_c_ratio = geb.oracle_relayer.safety_c_ratio(collateral_type)
         liquidation_c_ratio = geb.oracle_relayer.liquidation_c_ratio(collateral_type)
        
-        print(collateral_price)
-        print(redemption_price)
-        print(cdp_collateral_type.safety_price)
-        #calc_ratio = Ray(collateral_price * 10 ** 9) / redemption_price / cdp_collateral_type.safety_price
         calc_ratio = Ray(collateral_price) / redemption_price / cdp_collateral_type.safety_price
-        #calc_ratio = Ray(val) / redemption_price / collateral_type.safety_price
         assert safe_c_ratio == calc_ratio
 
 class TestAccountingEngine:

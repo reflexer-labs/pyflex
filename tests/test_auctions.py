@@ -147,7 +147,6 @@ def check_active_auctions(auction: AuctionContract):
         assert isinstance(bid.high_bidder, Address)
         assert bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
 
-#@pytest.mark.skip(reason="temporary")
 class TestEnglishCollateralAuctionHouse:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
@@ -214,9 +213,6 @@ class TestEnglishCollateralAuctionHouse:
         assert collateral_auction_house.total_auction_length() > collateral_auction_house.bid_duration()
         assert collateral_auction_house.auctions_started() >= 0
 
-    # NOTE some assertions are commented out
-    # English collateral
-    #@pytest.mark.skip(reason="temporary")
     def test_scenario(self, web3, geb, collateral, collateral_auction_house, our_address, other_address, deployment_address):
         prev_balance = geb.system_coin.balance_of(deployment_address)
         prev_coin_balance = geb.cdp_engine.coin_balance(deployment_address)
@@ -368,7 +364,6 @@ class TestEnglishCollateralAuctionHouse:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_cdp(geb, collateral, other_address)
 
-#@pytest.mark.skip(reason="temporary")
 class TestPreSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def surplus_auction_house(self, geb: GfDeployment) -> PreSettlementSurplusAuctionHouse:
@@ -408,8 +403,6 @@ class TestPreSettlementSurplusAuctionHouse:
         assert surplus_auction_house.total_auction_length() > surplus_auction_house.bid_duration()
         assert surplus_auction_house.auctions_started() >= 0
 
-    # Surplus
-    #@pytest.mark.skip(reason="")
     def test_scenario(self, web3, geb, surplus_auction_house, our_address, other_address, deployment_address):
         create_surplus(geb, surplus_auction_house, deployment_address)
 
@@ -466,7 +459,6 @@ class TestPreSettlementSurplusAuctionHouse:
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
 
-#@pytest.mark.skip(reason="temporary")
 class TestDebtAuctionHouse:
     @pytest.fixture(scope="session")
     def debt_auction_house(self, geb: GfDeployment) -> DebtAuctionHouse:
@@ -505,9 +497,6 @@ class TestDebtAuctionHouse:
         assert debt_auction_house.total_auction_length() > debt_auction_house.bid_duration()
         assert debt_auction_house.auctions_started() >= 0
 
-    # assertion fail at line 99
-    # debt
-    #@pytest.mark.skip(reason="temporary")
     def test_scenario(self, web3, geb, debt_auction_house, our_address, other_address, deployment_address):
         create_debt(web3, geb, our_address, deployment_address)
 

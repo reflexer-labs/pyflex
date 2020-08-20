@@ -209,8 +209,8 @@ class CoinJoin(BasicTokenAdapter):
         return DSToken(self.web3, address)
 
 
-class CollateralJoin(BasicTokenAdapter):
-    """A client for the `CollateralJoin` contract, which allows the user to deposit collateral into a new or existing vault.
+class BasicCollateralJoin(BasicTokenAdapter):
+    """A client for the `BasicCollateralJoin` contract, which allows the user to deposit collateral into a new or existing vault.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/BasicTokenAdapters.sol>
     """
@@ -219,7 +219,7 @@ class CollateralJoin(BasicTokenAdapter):
     bin = Contract._load_bin(__name__, 'abi/BasicCollateralJoin.bin')
 
     def __init__(self, web3: Web3, address: Address):
-        super(CollateralJoin, self).__init__(web3, address)
+        super(BasicCollateralJoin, self).__init__(web3, address)
         self._token = self.collateral()
 
     def collateral_type(self):
@@ -235,14 +235,14 @@ class CollateralJoin(BasicTokenAdapter):
 class Collateral:
     """The `Collateral` object wraps accounting information in the CollateralType with token-wide artifacts shared across
     multiple collateral types for the same token.  For example, ETH-A and ETH-B are represented by different CollateralTypes,
-    but will share the same collateral (WETH token), CollateralJoin instance, and Flipper contract.
+    but will share the same collateral (WETH token), BasicCollateralJoin instance, and CollateralAuctionHouse contract.
     """
 
-    def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: CollateralJoin,
+    def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: BasicCollateralJoin,
                  collateral_auction_house: EnglishCollateralAuctionHouse, pip):
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
-        assert isinstance(adapter, CollateralJoin)
+        assert isinstance(adapter, BasicCollateralJoin)
         assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse)
 
         self.collateral_type = collateral_type
@@ -264,7 +264,6 @@ class Collateral:
         self.adapter.approve(approve_cdp_modification_directly(from_address=usr, gas_price=gas_price), self.collateral_auction_house.cdp_engine())
         self.adapter.approve_token(directly(from_address=usr, gas_price=gas_price))
 
-
 class CDPEngine(Contract):
     """A client for the `CDPEngine` contract, which manages accounting for all CDPs (CDPs).
 
@@ -282,7 +281,6 @@ class CDPEngine(Contract):
             self.delta_debt = Wad(log['args']['deltaDebt'])
             self.locked_collateral = Wad(log['args']['lockedCollateral'])
             self.generated_debt = Wad(log['args']['generatedDebt'])
-            # Not sure here TODO Verify
             self.global_debt = Wad(log['args']['globalDebt'])
             self.raw = log
 
@@ -295,10 +293,7 @@ class CDPEngine(Contract):
                 log_abi = [abi for abi in CDPEngine.abi if abi.get('name') == 'ModifyCDPCollateralization'][0]
                 codec = ABICodec(default_registry)
                 event_data = get_event_data(codec, log_abi, event)
-
                 return CDPEngine.LogModifyCDPCollateralization(event_data)
-            else:
-                logging.warning(f'[from_event] Invalid topic in {event}')
 
         def __eq__(self, other):
             assert isinstance(other, CDPEngine.LogModifyCDPCollateralization)
@@ -586,10 +581,7 @@ class CDPEngine(Contract):
             log_modifications = [l for l in log_modifications if l is not None]
 
             logger.debug(f"Found {len(log_modifications)} total mod cdp logs from block {start} to {end}")
-            # '0x6f1493f7' is CDPEngine.modifyCDPCollateralization
-            #log_modifications = list(filter(lambda l: l.sig == '0x6f1493f7', lognotes))
-            #logger.debug(f"Found {len(log_modifications)} total sig matching logs from block {start} to {end}")
-            #log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization(l), log_modifications))
+
             if collateral_type is not None:
                 log_modifications = list(filter(lambda l: l.collateral_type == collateral_type.name, log_modifications))
 
@@ -657,6 +649,12 @@ class OracleRelayer(Contract):
     def redemption_price(self) -> Ray:
         return Ray(self._contract.functions.redemptionPrice().call())
 
+    def redemption_rate(self) -> Ray:
+        return Ray(self._contract.functions.redemptionRate().call())
+
+    def redemption_price_update_time(self) -> Ray:
+        return Ray(self._contract.functions.redemptionPriceUpdateTime().call())
+
     def safety_c_ratio(self, collateral_type: CollateralType) -> Ray:
         assert isinstance(collateral_type, CollateralType)
         (orcl, safety_c_ratio, liquidation_c_ratio) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
@@ -671,7 +669,6 @@ class OracleRelayer(Contract):
 
     def __repr__(self):
         return f"OracleRelayer('{self.address}')"
-
 
 class AccountingEngine(Contract):
     """A client for the `AccountingEngine` contract, which manages liquidation of surplus systemc coin and settlement of collateral debt.
@@ -825,7 +822,6 @@ class TaxCollector(Contract):
     def __repr__(self):
         return f"TaxCollector('{self.address}')"
 
-
 class LiquidationEngine(Contract):
     """A client for the `LiquidationEngine` contract, used to liquidate unsafe CDPs (CDPs).
     Specifically, this contract is useful for EnglishCollateralAuctionHouse auctions.
@@ -849,15 +845,11 @@ class LiquidationEngine(Contract):
             assert isinstance(event, dict)
 
             topics = event.get('topics')
-            # TO DO Fix
             if topics and topics[0] == HexBytes('0x99b5620489b6ef926d4518936cfec15d305452712b88bd59da2d9c10fb0953e8'):
                 log_liquidate_abi = [abi for abi in LiquidationEngine.abi if abi.get('name') == 'Liquidate'][0]
                 codec = ABICodec(default_registry)
                 event_data = get_event_data(codec, log_liquidate_abi, event)
-
                 return LiquidationEngine.LogLiquidate(event_data)
-            else:
-                logging.warning(f'[from_event] Invalid topic in {event}')
 
         def era(self, web3: Web3):
             return web3.eth.getBlock(self.raw['blockNumber'])['timestamp']

@@ -115,7 +115,7 @@ class TestProxyFactory:
         assert build_event.owner == other_address
         assert proxy_factory.is_proxy(build_event.proxy)
 
-    def test_cache(self, proxy_factory: DSProxyFactory, other_address):
+    def test_cache(self, proxy_factory: DSProxyFactory):
         assert proxy_factory.cache() is not None
 
 
