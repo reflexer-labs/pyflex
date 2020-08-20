@@ -19,10 +19,10 @@ import os
 import sys
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.deployment import GfDeployment
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
 
 web3 = Web3(HTTPProvider(endpoint_uri=os.environ['ETH_RPC_URL'], request_kwargs={"timeout": 10}))
 web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000aBcdef123
@@ -31,47 +31,52 @@ if len(sys.argv) > 2:
     run_transactions = True
 else:
     run_transactions = False
-mcd = DssDeployment.from_node(web3)
+geb = GfDeployment.from_node(web3)
 our_address = Address(web3.eth.defaultAccount)
 
 # Choose the desired collateral; in this case we'll wrap some Eth
-collateral = mcd.collaterals['ETH-A']
-ilk = collateral.ilk
+collateral = geb.collaterals['ETH-A']
+collateral_type = collateral.collateral_type
 
 # Set an amount of collateral to join and an amount of Dai to draw
 collateral_amount = Wad.from_number(0.2)
-dai_amount = Wad.from_number(20.0)
+system_coin_amount = Wad.from_number(20.0)
 
-if collateral.gem.balance_of(our_address) > collateral_amount:
-    if run_transactions and collateral.ilk.name.startswith("ETH"):
+if collateral.collateral.balance_of(our_address) > collateral_amount:
+    if run_transactions and collateral.collateral_type.name.startswith("ETH"):
         # Wrap ETH to produce WETH
-        assert collateral.gem.deposit(collateral_amount).transact()
+        assert collateral.collateral.deposit(collateral_amount).transact()
 
     if run_transactions:
         # Add collateral and allocate the desired amount of Dai
         collateral.approve(our_address)
         assert collateral.adapter.join(our_address, collateral_amount).transact()
-        assert mcd.vat.frob(ilk, our_address, dink=collateral_amount, dart=Wad(0)).transact()
-        assert mcd.vat.frob(ilk, our_address, dink=Wad(0), dart=dai_amount).transact()
-    print(f"Urn balance: {mcd.vat.urn(ilk, our_address)}")
-    print(f"Dai balance: {mcd.vat.dai(our_address)}")
+        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=collateral_amount,
+                                                           delta_debt=Wad(0)).transact()
+        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=Wad(0),
+                                                           delta_debt=system_coin_amount).transact()
+
+    print(f"CDP balance: {geb.cdp_engine.cdps(collateral_type, our_address)}")
+    print(f"System coin balance: {geb.cdp_engine.coin_balance(our_address)}")
 
     if run_transactions:
-        # Mint and withdraw our Dai
-        mcd.approve_dai(our_address)
-        assert mcd.dai_adapter.exit(our_address, dai_amount).transact()
-        print(f"Dai balance after withdrawal:  {mcd.vat.dai(our_address)}")
+        # Mint and withdraw our system coin
+        geb.approve_system_coin(our_address)
+        assert geb.system_coin_adapter.exit(our_address, system_coin_amount).transact()
+        print(f"System coin balance after withdrawal:  {geb.cdp_engine.coin_balance(our_address)}")
 
-        # Repay (and burn) our Dai
-        assert mcd.dai_adapter.join(our_address, dai_amount).transact()
-        print(f"Dai balance after repayment:   {mcd.vat.dai(our_address)}")
+        # Repay (and burn) our system coin
+        assert geb.system_coin_adapter.join(our_address, system_coin_amount).transact()
+        print(f"System coin balance after repayment:   {geb.cdp_engine.coin_balance(our_address)}")
 
         # Withdraw our collateral; stability fee accumulation may make these revert
-        assert mcd.vat.frob(ilk, our_address, dink=Wad(0), dart=dai_amount*-1).transact()
-        assert mcd.vat.frob(ilk, our_address, dink=collateral_amount*-1, dart=Wad(0)).transact()
+        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=Wad(0),
+                                                           delta_debt=system_coin_amount*-1).transact()
+        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=collateral_amount*-1,
+                                                           delta_debt=Wad(0)).transact()
         assert collateral.adapter.exit(our_address, collateral_amount).transact()
-        print(f"Dai balance w/o collateral:    {mcd.vat.dai(our_address)}")
+        print(f"System coin balance w/o collateral:    {geb.cdp_engine.coin_balance(our_address)}")
 else:
-    print(f"Not enough {ilk.name} to join to the vat")
+    print(f"Not enough {collateral_type.name} to join to the cdp_engine")
 
-print(f"Collateral balance: {mcd.vat.gem(ilk, our_address)}")
+print(f"Collateral balance: {geb.cdp_engine.collateral(collateral_type, our_address)}")

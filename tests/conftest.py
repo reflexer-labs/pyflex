@@ -20,24 +20,23 @@ import pytest
 
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.auctions import Flipper, Flapper, Flopper
-from pymaker.deployment import Deployment, DssDeployment
-from pymaker.dss import Vat, Vow, Cat, Jug, Pot
-from pymaker.keys import register_keys
+from pyflex import Address
+from pyflex.auctions import EnglishCollateralAuctionHouse, PreSettlementSurplusAuctionHouse, DebtAuctionHouse
+from pyflex.deployment import GfDeployment
+from pyflex.gf import CDPEngine, AccountingEngine, LiquidationEngine, TaxCollector, CoinSavingsAccount
+from pyflex.keys import register_keys
 
-
+'''
 @pytest.fixture(scope='session')
 def new_deployment() -> Deployment:
     return Deployment()
-
 
 @pytest.fixture()
 def deployment(new_deployment: Deployment) -> Deployment:
     new_deployment.reset()
     return new_deployment
 
-
+'''
 @pytest.fixture(scope="session")
 def web3() -> Web3:
     # for local dockerized parity testchain
@@ -76,25 +75,24 @@ def deployment_address(web3) -> Address:
 
 
 @pytest.fixture(scope="session")
-def mcd(web3) -> DssDeployment:
+def geb(web3) -> GfDeployment:
     # for local dockerized parity testchain
-    deployment = DssDeployment.from_node(web3=web3)
+    deployment = GfDeployment.from_node(web3=web3)
     validate_contracts_loaded(deployment)
     return deployment
 
-
-def validate_contracts_loaded(deployment: DssDeployment):
-    assert isinstance(deployment.vat, Vat)
-    assert deployment.vat.address is not None
-    assert isinstance(deployment.vow, Vow)
-    assert deployment.vow.address is not None
-    assert isinstance(deployment.cat, Cat)
-    assert deployment.cat.address is not None
-    assert isinstance(deployment.jug, Jug)
-    assert deployment.jug.address is not None
-    assert isinstance(deployment.flapper, Flapper)
-    assert deployment.flapper.address is not None
-    assert isinstance(deployment.flopper, Flopper)
-    assert deployment.flopper.address is not None
-    assert isinstance(deployment.pot, Pot)
-    assert deployment.pot.address is not None
+def validate_contracts_loaded(deployment: GfDeployment):
+    assert isinstance(deployment.cdp_engine, CDPEngine)
+    assert deployment.cdp_engine.address is not None
+    assert isinstance(deployment.accounting_engine, AccountingEngine)
+    assert deployment.accounting_engine.address is not None
+    assert isinstance(deployment.liquidation_engine, LiquidationEngine)
+    assert deployment.liquidation_engine.address is not None
+    assert isinstance(deployment.tax_collector, TaxCollector)
+    assert deployment.tax_collector.address is not None
+    assert isinstance(deployment.surplus_auction_house, PreSettlementSurplusAuctionHouse)
+    assert deployment.surplus_auction_house.address is not None
+    assert isinstance(deployment.debt_auction_house, DebtAuctionHouse)
+    assert deployment.debt_auction_house.address is not None
+    assert isinstance(deployment.coin_savings_acct, CoinSavingsAccount)
+    assert deployment.coin_savings_acct.address is not None

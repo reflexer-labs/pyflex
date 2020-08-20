@@ -24,11 +24,11 @@ import time
 
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.deployment import DssDeployment
-from pymaker.gas import FixedGasPrice
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.deployment import GfDeployment
+from pyflex.gas import FixedGasPrice
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
 
 logging.basicConfig(format='%(asctime)-15s %(levelname)-8s %(message)s', level=logging.DEBUG)
 # reduce logspew
@@ -41,11 +41,11 @@ web3 = Web3(HTTPProvider(endpoint_uri=os.environ['ETH_RPC_URL'], request_kwargs=
 web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000aBcdef123
 register_keys(web3, [sys.argv[2]])      # ex: key_file=~keys/default-account.json,pass_file=~keys/default-account.pass
 
-mcd = DssDeployment.from_node(web3)
+geb = GfDeployment.from_node(web3)
 our_address = Address(web3.eth.defaultAccount)
 
-collateral = mcd.collaterals['ETH-A']
-ilk = collateral.ilk
+collateral = geb.collaterals['ETH-A']
+collateral_type = collateral.collateral_type
 collateral.approve(our_address)
 
 GWEI = 1000000000
@@ -63,7 +63,7 @@ class TestApp:
 
     def startup(self):
         logging.info(f"Wrapping {self.wrap_amount} ETH")
-        assert collateral.gem.deposit(self.wrap_amount).transact()
+        assert collateral.collateral.deposit(self.wrap_amount).transact()
 
     def test_replacement(self):
         first_tx = collateral.adapter.join(our_address, Wad(4))
@@ -84,13 +84,13 @@ class TestApp:
         asyncio.sleep(6)
 
     def shutdown(self):
-        logging.info(f"Exiting {ilk.name} from our urn")
-        # balance = mcd.vat.gem(ilk, our_address)
+        logging.info(f"Exiting {collateral_type.name} from our cdp")
+        # balance = geb.cdp_engine.collateral(collateral_type our_address)
         # assert collateral.adapter.exit(our_address, balance).transact()
         assert collateral.adapter.exit(our_address, Wad(6)).transact()
-        logging.info(f"Balance is {mcd.vat.gem(ilk, our_address)} {ilk.name}")
+        logging.info(f"Balance is {geb.cdp_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
         logging.info(f"Unwrapping {self.wrap_amount} ETH")
-        assert collateral.gem.withdraw(self.wrap_amount).transact()
+        assert collateral.collateral.withdraw(self.wrap_amount).transact()
 
     @staticmethod
     def _run_future(future):

@@ -20,11 +20,11 @@ import os
 import sys
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.lifecycle import Lifecycle
-from pymaker.deployment import DssDeployment
-from pymaker.keys import register_keys
-from pymaker.numeric import Wad
+from pyflex import Address
+from pyflex.lifecycle import Lifecycle
+from pyflex.deployment import GfDeployment
+from pyflex.keys import register_keys
+from pyflex.numeric import Wad
 
 logging.basicConfig(format='%(asctime)-15s %(levelname)-8s %(message)s', level=logging.DEBUG)
 # reduce logspew
@@ -44,9 +44,9 @@ else:
     our_address = Address(sys.argv[2])
     run_transactions = False
 
-mcd = DssDeployment.from_node(web3)
-collateral = mcd.collaterals['ETH-A']
-ilk = collateral.ilk
+geb = GfDeployment.from_node(web3)
+collateral = geb.collaterals['ETH-A']
+collateral_type = collateral.collateral_type
 if run_transactions:
     collateral.approve(our_address)
 past_blocks = 100
@@ -64,24 +64,24 @@ class TestApp:
 
     def on_block(self):
         if run_transactions:
-            logging.info(f"Found block {web3.eth.blockNumber}, joining {self.amount} {ilk.name}  to our urn")
-            collateral.gem.deposit(self.amount).transact()
+            logging.info(f"Found block {web3.eth.blockNumber}, joining {self.amount} {collateral_type.name}  to our cdp")
+            collateral.collateral.deposit(self.amount).transact()
             assert collateral.adapter.join(our_address, self.amount).transact()
             self.joined += self.amount
         else:
             logging.info(f"Found block {web3.eth.blockNumber}")
-        logging.info(f"Urn balance is {mcd.vat.gem(ilk, our_address)} {ilk.name}")
+        logging.info(f"CDP balance is {geb.cdp_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
         self.request_history()
 
     def request_history(self):
-        logs = mcd.vat.past_frobs(web3.eth.blockNumber - past_blocks)
-        logging.info(f"Found {len(logs)} frobs in the past {past_blocks} blocks")
+        logs = geb.cdp_engine.past_cdp_modifications(web3.eth.blockNumber - past_blocks)
+        logging.info(f"Found {len(logs)} cdp modifications in the past {past_blocks} blocks")
 
     def on_shutdown(self):
         if run_transactions and self.joined > Wad(0):
-            logging.info(f"Exiting {self.joined} {ilk.name} from our urn")
+            logging.info(f"Exiting {self.joined} {collateral_type.name} from our cdp")
             assert collateral.adapter.exit(our_address, self.joined).transact()
-            assert collateral.gem.withdraw(self.joined).transact()
+            assert collateral.collateral.withdraw(self.joined).transact()
 
 
 if __name__ == '__main__':

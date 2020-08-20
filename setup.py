@@ -20,7 +20,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 # Fields marked as "Optional" may be commented out.
 
 setup(
-    name='pymaker',
+    name='pyflex',
 
     # Versions should comply with PEP 440:
     # https://www.python.org/dev/peps/pep-0440/
@@ -29,14 +29,14 @@ setup(
     # project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
     version='1.1.0',  # Required
-    description='Python API for Maker contracts',
+    description='Python API for Reflexer contracts',
     license='COPYING',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/makerdao/pymaker',
-    author='MakerDAO',
-    packages=find_packages(include=['pymaker', 'pymaker.*']),  # Required
-    package_data={'pymaker': ['abi/*', '../config/*']},
+    url='https://github.com/reflexer-labs/pyflex',
+    author='Reflexer Labs',
+    packages=find_packages(include=['pyflex', 'pyflex.*']),  # Required
+    package_data={'pyflex': ['abi/*', '../config/*']},
     include_package_data=True,
     python_requires='~=3.6',
 

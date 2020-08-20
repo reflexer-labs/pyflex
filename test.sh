@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Pull the docker image
-docker pull makerdao/testchain-pymaker:unit-testing
+docker pull reflexer/testchain-pyflex:unit-testing
 
 # Remove existing container if tests not gracefully stopped
 docker-compose down
@@ -13,8 +13,9 @@ docker-compose up -d ganache
 docker-compose up -d parity
 sleep 2
 
-# Run the tests
-py.test --cov=pymaker --cov-report=term --cov-append tests/ $@
+#Run the tests
+
+py.test --cov=pyflex --cov-report=term --cov-append tests/$@
 TEST_RESULT=$?
 
 # Cleanup

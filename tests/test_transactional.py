@@ -18,11 +18,11 @@
 import pytest
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.approval import directly
-from pymaker.numeric import Wad
-from pymaker.token import DSToken
-from pymaker.transactional import TxManager
+from pyflex import Address
+from pyflex.approval import directly
+from pyflex.numeric import Wad
+from pyflex.token import DSToken
+from pyflex.transactional import TxManager
 
 
 class TestTxManager:

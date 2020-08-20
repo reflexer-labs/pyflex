@@ -20,12 +20,12 @@ import pytest
 from mock import MagicMock
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address, eth_transfer, TransactStatus, Calldata, Receipt
-from pymaker.gas import FixedGasPrice
-from pymaker.numeric import Wad
-from pymaker.proxy import DSProxy, DSProxyCache
-from pymaker.token import DSToken
-from pymaker.util import synchronize, eth_balance
+from pyflex import Address, eth_transfer, TransactStatus, Calldata, Receipt
+from pyflex.gas import FixedGasPrice
+from pyflex.numeric import Wad
+from pyflex.proxy import DSProxy, DSProxyCache
+from pyflex.token import DSToken
+from pyflex.util import synchronize, eth_balance
 
 
 class TestTransact:

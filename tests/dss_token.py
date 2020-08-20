@@ -14,11 +14,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
 from web3 import Web3
 
-from pymaker import Contract, Address, Transact
-from pymaker.dss import Urn, Ilk
-from pymaker.numeric import Wad
+from pyflex import Contract, Address, Transact
+from pyflex.dss import Urn, Ilk
+from pyflex.numeric import Wad
 
 
 class GemMock(Contract):
@@ -67,3 +68,4 @@ class GemMock(Contract):
 
     def __repr__(self):
         return f"GemMock('{self.address}')"
+'''

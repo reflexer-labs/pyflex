@@ -1,8 +1,8 @@
 version: "3.2"
 services:
   parity:
-    image: makerdao/testchain-pymaker:unit-testing
-    container_name: parity-pymaker-test
+    image: reflexer/testchain-pyflex:unit-testing
+    container_name: parity-pyflex-test
     ports:
       - "8545:8545"
       - "8546:8546"

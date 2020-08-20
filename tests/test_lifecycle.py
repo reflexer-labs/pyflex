@@ -23,9 +23,9 @@ import pytest
 from mock import MagicMock
 from web3 import Web3, HTTPProvider
 
-import pymaker
-from pymaker import Address
-from pymaker.lifecycle import Lifecycle, trigger_event
+import pyflex
+from pyflex import Address
+from pyflex.lifecycle import Lifecycle, trigger_event
 
 
 @pytest.mark.timeout(60)
@@ -38,7 +38,7 @@ class TestLifecycle:
         # `test_etherdelta.py` executes before this test file and creates some event filters,
         # so we need to clear the list of filter threads as otherwise `Web3Lifecycle` will
         # be waiting forever for them to terminate and the test harness will never finish
-        pymaker.filter_threads = []
+        pyflex.filter_threads = []
 
     def use_web3(self, with_web3: bool):
         return self.web3 if with_web3 else None

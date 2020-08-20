@@ -18,8 +18,8 @@
 import pytest
 from hexbytes import HexBytes
 
-from pymaker import Address, Calldata, Receipt, Transfer
-from pymaker.numeric import Wad
+from pyflex import Address, Calldata, Receipt, Transfer
+from pyflex.numeric import Wad
 from tests.helpers import is_hashable
 
 

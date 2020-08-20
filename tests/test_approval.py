@@ -22,12 +22,12 @@ import pytest
 from web3 import HTTPProvider
 from web3 import Web3
 
-from pymaker import Address
-from pymaker import Wad
-from pymaker.approval import directly, via_tx_manager
-from pymaker.gas import FixedGasPrice
-from pymaker.token import DSToken
-from pymaker.transactional import TxManager
+from pyflex import Address
+from pyflex import Wad
+from pyflex.approval import directly, via_tx_manager
+from pyflex.gas import FixedGasPrice
+from pyflex.token import DSToken
+from pyflex.transactional import TxManager
 
 
 class FailingTransact:

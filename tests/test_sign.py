@@ -18,9 +18,9 @@
 import pkg_resources
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.keys import register_key_file
-from pymaker.sign import eth_sign
+from pyflex import Address
+from pyflex.keys import register_key_file
+from pyflex.sign import eth_sign
 
 
 def test_signing():

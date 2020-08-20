@@ -18,9 +18,9 @@
 import pytest
 from web3 import Web3, HTTPProvider
 
-from pymaker import Address
-from pymaker.auth import DSGuard, DSAuth
-from pymaker.util import hexstring_to_bytes
+from pyflex import Address
+from pyflex.auth import DSGuard, DSAuth
+from pyflex.util import hexstring_to_bytes
 
 
 class TestDSGuard:
