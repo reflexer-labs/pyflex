@@ -25,6 +25,7 @@ from pyflex.deployment import GfDeployment
 from pyflex.gf import Collateral
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.shutdown import ESM, GlobalSettlement
+from pyflex.auctions import SettlementSurplusAuctioneer
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
@@ -63,6 +64,7 @@ def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_a
 
 
 nobody = Address("0x0000000000000000000000000000000000000000")
+#@pytest.mark.skip(reason="tmp")
 class TestESM:
     """This test must be run after other GEB tests because it will leave the testchain `disabled`d."""
 
@@ -113,6 +115,7 @@ class TestESM:
         assert not geb.accounting_engine.contract_enabled()
         assert not geb.oracle_relayer.contract_enabled()
 
+#@pytest.mark.skip(reason="tmp")
 class TestGlobalSettlement:
     """This test must be run after TestESM, which calls `esm.shutdown`."""
 
@@ -205,3 +208,20 @@ class TestGlobalSettlement:
         # FIXME: `prepareCoinsForRedeeming` fails, possibly because we're passing 0 to `cdpEngine.transfer_collateral`
         assert geb.global_settlement.prepare_coins_for_redeeming(Wad.from_number(10)).transact()
         assert geb.global_settlement.coin_bag(our_address) == Wad.from_number(10)
+
+class TestPreSettlementSurplusAuctionHouse:
+
+    @pytest.fixture(scope="session")
+    def surplus_auctioneer(self, geb: GfDeployment) -> SettlementSurplusAuctioneer:
+        return geb.surplus_auctioneer
+
+    def test_getters(self, geb, surplus_auctioneer):
+        assert surplus_auctioneer.accounting_engine() == geb.accounting_engine.address
+        #assert surplus_auctioneer.surplus_auction_house() == geb.surplus_auction_house.address
+        assert surplus_auctioneer.address == geb.accounting_engine.post_settlement_surplus_drain()
+        assert surplus_auctioneer.cdp_engine() == geb.cdp_engine.address
+        assert surplus_auctioneer.last_surplus_auction_time() == 0
+
+    def test_surplus_auction(self, geb, surplus_auctioneer):
+        assert geb.accounting_engine.contract_enabled() == False
+        assert surplus_auctioneer.auction_surplus().transact()

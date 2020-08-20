@@ -33,7 +33,6 @@ from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_cdp_modification_directly
 from pyflex.auctions import PreSettlementSurplusAuctionHouse, EnglishCollateralAuctionHouse, DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
-from pyflex.logging import LogNote
 from pyflex.token import DSToken, ERC20Token
 from pyflex.numeric import Wad, Ray, Rad
 
@@ -708,6 +707,9 @@ class AccountingEngine(Contract):
 
     def surplus_auction_house(self) -> Address:
         return Address(self._contract.functions.surplusAuctionHouse().call())
+
+    def post_settlement_surplus_drain(self) -> Address:
+        return Address(self._contract.functions.postSettlementSurplusDrain().call())
 
     def debt_auction_house(self) -> Address:
         return Address(self._contract.functions.debtAuctionHouse().call())

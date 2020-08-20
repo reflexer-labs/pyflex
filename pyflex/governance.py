@@ -149,7 +149,7 @@ class Etch:
     def __repr__(self):
         return pformat(vars(self))
 
-class DSChief(Contract):
+class DSVoteQuorum(Contract):
     """A client for the `DSChief` contract, which manages lists of user roles and capabilities.
 
     You can find the source code of the `DSChief` contract here:
@@ -160,8 +160,10 @@ class DSChief(Contract):
         address: Ethereum address of the `DSChief` contract.
     """
 
-    abi = Contract._load_abi(__name__, 'abi/DSChief.abi')
-    bin = Contract._load_bin(__name__, 'abi/DSChief.bin')
+    #abi = Contract._load_abi(__name__, 'abi/DSVoteQuorum.abi')
+    #bin = Contract._load_bin(__name__, 'abi/DSVoteQuorum.bin')
+    abi = None
+    bin = None
 
     def __init__(self, web3: Web3, address: Address):
         assert (isinstance(web3, Web3))

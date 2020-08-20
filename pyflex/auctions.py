@@ -26,7 +26,6 @@ from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
 from pyflex import Contract, Address, Transact
-from pyflex.logging import LogNote
 from pyflex.numeric import Wad, Rad, Ray
 from pyflex.token import ERC20Token
 
@@ -286,26 +285,6 @@ class EnglishCollateralAuctionHouse(AuctionContract):
         assert(isinstance(id, int))
 
         array = self._contract.functions.bids(id).call()
-        '''
-        struct Bid {
-        // Bid size (how many coins are offered per collateral sold)
-        uint256 bidAmount;
-        // How much collateral is sold in an auction
-        uint256 amountToSell;
-        // Who the high bidder is
-        address highBidder;
-        // When the latest bid expires and the auction can be settled
-        uint48  bidExpiry;
-        // Hard deadline for the auction after which no more bids can be placed
-        uint48  auctionDeadline;
-        // Who (which CDP) receives leftover collateral that is not sold in the auction; usually the liquidated CDP
-        address forgoneCollateralReceiver;
-        // Who receives the coins raised from the auction; usually the accounting engine
-        address auctionIncomeRecipient;
-        // Total/max amount of coins to raise
-        uint256 amountToRaise;
-    }
-        '''
         return EnglishCollateralAuctionHouse.Bid(id=id,
                            bid_amount=Rad(array[0]),
                            amount_to_sell=Wad(array[1]),
@@ -965,3 +944,91 @@ class DebtAuctionHouse(AuctionContract):
 
     def __repr__(self):
         return f"DebtAuctionHouse('{self.address}')"
+
+class SettlementSurplusAuctioneer(Contract):
+    """A client for the `SettlementSurplusAuctioneer` contract, used to settle surplus auctions after global settlement
+
+    You can find the source code of the `SettlementSurplusAuctioneer` contract here:
+    <https://github.com/reflexer-labs/geb/blob/master/src/SettlementSurplusAuctioneer.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `SettlementSurplusAuctioneer` contract.
+
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/SettlementSurplusAuctioneer.abi')
+    bin = Contract._load_bin(__name__, 'abi/SettlementSurplusAuctioneer.bin')
+
+    class AuctionSurplusLog:
+        """event AuctionSurplus(uint id, uint lastSurplusAuctionTime, uint coinBalance);"""
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.last_surplus_auction_time = args['lastSurplusAuctionTime']
+            self.coin_balance = args['coinBalance']
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"SettlementSurplusAuctioneer.AuctionSurplusLog({pformat(vars(self))})"
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        # Set ABIs for event names
+        self.auction_surplus_abi = None
+        for member in SettlementSurplusAuctioneer.abi:
+            if not self.auction_surplus_abi and member.get('name') == 'AuctionSurplus':
+                self.auction_surplus_abi = member
+
+        self.web3 = web3
+        self.address = address
+        self._contract = self._get_contract(web3, self.abi, address)
+
+    def auction_surplus(self) -> int:
+        """
+        Start a surplus auction
+
+        Returns:
+            surplus auction id
+        """
+        #return int(self._contract.functions.auctionSurplus().call())
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionSurplus', [])
+
+    def last_surplus_auction_time(self) -> int:
+        """
+        Last surplus auction time in epoch seconds
+
+        Returns:
+            time in epoch seconds
+        """
+        return int(self._contract.functions.lastSurplusAuctionTime().call())
+
+    def accounting_engine(self) -> Address:
+        """
+        Address of AccountingEngine
+
+        Returns:
+            Address
+        """
+        return Address(self._contract.functions.accountingEngine().call())
+
+    def surplus_auction_house(self) -> Address:
+        """
+        Address of SurplusAuctionHouse
+
+        Returns:
+            Address
+        """
+        return Address(self._contract.functions.surplusAuctionHouse().call())
+
+    def cdp_engine(self) -> Address:
+        """
+        Address of CDPEngine
+
+        Returns:
+            Address
+        """
+        return Address(self._contract.functions.cdpEngine().call())
