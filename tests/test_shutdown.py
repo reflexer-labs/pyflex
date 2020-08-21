@@ -268,13 +268,13 @@ class TestPostSettlementSurplusAuctioneer:
         assert surplus_auctioneer.auction_surplus().transact()
         assert len(surplus_auction_house.active_auctions()) == 1
         bid = surplus_auction_house.bids(1)
-        print(bid)
 
         # Wait for bid duration
         wait(geb, our_address, surplus_auction_house.bid_duration()+1)
 
         # Can't settle with no other bids
         assert surplus_auction_house.settle_auction(1).transact() == None
+       
 
 
         

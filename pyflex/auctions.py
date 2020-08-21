@@ -70,7 +70,7 @@ class AuctionContract(Contract):
     def approve(self, source: Address, approval_function):
         """Approve the auction to access our collateral, Dai, or MKR so we can participate in auctions.
 
-        For available approval functions (i.e. approval modes) see `directly` and `hope_directly`
+        For available approval functions (i.e. approval modes) see `directly` and `approve_cdp_modifications_directly`
         in `pyflex.approval`.
 
         Args:
@@ -469,11 +469,6 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
 
         def __repr__(self):
             return f"FixedDiscountCollateralAuctionHouse.Bid({pformat(vars(self))})"
-
-    def settle_auction(self, id: int) -> Transact:
-        assert(isinstance(id, int))
-
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -1089,7 +1084,7 @@ class PostSettlementSurplusAuctionHouse(AuctionContract):
                 continue
 
             if isinstance(log, PostSettlementSurplusAuctionHouse.StartAuctionLog) or \
-               isinstance(log, PosttSettlementSurplusAuctionHouse.IncreaseBidSizeLog) or \
+               isinstance(log, PostSettlementSurplusAuctionHouse.IncreaseBidSizeLog) or \
                isinstance(log, PostSettlementSurplusAuctionHouse.SettleAuctionLog):
                 history.append(log)
 
@@ -1161,7 +1156,6 @@ class SettlementSurplusAuctioneer(Contract):
         Returns:
             surplus auction id
         """
-        #return int(self._contract.functions.auctionSurplus().call())
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionSurplus', [])
 
     def last_surplus_auction_time(self) -> int:
