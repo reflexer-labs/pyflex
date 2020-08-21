@@ -21,7 +21,8 @@ import re
 from typing import Dict, List, Optional
 
 import pkg_resources
-from pyflex.auctions import PreSettlementSurplusAuctionHouse, DebtAuctionHouse, EnglishCollateralAuctionHouse
+from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
+from pyflex.auctions import DebtAuctionHouse, EnglishCollateralAuctionHouse
 from pyflex.auctions import SettlementSurplusAuctioneer
 from web3 import Web3, HTTPProvider
 
@@ -78,7 +79,8 @@ class GfDeployment:
 
     class Config:
         def __init__(self, pause: DSPause, cdp_engine: CDPEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
-                     liquidation_engine: LiquidationEngine, surplus_auction_house: DebtAuctionHouse,
+                     liquidation_engine: LiquidationEngine, surplus_auction_house: PreSettlementSurplusAuctionHouse,
+                     post_surplus_auction_house: PostSettlementSurplusAuctionHouse,
                      surplus_auctioneer: SettlementSurplusAuctioneer, debt_auction_house: DebtAuctionHouse,
                      coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
                      prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
@@ -90,6 +92,7 @@ class GfDeployment:
             self.tax_collector = tax_collector
             self.liquidation_engine = liquidation_engine
             self.surplus_auction_house = surplus_auction_house
+            self.post_surplus_auction_house = post_surplus_auction_house
             self.surplus_auctioneer = surplus_auctioneer
             self.debt_auction_house = debt_auction_house
             self.coin_savings_acct = coin_savings_acct
@@ -116,6 +119,7 @@ class GfDeployment:
             system_coin = DSToken(web3, Address(conf['GEB_COIN']))#
             system_coin_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))#
             surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
+            post_surplus_auction_house = PostSettlementSurplusAuctionHouse(web3, Address(conf['GEB_POST_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             surplus_auctioneer = SettlementSurplusAuctioneer(web3, Address(conf['GEB_SETTLEMENT_SURPLUS_AUCTIONEER']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
@@ -156,10 +160,10 @@ class GfDeployment:
                 collaterals[collateral_type.name] = collateral
 
             return GfDeployment.Config(pause, cdp_engine, accounting_engine, tax_collector, liquidation_engine,
-                                        surplus_auction_house, surplus_auctioneer, debt_auction_house, coin_savings_acct,
-                                        system_coin, system_coin_adapter, prot, oracle_relayer, esm, global_settlement,
-                                        proxy_registry, proxy_actions, cdp_manager,
-                                        collaterals)
+                                        surplus_auction_house, post_surplus_auction_house, surplus_auctioneer,
+                                        debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
+                                        prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
+                                        cdp_manager, collaterals)
 
         @staticmethod
         def _infer_collaterals_from_addresses(keys: []) -> List:
@@ -183,6 +187,7 @@ class GfDeployment:
                 'GEB_TAX_COLLECTOR': self.tax_collector.address.address,
                 'GEB_LIQUIDATION_ENGINE': self.liquidation_engine.address.address,
                 'GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.surplus_auction_house.address.address,
+                'GEB_POST_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.post_surplus_auction_house.address.address,
                 'GEB_SETTLEMENT_SURPLUS_AUCTIONEER': self.surplus_auctioneer.address.address,
                 'GEB_DEBT_AUCTION_HOUSE': self.debt_auction_house.address.address,
                 #'MCD_POT': self.pot.address.address,
@@ -225,6 +230,7 @@ class GfDeployment:
         self.tax_collector = config.tax_collector
         self.liquidation_engine = config.liquidation_engine
         self.surplus_auction_house = config.surplus_auction_house
+        self.post_surplus_auction_house = config.post_surplus_auction_house
         self.surplus_auctioneer = config.surplus_auctioneer
         self.debt_auction_house = config.debt_auction_house
         self.coin_savings_acct = config.coin_savings_acct
@@ -289,6 +295,7 @@ class GfDeployment:
         return {
             "collateral_auctions": collateral_auctions,
             "surplus_auctions": self.surplus_auction_house.active_auctions(),
+            "post_surplus_auctions": self.post_surplus_auction_house.active_auctions(),
             "debt_auctions": self.debt_auction_house.active_auctions()
         }
 

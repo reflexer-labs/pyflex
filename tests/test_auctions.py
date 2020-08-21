@@ -22,7 +22,8 @@ from web3 import Web3
 
 from pyflex import Address
 from pyflex.approval import directly, approve_cdp_modification_directly
-from pyflex.auctions import AuctionContract, EnglishCollateralAuctionHouse, PreSettlementSurplusAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import AuctionContract, EnglishCollateralAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
 from pyflex.deployment import GfDeployment
 from pyflex.gf import Collateral, CDP, OracleRelayer
 from pyflex.numeric import Wad, Ray, Rad
@@ -31,7 +32,8 @@ from tests.test_gf import cleanup_cdp, max_delta_debt, simulate_liquidate_cdp
 
 def create_surplus(geb: GfDeployment, surplus_auction_house: PreSettlementSurplusAuctionHouse, deployment_address: Address):
     assert isinstance(geb, GfDeployment)
-    assert isinstance(surplus_auction_house, PreSettlementSurplusAuctionHouse)
+    assert isinstance(surplus_auction_house, PreSettlementSurplusAuctionHouse) or \
+           isinstance(surplus_auction_house, PostSettlementSurplusAuctionHouse)
     assert isinstance(deployment_address, Address)
 
     joy = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
@@ -147,6 +149,7 @@ def check_active_auctions(auction: AuctionContract):
         assert isinstance(bid.high_bidder, Address)
         assert bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
 
+#@pytest.mark.skip("tmp")
 class TestEnglishCollateralAuctionHouse:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
@@ -364,6 +367,7 @@ class TestEnglishCollateralAuctionHouse:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_cdp(geb, collateral, other_address)
 
+#@pytest.mark.skip("tmp")
 class TestPreSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def surplus_auction_house(self, geb: GfDeployment) -> PreSettlementSurplusAuctionHouse:
@@ -459,6 +463,7 @@ class TestPreSettlementSurplusAuctionHouse:
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
 
+#@pytest.mark.skip("tmp")
 class TestDebtAuctionHouse:
     @pytest.fixture(scope="session")
     def debt_auction_house(self, geb: GfDeployment) -> DebtAuctionHouse:
@@ -545,20 +550,19 @@ class TestDebtAuctionHouse:
         #assert log.forgone_collateral_receiver == our_address
         assert log.id == start_auction
 
-class TestSettlementSurplusAuctioneer:
+@pytest.mark.skip("not authed")
+class TestPostSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
-    def surplus_auction_house(self, geb: GfDeployment) -> PreSettlementSurplusAuctionHouse:
-        return geb.surplus_auction_house
+    def surplus_auction_house(self, geb: GfDeployment) -> PostSettlementSurplusAuctionHouse:
+        return geb.post_surplus_auction_house
 
     @staticmethod
-    def increase_bid_size(surplus_auction_house: PreSettlementSurplusAuctionHouse, id: int, address: Address,
+    def increase_bid_size(surplus_auction_house: PostSettlementSurplusAuctionHouse, id: int, address: Address,
                           amount_to_sell: Rad, bid_amount: Wad):
-        assert (isinstance(surplus_auction_house, PreSettlementSurplusAuctionHouse))
+        assert (isinstance(surplus_auction_house, PostSettlementSurplusAuctionHouse))
         assert (isinstance(id, int))
         assert (isinstance(amount_to_sell, Rad))
         assert (isinstance(bid_amount, Wad))
-
-        assert surplus_auction_house.contract_enabled() == 1
 
         current_bid = surplus_auction_house.bids(id)
         assert current_bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
@@ -571,7 +575,7 @@ class TestSettlementSurplusAuctioneer:
 
         assert surplus_auction_house.increase_bid_size(id, amount_to_sell, bid_amount).transact(from_address=address)
         log = surplus_auction_house.past_logs(1)[0]
-        assert isinstance(log, PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog)
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.IncreaseBidSizeLog)
         assert log.high_bidder == address
         assert log.id == id
         assert log.amount_to_buy == amount_to_sell
@@ -594,7 +598,9 @@ class TestSettlementSurplusAuctioneer:
         assert joy_before > geb.cdp_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
-        assert geb.accounting_engine.auction_surplus().transact()
+
+        # This doesn't start a Post Auction
+        #assert geb.accounting_engine.auction_surplus().transact()
         start_auction = surplus_auction_house.auctions_started()
         assert start_auction == 1
         assert len(surplus_auction_house.active_auctions()) == 1
@@ -602,7 +608,7 @@ class TestSettlementSurplusAuctioneer:
         current_bid = surplus_auction_house.bids(1)
         assert current_bid.amount_to_sell > Rad(0)
         log = surplus_auction_house.past_logs(1)[0]
-        assert isinstance(log, PreSettlementSurplusAuctionHouse.StartAuctionLog)
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.StartAuctionLog)
         assert log.id == start_auction
         assert log.amount_to_sell == current_bid.amount_to_sell
         assert log.initial_bid == current_bid.bid_amount
@@ -616,7 +622,7 @@ class TestSettlementSurplusAuctioneer:
         surplus_auction_house.approve(geb.prot.address, directly(from_address=our_address))
         bid_amount = Wad.from_number(0.001)
         assert geb.prot.balance_of(our_address) > bid_amount
-        TestPreSettlementSurplusAuctionHouse.increase_bid_size(surplus_auction_house, start_auction, our_address, current_bid.amount_to_sell, bid_amount)
+        TestPostSettlementSurplusAuctionHouse.increase_bid_size(surplus_auction_house, start_auction, our_address, current_bid.amount_to_sell, bid_amount)
         current_bid = surplus_auction_house.bids(start_auction)
         assert current_bid.bid_amount == bid_amount
         assert current_bid.high_bidder == our_address
@@ -630,7 +636,7 @@ class TestSettlementSurplusAuctioneer:
         print(f'joy_before={str(joy_before)}, joy_after={str(joy_after)}')
         assert joy_before - joy_after == geb.accounting_engine.surplus_auction_amount_to_sell()
         log = surplus_auction_house.past_logs(1)[0]
-        assert isinstance(log, PreSettlementSurplusAuctionHouse.SettleAuctionLog)
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.SettleAuctionLog)
         assert log.id == start_auction
 
         # Grab our system_coin
@@ -639,4 +645,3 @@ class TestSettlementSurplusAuctioneer:
         assert geb.system_coin.balance_of(our_address) >= Wad(current_bid.amount_to_sell)
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
-

@@ -18,6 +18,7 @@
 
 import pytest
 from datetime import datetime, timedelta
+import time
 
 from pyflex import Address
 from pyflex.approval import directly
@@ -26,10 +27,11 @@ from pyflex.gf import Collateral
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.shutdown import ESM, GlobalSettlement
 from pyflex.auctions import SettlementSurplusAuctioneer
+from pyflex.auctions import PostSettlementSurplusAuctionHouse
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
-from tests.test_gf import mint_prot, wrap_eth, wrap_modify_cdp_collateralization
+from tests.test_gf import mint_prot, wait, wrap_eth, wrap_modify_cdp_collateralization
 
 def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     assert isinstance(geb, GfDeployment)
@@ -209,19 +211,71 @@ class TestGlobalSettlement:
         assert geb.global_settlement.prepare_coins_for_redeeming(Wad.from_number(10)).transact()
         assert geb.global_settlement.coin_bag(our_address) == Wad.from_number(10)
 
-class TestPreSettlementSurplusAuctionHouse:
-
+class TestPostSettlementSurplusAuctioneer:
     @pytest.fixture(scope="session")
     def surplus_auctioneer(self, geb: GfDeployment) -> SettlementSurplusAuctioneer:
         return geb.surplus_auctioneer
 
     def test_getters(self, geb, surplus_auctioneer):
         assert surplus_auctioneer.accounting_engine() == geb.accounting_engine.address
-        #assert surplus_auctioneer.surplus_auction_house() == geb.surplus_auction_house.address
         assert surplus_auctioneer.address == geb.accounting_engine.post_settlement_surplus_drain()
         assert surplus_auctioneer.cdp_engine() == geb.cdp_engine.address
         assert surplus_auctioneer.last_surplus_auction_time() == 0
 
-    def test_surplus_auction(self, geb, surplus_auctioneer):
+    def _test_post_settlement_surplus_auction(self, web3, geb, our_address, surplus_auctioneer):
         assert geb.accounting_engine.contract_enabled() == False
+        prev_coin_balance = geb.cdp_engine.coin_balance(surplus_auctioneer.address)
+        surplus_auction_house = PostSettlementSurplusAuctionHouse(web3, surplus_auctioneer.surplus_auction_house())
+        assert len(surplus_auction_house.active_auctions()) == 0
+
+        # Start first auction
         assert surplus_auctioneer.auction_surplus().transact()
+        assert len(surplus_auction_house.active_auctions()) == 1
+
+        # Check bid and auctioneer coin balance
+        bid = surplus_auction_house.bids(1)
+        after_coin_balance = geb.cdp_engine.coin_balance(surplus_auctioneer.address)
+        assert bid.id == 1
+        assert bid.bid_amount == Wad(0)
+        assert bid.high_bidder == Address(surplus_auctioneer.address)
+        assert(prev_coin_balance - after_coin_balance == bid.amount_to_sell)
+
+        #shouldn't be able to start another auction 
+        while datetime.utcnow() - timedelta(seconds=geb.accounting_engine.surplus_auction_delay) > datatime.utcnow():
+            assert surplus_auctioneer.auction_surplus().transact() == None
+            time.sleep(2)
+
+        # Start second auction
+        assert surplus_auctioneer.auction_surplus().transact()
+
+        assert len(surplus_auction_house.active_auctions()) == 2
+
+        # Check bid and auctioneer coin balance
+        bid = surplus_auction_house.bids(2)
+        after_after_coin_balance = geb.cdp_engine.coin_balance(surplus_auctioneer.address)
+        assert bid.id == 1
+        assert bid.bid_amount == Wad(0)
+        assert bid.high_bidder == Address(surplus_auctioneer.address)
+        assert(after_coin_balance - after_after_coin_balance == bid.amount_to_sell)
+
+    def test_post_settlement_surplus_auction_no_other_bids(self, web3, geb, our_address, surplus_auctioneer):
+        assert geb.accounting_engine.contract_enabled() == False
+        prev_coin_balance = geb.cdp_engine.coin_balance(surplus_auctioneer.address)
+        surplus_auction_house = PostSettlementSurplusAuctionHouse(web3, surplus_auctioneer.surplus_auction_house())
+        assert len(surplus_auction_house.active_auctions()) == 0
+
+        # Start first auction
+        assert surplus_auctioneer.auction_surplus().transact()
+        assert len(surplus_auction_house.active_auctions()) == 1
+        bid = surplus_auction_house.bids(1)
+        print(bid)
+
+        # Wait for bid duration
+        wait(geb, our_address, surplus_auction_house.bid_duration()+1)
+
+        # Can't settle with no other bids
+        assert surplus_auction_house.settle_auction(1).transact() == None
+
+
+        
+

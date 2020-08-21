@@ -586,7 +586,6 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
     def __repr__(self):
         return f"FixedDiscountCollateralAuctionHouse('{self.address}')"
 
-
 class PreSettlementSurplusAuctionHouse(AuctionContract):
     """A client for the `PreSettlementSurplusAuctionHouse` contract, used to interact with surplus auctions.
 
@@ -944,6 +943,174 @@ class DebtAuctionHouse(AuctionContract):
 
     def __repr__(self):
         return f"DebtAuctionHouse('{self.address}')"
+
+class PostSettlementSurplusAuctionHouse(AuctionContract):
+    """A client for the `PostSettlementSurplusAuctionHouse` contract, used to interact with surplus auctions
+       after global settlement.
+
+    You can find the source code of the `PostSettlementSurplusAuctionHouse` contract here:
+    <https://github.com/reflexer-labs/geb/blob/master/src/SurplusAuctionHouse.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `PostSettlementSurplusAuctionHouse` contract.
+
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/PostSettlementSurplusAuctionHouse.abi')
+    bin = Contract._load_bin(__name__, 'abi/PostSettlementSurplusAuctionHouse.bin')
+
+    class Bid:
+        def __init__(self, id: int, bid_amount: Wad, amount_to_sell: Rad, high_bidder: Address,
+                     bid_expiry: int, auction_deadline: int):
+            assert(isinstance(id, int))
+            assert(isinstance(bid_amount, Wad)) # Gov
+            assert(isinstance(amount_to_sell, Rad)) # System coin
+            assert(isinstance(high_bidder, Address))
+            assert(isinstance(bid_expiry, int))
+            assert(isinstance(auction_deadline, int))
+
+            self.id = id
+            self.bid_amount = bid_amount
+            self.amount_to_sell = amount_to_sell
+            self.high_bidder = high_bidder
+            self.bid_expiry = bid_expiry
+            self.auction_deadline = auction_deadline
+
+        def __repr__(self):
+            return f"PostSettlementSurplusAuctionHouse.Bid({pformat(vars(self))})"
+
+    class StartAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.auctions_started = int(args['auctionsStarted'])
+            self.amount_to_sell = Rad(args['amountToSell'])
+            self.initial_bid = Wad(args['initialBid'])
+            self.auction_deadline = int(args['auctionDeadline'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"PostSettlementSurplusAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+
+    class IncreaseBidSizeLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.high_bidder = Address(args['highBidder'])
+            self.amount_to_buy = Rad(args['amountToBuy'])
+            self.bid = Wad(args['bid'])
+            self.bid_expiry = int(args['bidExpiry'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"PostSettlementSurplusAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
+
+    class SettleAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"PostSettlementSurplusAuctionHouse.SettleAuctionLog({pformat(vars(self))})"
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        # Set ABIs for event names that are not in AuctionContract
+        self.increase_bid_size_abi = None
+        for member in PostSettlementSurplusAuctionHouse.abi:
+            if not self.increase_bid_size_abi and member.get('name') == 'IncreaseBidSize':
+                self.increase_bid_size_abi = member
+
+        super(PostSettlementSurplusAuctionHouse, self).__init__(web3, address, PostSettlementSurplusAuctionHouse.abi, self.bids)
+
+    def bid_increase(self) -> Wad:
+        """Returns the percentage minimum bid increase.
+
+        Returns:
+            The percentage minimum bid increase.
+        """
+        return Wad(self._contract.functions.bidIncrease().call())
+
+    def bids(self, id: int) -> Bid:
+        """Returns the auction details.
+
+        Args:
+            id: Auction identifier.
+
+        Returns:
+            The auction details.
+        """
+        assert(isinstance(id, int))
+
+        array = self._contract.functions.bids(id).call()
+
+        return PostSettlementSurplusAuctionHouse.Bid(id=id,
+                           bid_amount=Wad(array[0]),
+                           amount_to_sell=Rad(array[1]),
+                           high_bidder=Address(array[2]),
+                           bid_expiry=int(array[3]),
+                           auction_deadline=int(array[4]))
+
+    def start_auction(self, amount_to_sell: Rad, bid_amount: Wad) -> Transact:
+        assert(isinstance(amount_to_sell, Rad))
+        assert(isinstance(bid_amount, Wad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [amount_to_sell.value,
+                                                                                          bid_amount.value])
+
+    def increase_bid_size(self, id: int, amount_to_sell: Rad, bid_amount: Wad) -> Transact:
+        assert(isinstance(id, int))
+        assert(isinstance(amount_to_sell, Rad))
+        assert(isinstance(bid_amount, Wad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize',
+                        [id, amount_to_sell.value, bid_amount.value])
+
+    def restart_auction(self, id: int) -> Transact:
+        """Resurrect an auction which expired without any bids."""
+        assert (isinstance(id, int))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
+
+    def past_logs(self, number_of_past_blocks: int):
+        assert isinstance(number_of_past_blocks, int)
+        logs = super().get_past_logs(number_of_past_blocks, PostSettlementSurplusAuctionHouse.abi)
+
+        history = []
+        for log in logs:
+            if log is None:
+                continue
+
+            if isinstance(log, PostSettlementSurplusAuctionHouse.StartAuctionLog) or \
+               isinstance(log, PosttSettlementSurplusAuctionHouse.IncreaseBidSizeLog) or \
+               isinstance(log, PostSettlementSurplusAuctionHouse.SettleAuctionLog):
+                history.append(log)
+
+        return history
+
+    def parse_event(self, event):
+        signature = Web3.toHex(event['topics'][0])
+        codec = ABICodec(default_registry)
+        if signature == "0xa4863af70e77aecfe2769e0569806782ba7c6f86fc9a307290a3816fb8a563e5":
+            event_data = get_event_data(codec, self.start_auction_abi, event)
+            return PostSettlementSurplusAuctionHouse.StartAuctionLog(event_data)
+        elif signature == "0xd87c815d5a67c2e130ad04b714d87a6fb69d5a6df0dbb0f1639cd9fe292201f9":
+            event_data = get_event_data(codec, self.increase_bid_size_abi, event)
+            return PostSettlementSurplusAuctionHouse.IncreaseBidSizeLog(event_data)
+        elif signature == "0x03af424b0e12d91ea31fe7f2c199fc02c9ede38f9aa1bdc019a8087b41445f7a":
+            event_data = get_event_data(codec, self.settle_auction_abi, event)
+            return PostSettlementSurplusAuctionHouse.SettleAuctionLog(event_data)
+
+    def __repr__(self):
+        return f"PostSettlementSurplusAuctionHouse('{self.address}')"
+
 
 class SettlementSurplusAuctioneer(Contract):
     """A client for the `SettlementSurplusAuctioneer` contract, used to settle surplus auctions after global settlement
