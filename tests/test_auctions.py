@@ -17,54 +17,58 @@
 
 
 import pytest
+from typing import Union
 from datetime import datetime
 from web3 import Web3
 
 from pyflex import Address
 from pyflex.approval import directly, approve_cdp_modification_directly
-from pyflex.auctions import AuctionContract, EnglishCollateralAuctionHouse, PreSettlementSurplusAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import AuctionContract, EnglishCollateralAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
 from pyflex.deployment import GfDeployment
 from pyflex.gf import Collateral, CDP, OracleRelayer
 from pyflex.numeric import Wad, Ray, Rad
 from tests.test_gf import wrap_eth, mint_prot, set_collateral_price, wait, wrap_modify_cdp_collateralization
 from tests.test_gf import cleanup_cdp, max_delta_debt, simulate_liquidate_cdp
 
-def create_surplus(geb: GfDeployment, surplus_auction_house: PreSettlementSurplusAuctionHouse, deployment_address: Address):
+def create_surplus(geb: GfDeployment, surplus_auction_house: Union[PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse],
+        deployment_address: Address, collateral: Collateral, delta_collateral: int=300, delta_debt: int=1000, can_skip: bool=True):
+
     assert isinstance(geb, GfDeployment)
-    assert isinstance(surplus_auction_house, PreSettlementSurplusAuctionHouse)
+    assert isinstance(surplus_auction_house, PreSettlementSurplusAuctionHouse) or \
+           isinstance(surplus_auction_house, PostSettlementSurplusAuctionHouse)
     assert isinstance(deployment_address, Address)
 
     joy = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
 
-    if joy < geb.accounting_engine.surplus_buffer() + geb.accounting_engine.surplus_auction_amount_to_sell():
-        # Create a CDP with surplus
-        print('Creating a CDP with surplus')
-        collateral = geb.collaterals['ETH-B']
-        assert surplus_auction_house.auctions_started() == 0
-        wrap_eth(geb, deployment_address, Wad.from_number(300))
-        collateral.approve(deployment_address)
-
-        assert collateral.adapter.join(deployment_address, Wad.from_number(300)).transact(from_address=deployment_address)
-
-        wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(300),
-                                          delta_debt=Wad.from_number(1000))
-
-        assert geb.tax_collector.tax_single(collateral.collateral_type).transact(from_address=deployment_address)
-          
-        joy = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
-
-        assert joy >= geb.accounting_engine.surplus_buffer() + geb.accounting_engine.surplus_auction_amount_to_sell()
-    else:
+    if can_skip and joy >= geb.accounting_engine.surplus_buffer() + geb.accounting_engine.surplus_auction_amount_to_sell():
         print(f'Surplus of {joy} already exists; skipping CDP creation')
+        return
 
-def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_address: Address):
+    # Create a CDP with surplus
+    print('Creating a CDP with surplus')
+    #assert surplus_auction_house.auctions_started() == 0
+    wrap_eth(geb, deployment_address, Wad.from_number(delta_collateral))
+    collateral.approve(deployment_address)
+
+    assert collateral.adapter.join(deployment_address, Wad.from_number(delta_collateral)).transact(from_address=deployment_address)
+
+    wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(delta_collateral),
+                                      delta_debt=Wad.from_number(delta_debt))
+
+    assert geb.tax_collector.tax_single(collateral.collateral_type).transact(from_address=deployment_address)
+      
+    joy = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
+
+    assert joy >= geb.accounting_engine.surplus_buffer() + geb.accounting_engine.surplus_auction_amount_to_sell()
+
+def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_address: Address, collateral: Collateral):
     assert isinstance(web3, Web3)
     assert isinstance(geb, GfDeployment)
     assert isinstance(our_address, Address)
     assert isinstance(deployment_address, Address)
 
     # Create a CDP
-    collateral = geb.collaterals['ETH-A']
     collateral_type = collateral.collateral_type
     wrap_eth(geb, deployment_address, Wad.from_number(100))
     collateral.approve(deployment_address)
@@ -72,9 +76,7 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
         from_address=deployment_address)
     wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(100),
                                       delta_debt=Wad(0))
-    delta_debt = max_delta_debt(geb, collateral, deployment_address) - Wad(1)
-    print("delta debt")
-    print(delta_debt)
+    delta_debt = max_delta_debt(geb, collateral, deployment_address) - Wad.from_number(500)
     wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad(0),
                                       delta_debt=delta_debt)
 
@@ -107,7 +109,7 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
     assert Rad(cdp.generated_debt) > current_bid.amount_to_raise
 
-    bid_amount = Rad.from_number(3600)
+    bid_amount = Rad.from_number(3460)
     TestEnglishCollateralAuctionHouse.increase_bid_size(collateral.collateral_auction_house, geb.oracle_relayer,
                                                         collateral, auction_id, our_address,
                                                         current_bid.amount_to_sell, bid_amount)
@@ -119,7 +121,7 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
 
     # Raise debt from the queue (note that accounting_engine.pop_debt_delay is 0 on our testchain)
     # TODO: Account for existing liquidations on testchain
-    liquidations = geb.liquidation_engine.past_liquidations(20)
+    liquidations = geb.liquidation_engine.past_liquidations(100)
     for liquidation in liquidations:
         era_liquidation = liquidation.era(web3)
         liquidation_age = int(datetime.now().timestamp()) - era_liquidation
@@ -132,13 +134,20 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     # Cancel out surplus and debt
     acct_engine_coin_balance = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
     print("acct_engine_coin_balance")
-    print(acct_engine_coin_balance)
+    print(float(acct_engine_coin_balance))
     print("geb.accounting_engine.unqueued_unauctioned_debt()")
-    print(geb.accounting_engine.unqueued_unauctioned_debt())
+    print(float(geb.accounting_engine.unqueued_unauctioned_debt()))
 
     assert acct_engine_coin_balance <= geb.accounting_engine.unqueued_unauctioned_debt()
     assert geb.accounting_engine.settle_debt(acct_engine_coin_balance).transact()
     assert geb.accounting_engine.unqueued_unauctioned_debt() >= geb.accounting_engine.debt_auction_bid_size()
+
+    print("after settle_debt(): geb.accounting_engine.unqueued_unauctioned_debt()")
+    print(float(geb.accounting_engine.unqueued_unauctioned_debt()))
+    print("total queued debt")
+    print(float(geb.accounting_engine.debt_queue()))
+    print("total on auction debt")
+    print(float(geb.accounting_engine.total_on_auction_debt()))
 
 def check_active_auctions(auction: AuctionContract):
     for bid in auction.active_auctions():
@@ -216,19 +225,21 @@ class TestEnglishCollateralAuctionHouse:
     def test_scenario(self, web3, geb, collateral, collateral_auction_house, our_address, other_address, deployment_address):
         prev_balance = geb.system_coin.balance_of(deployment_address)
         prev_coin_balance = geb.cdp_engine.coin_balance(deployment_address)
-
         # Create a CDP
         collateral = geb.collaterals['ETH-A']
         auctions_started_before = collateral_auction_house.auctions_started()
         collateral_type = collateral.collateral_type
+
+        # Generate eth and join
         wrap_eth(geb, deployment_address, Wad.from_number(1))
         collateral.approve(deployment_address)
         assert collateral.adapter.join(deployment_address, Wad.from_number(1)).transact(
             from_address=deployment_address)
+ 
+        # generate the maximum debt possible
         wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(1), delta_debt=Wad(0))
         delta_debt = max_delta_debt(geb, collateral, deployment_address) - Wad(1)
-        print("collateral test delta_debt")
-        print(delta_debt)
+        debt_before = geb.cdp_engine.cdp(collateral_type, deployment_address).generated_debt
         wrap_modify_cdp_collateralization(geb, collateral, deployment_address, delta_collateral=Wad(0), delta_debt=delta_debt)
 
         # Mint and withdraw all the system coin
@@ -310,7 +321,7 @@ class TestEnglishCollateralAuctionHouse:
         cdp = geb.cdp_engine.cdp(collateral.collateral_type, other_address)
         assert Rad(cdp.generated_debt) >= current_bid.amount_to_raise
 
-        # Bid the amount_to_raise to instantly transition to dent stage
+        # Bid the amount_to_raise to instantly transition to decreaseSoldAmount stage
         TestEnglishCollateralAuctionHouse.increase_bid_size(collateral_auction_house, geb.oracle_relayer, collateral, start_auction, other_address,
                                                             current_bid.amount_to_sell, current_bid.amount_to_raise)
         current_bid = collateral_auction_house.bids(start_auction)
@@ -404,7 +415,7 @@ class TestPreSettlementSurplusAuctionHouse:
         assert surplus_auction_house.auctions_started() >= 0
 
     def test_scenario(self, web3, geb, surplus_auction_house, our_address, other_address, deployment_address):
-        create_surplus(geb, surplus_auction_house, deployment_address)
+        create_surplus(geb, surplus_auction_house, deployment_address, geb.collaterals['ETH-A'], 1, 10)
 
         joy_before = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
 
@@ -459,6 +470,8 @@ class TestPreSettlementSurplusAuctionHouse:
         assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
 
+        cleanup_cdp(geb, geb.collaterals['ETH-A'], deployment_address)
+
 class TestDebtAuctionHouse:
     @pytest.fixture(scope="session")
     def debt_auction_house(self, geb: GfDeployment) -> DebtAuctionHouse:
@@ -498,7 +511,7 @@ class TestDebtAuctionHouse:
         assert debt_auction_house.auctions_started() >= 0
 
     def test_scenario(self, web3, geb, debt_auction_house, our_address, other_address, deployment_address):
-        create_debt(web3, geb, our_address, deployment_address)
+        create_debt(web3, geb, our_address, deployment_address, geb.collaterals['ETH-A'])
 
         # start the debt auction
         assert debt_auction_house.auctions_started() == 0
@@ -544,3 +557,133 @@ class TestDebtAuctionHouse:
         # Not present in SettleAuctionLog
         #assert log.forgone_collateral_receiver == our_address
         assert log.id == start_auction
+        cleanup_cdp(geb, geb.collaterals['ETH-A'], our_address)
+        cleanup_cdp(geb, geb.collaterals['ETH-A'], deployment_address)
+
+class TestPostSettlementSurplusAuctionHouse:
+    @pytest.fixture(scope="session")
+    def post_surplus_auction_house(self, geb: GfDeployment) -> PostSettlementSurplusAuctionHouse:
+        return geb.post_surplus_auction_house
+
+    @staticmethod
+    def increase_bid_size(surplus_auction_house: PostSettlementSurplusAuctionHouse, id: int, address: Address,
+                          amount_to_sell: Rad, bid_amount: Wad):
+        assert (isinstance(surplus_auction_house, PostSettlementSurplusAuctionHouse))
+        assert (isinstance(id, int))
+        assert (isinstance(amount_to_sell, Rad))
+        assert (isinstance(bid_amount, Wad))
+
+        current_bid = surplus_auction_house.bids(id)
+        assert current_bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
+        assert current_bid.bid_expiry > datetime.now().timestamp() or current_bid.bid_expiry == 0
+        assert current_bid.auction_deadline > datetime.now().timestamp()
+
+        assert amount_to_sell == current_bid.amount_to_sell
+        assert bid_amount > current_bid.bid_amount
+        assert bid_amount >= surplus_auction_house.bid_increase() * current_bid.bid_amount
+
+        assert surplus_auction_house.increase_bid_size(id, amount_to_sell, bid_amount).transact(from_address=address)
+        log = surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.IncreaseBidSizeLog)
+        assert log.high_bidder == address
+        assert log.id == id
+        assert log.amount_to_buy == amount_to_sell
+        assert log.bid == bid_amount
+
+    def test_getters(self, geb, post_surplus_auction_house):
+        assert post_surplus_auction_house.cdp_engine() == geb.cdp_engine.address
+        assert post_surplus_auction_house.bid_increase() > Wad.from_number(1)
+        assert post_surplus_auction_house.bid_duration() > 0
+        assert post_surplus_auction_house.total_auction_length() > post_surplus_auction_house.bid_duration()
+        assert post_surplus_auction_house.auctions_started() >= 0
+
+    def test_scenario(self, web3, geb, post_surplus_auction_house, our_address, other_address, deployment_address):
+        # Generate some system coin with deployment_addresses so we can start an auction
+        collateral = geb.collaterals['ETH-A']
+        wrap_eth(geb, deployment_address, Wad.from_number(100))
+        collateral.approve(deployment_address)
+
+        assert collateral.adapter.join(deployment_address, Wad.from_number(100)).transact(from_address=deployment_address)
+        wrap_modify_cdp_collateralization(geb, collateral, deployment_address, Wad.from_number(100), Wad.from_number(100))
+
+        # No auctions started. No system coins yet
+        assert post_surplus_auction_house.auctions_started() == 0
+        assert geb.cdp_engine.coin_balance(post_surplus_auction_house.address) == Rad(0)
+
+        # Auction house needs to transfer internal coins from us when startAuction is called
+        geb.cdp_engine.approve_cdp_modification(post_surplus_auction_house.address).transact(from_address=deployment_address)
+
+        # Start auction
+        assert post_surplus_auction_house.start_auction(Rad(Wad.from_number(90)), Wad(0)).transact(from_address=deployment_address)
+
+        # System coins have been transferred
+        assert geb.cdp_engine.coin_balance(post_surplus_auction_house.address) == Rad(Wad.from_number(90))
+
+        # There is one auction now
+        assert len(post_surplus_auction_house.active_auctions()) == 1
+
+        # Get auction id
+        start_auction = post_surplus_auction_house.auctions_started()
+        assert start_auction == 1
+
+        # basic bid checks
+        check_active_auctions(post_surplus_auction_house)
+
+        # check our bid and StartAuctionLog
+        current_bid = post_surplus_auction_house.bids(1)
+        assert current_bid.amount_to_sell > Rad(0)
+        log = post_surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.StartAuctionLog)
+        assert log.id == start_auction
+        assert log.amount_to_sell == current_bid.amount_to_sell
+        assert log.initial_bid == current_bid.bid_amount
+
+        # Allow the auction to expire
+        wait(geb, our_address, post_surplus_auction_house.total_auction_length()+1)
+
+        # Can't settle with no other bids
+        assert geb.post_surplus_auction_house.settle_auction(1).transact() == None
+
+        # Restart auction
+        assert post_surplus_auction_house.restart_auction(start_auction).transact()
+
+        # Mint so we can bid on the resurrected auction
+        mint_prot(geb.prot, our_address, Wad.from_number(10))
+        post_surplus_auction_house.approve(geb.prot.address, directly(from_address=our_address))
+
+        prev = geb.prot.balance_of(post_surplus_auction_house.address)
+        # bid
+        bid_amount = Wad.from_number(0.001)
+        assert geb.prot.balance_of(our_address) > bid_amount
+        TestPostSettlementSurplusAuctionHouse.increase_bid_size(post_surplus_auction_house, start_auction, our_address,
+                                                                current_bid.amount_to_sell, bid_amount)
+
+        # Ensure we have enough system coins to pay winning bidder.
+        assert current_bid.amount_to_sell <= geb.cdp_engine.coin_balance(post_surplus_auction_house.address)
+
+        #after = geb.prot.balance_of(surplus_auction_house.address)
+
+        assert geb.prot.balance_of(post_surplus_auction_house.address) >= bid_amount
+
+        # Check new bid
+        current_bid = post_surplus_auction_house.bids(start_auction)
+        assert current_bid.bid_amount == bid_amount
+        assert current_bid.high_bidder == our_address
+
+        # Exercise _settleAuction_ after bid has expired
+        wait(geb, our_address, post_surplus_auction_house.bid_duration() + 1)
+        now = datetime.now().timestamp()
+
+        # Check that bid is expired or auction is past deadline
+        assert (0 != current_bid.bid_expiry) and (current_bid.bid_expiry < now or current_bid.auction_deadline < now)
+
+        # Anyone can settle. 
+        assert post_surplus_auction_house.settle_auction(start_auction).transact()
+        log = post_surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.SettleAuctionLog)
+        assert log.id == start_auction
+
+        # Grab our system_coin
+        geb.approve_system_coin(our_address)
+        assert geb.system_coin_adapter.exit(our_address, Wad(current_bid.amount_to_sell)).transact(from_address=our_address)
+        assert geb.system_coin.balance_of(our_address) >= Wad(current_bid.amount_to_sell)

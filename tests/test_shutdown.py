@@ -18,6 +18,7 @@
 
 import pytest
 from datetime import datetime, timedelta
+import time
 
 from pyflex import Address
 from pyflex.approval import directly
@@ -25,10 +26,12 @@ from pyflex.deployment import GfDeployment
 from pyflex.gf import Collateral
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.shutdown import ESM, GlobalSettlement
+from pyflex.auctions import SettlementSurplusAuctioneer
+from pyflex.auctions import PostSettlementSurplusAuctionHouse
 
 from tests.helpers import time_travel_by
 from tests.test_auctions import create_surplus
-from tests.test_gf import mint_prot, wrap_eth, wrap_modify_cdp_collateralization
+from tests.test_gf import cleanup_cdp, mint_prot, wait, wrap_eth, wrap_modify_cdp_collateralization
 
 def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     assert isinstance(geb, GfDeployment)
@@ -43,13 +46,13 @@ def open_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
     assert geb.cdp_engine.global_debt() >= Rad(Wad.from_number(15))
     assert geb.cdp_engine.coin_balance(address) >= Rad.from_number(10)
 
-def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_address: Address):
+def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_address: Address, collateral: Collateral):
     assert isinstance(geb, GfDeployment)
     assert isinstance(deployment_address, Address)
     assert isinstance(our_address, Address)
 
     surplus_auction_house = geb.surplus_auction_house
-    create_surplus(geb, surplus_auction_house, deployment_address)
+    create_surplus(geb, surplus_auction_house, deployment_address, collateral)
     coin_balance = geb.cdp_engine.coin_balance(geb.accounting_engine.address)
     assert coin_balance > geb.cdp_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
     assert (geb.cdp_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - geb.accounting_engine.total_on_auction_debt() == Rad(0)
@@ -77,9 +80,25 @@ class TestESM:
         awe = geb.cdp_engine.debt_balance(geb.accounting_engine.address)
         # If `test_shutdown.py` is run in isolation, create a surplus auction to exercise `terminate_auction_prematurely`
         if coin_balance == Rad(0) and awe == Rad(0):
-            create_surplus_auction(geb, deployment_address, our_address)
+            create_surplus_auction(geb, deployment_address, our_address, geb.collaterals['ETH-A'])
+
+    @pytest.mark.skip(reason="increasing surplus currently takes too long with current amount of debt")
+    def test_increase_surplus_before_shutdown(self, geb, our_address, deployment_address):
+        print("Initial acct engine debt balance: %s" % geb.cdp_engine.debt_balance(geb.accounting_engine.address))
+        print("Initial acct engine coin balance: %s" % geb.cdp_engine.coin_balance(geb.accounting_engine.address))
+
+        # Create surplus before shutdown so the SettlmentSurplusAuctioneer can be tested after this module
+        while geb.cdp_engine.coin_balance(geb.accounting_engine.address) <= geb.cdp_engine.debt_balance(geb.accounting_engine.address):
+            print("acct engine debt balance: %s" % geb.cdp_engine.debt_balance(geb.accounting_engine.address))
+            print("acct engine coin balance: %s" % geb.cdp_engine.coin_balance(geb.accounting_engine.address))
+            create_surplus(geb, geb.post_surplus_auction_house, deployment_address, geb.collaterals['ETH-A'], 1000000, 8000000, False)
+            cleanup_cdp(geb, geb.collaterals['ETH-A'], deployment_address)
+
+        print("Final acct engine debt balance: %s" % geb.cdp_engine.debt_balance(geb.accounting_engine.address))
+        print("Final acct engine coin balance: %s" % geb.cdp_engine.coin_balance(geb.accounting_engine.address))
 
     def test_shutdown(self, geb, our_address, deployment_address):
+
         open_cdp(geb, geb.collaterals['ETH-A'], our_address)
 
         mint_prot(geb.prot, deployment_address, geb.esm.trigger_threshold())
@@ -104,6 +123,7 @@ class TestESM:
         assert geb.accounting_engine.authorized_accounts(geb.global_settlement.address) == True
         assert geb.oracle_relayer.authorized_accounts(geb.global_settlement.address) == True
 
+
         assert geb.esm.shutdown().transact(from_address=deployment_address)
 
         assert geb.esm.settled()
@@ -112,6 +132,10 @@ class TestESM:
         assert not geb.liquidation_engine.contract_enabled()
         assert not geb.accounting_engine.contract_enabled()
         assert not geb.oracle_relayer.contract_enabled()
+
+        # accounting engine balance should be transfers to its postSettlementSurplusDrain
+        assert geb.accounting_engine.post_settlement_surplus_drain() == geb.surplus_auctioneer.address
+        assert geb.cdp_engine.coin_balance(geb.accounting_engine.address) == Rad(0)
 
 class TestGlobalSettlement:
     """This test must be run after TestESM, which calls `esm.shutdown`."""
@@ -138,7 +162,6 @@ class TestGlobalSettlement:
         collateral_type = geb.collaterals['ETH-A'].collateral_type
 
         assert geb.global_settlement.freeze_collateral_type(collateral_type).transact()
-
         assert geb.global_settlement.collateral_total_debt(collateral_type) > Wad(0)
         assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) > Ray(0)
 
@@ -205,3 +228,89 @@ class TestGlobalSettlement:
         # FIXME: `prepareCoinsForRedeeming` fails, possibly because we're passing 0 to `cdpEngine.transfer_collateral`
         assert geb.global_settlement.prepare_coins_for_redeeming(Wad.from_number(10)).transact()
         assert geb.global_settlement.coin_bag(our_address) == Wad.from_number(10)
+
+@pytest.mark.skip(reason="currently takes too long to create enough surplus")
+class TestPostSettlementSurplusAuctioneer:
+    def test_getters(self, geb):
+        assert geb.surplus_auctioneer.accounting_engine() == geb.accounting_engine.address
+        assert geb.surplus_auctioneer.address == geb.accounting_engine.post_settlement_surplus_drain()
+        assert geb.surplus_auctioneer.cdp_engine() == geb.cdp_engine.address
+        assert geb.surplus_auctioneer.last_surplus_auction_time() == 0
+        assert geb.cdp_engine.coin_balance(geb.surplus_auctioneer.address) > Rad(0)
+
+
+    def test_post_settlement_surplus_auction(self, web3, geb, our_address):
+        initial_id = geb.post_surplus_auction_house.auctions_started()
+        auction_1_id = initial_id + 1
+        auction_2_id = initial_id + 2
+
+        before_bid_balance = geb.cdp_engine.coin_balance(geb.surplus_auctioneer.address)
+        assert len(geb.post_surplus_auction_house.active_auctions()) == 0
+
+        assert geb.accounting_engine.contract_enabled() == False
+        # Might have to wait if other tests previously started an auction 
+        while datetime.utcnow() - timedelta(seconds=geb.accounting_engine.surplus_auction_delay()) > datetime.utcnow():
+            #assert geb.surplus_auctioneer.auction_surplus().transact() == None
+            time.sleep(2)
+
+        assert geb.cdp_engine.coin_balance(geb.surplus_auctioneer.address) > Rad(0)
+
+        # Start first auction
+        assert geb.surplus_auctioneer.auction_surplus().transact()
+        log = geb.post_surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.StartAuctionLog)
+        assert log.id == auction_1_id
+        assert log.initial_bid == Wad(0)
+
+        assert len(geb.post_surplus_auction_house.active_auctions()) == 1
+
+        # Check starting bid and auctioneer coin balance
+        bid = geb.post_surplus_auction_house.bids(auction_1_id)
+        after_bid_balance = geb.cdp_engine.coin_balance(geb.surplus_auctioneer.address)
+        assert bid.id == auction_1_id
+        assert bid.bid_amount == Wad(0)
+        assert bid.high_bidder == Address(geb.surplus_auctioneer.address)
+        assert(before_bid_balance - after_bid_balance == bid.amount_to_sell)
+
+        # get protocol tokens for bidding
+        mint_prot(geb.prot, our_address, Wad.from_number(10))
+        geb.post_surplus_auction_house.approve(geb.prot.address, directly(from_address=our_address))
+
+        # Bid on first auction
+        assert geb.post_surplus_auction_house.increase_bid_size(auction_1_id, bid.amount_to_sell,
+                                                                Wad.from_number(1)).transact(from_address=our_address)
+        log = geb.post_surplus_auction_house.past_logs(1)[0]
+        assert isinstance(log, PostSettlementSurplusAuctionHouse.IncreaseBidSizeLog)
+        assert log.id == auction_1_id
+        assert log.bid == Wad.from_number(1)
+
+        # Shouldn't be able to start another auction 
+        while datetime.utcnow() - timedelta(seconds=geb.accounting_engine.surplus_auction_delay()) > datetime.utcnow():
+            assert geb.surplus_auctioneer.auction_surplus().transact() == None
+            time.sleep(2)
+
+        # Start second auction
+        assert geb.surplus_auctioneer.auction_surplus().transact()
+        assert len(geb.post_surplus_auction_house.active_auctions()) == 2
+
+        # Check bid and auctioneer coin balance
+        bid = geb.post_surplus_auction_house.bids(auction_2_id)
+        after_bid2_balance = geb.cdp_engine.coin_balance(geb.surplus_auctioneer.address)
+        assert bid.id == auction_2_id
+        assert bid.bid_amount == Wad(0)
+        assert bid.high_bidder == Address(geb.surplus_auctioneer.address)
+        assert(after_bid_balance - after_bid2_balance == bid.amount_to_sell)
+
+        # Bid on second auction
+        assert geb.post_surplus_auction_house.increase_bid_size(auction_2_id, bid.amount_to_sell,
+                                                                Wad.from_number(1)).transact(from_address=our_address)
+        # Wait for bid duration
+        wait(geb, our_address, geb.post_surplus_auction_house.bid_duration() + 1)
+
+        # Settle first auction
+        assert geb.post_surplus_auction_house.settle_auction(auction_1_id).transact()
+
+        # Settle second auction
+        assert geb.post_surplus_auction_house.settle_auction(auction_2_id).transact()
+
+        assert len(geb.post_surplus_auction_house.active_auctions()) == 0

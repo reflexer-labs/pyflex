@@ -15,7 +15,7 @@ sleep 2
 
 #Run the tests
 
-py.test --cov=pyflex --cov-report=term --cov-append tests/$@
+py.test  --cov=pyflex --cov-report=term --cov-append tests/$@
 TEST_RESULT=$?
 
 # Cleanup
