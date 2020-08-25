@@ -712,6 +712,9 @@ class AccountingEngine(Contract):
     def post_settlement_surplus_drain(self) -> Address:
         return Address(self._contract.functions.postSettlementSurplusDrain().call())
 
+    def disable_cooldown(self) -> int:
+        return int(self._contract.functions.disableCooldown().call())
+
     def debt_auction_house(self) -> Address:
         return Address(self._contract.functions.debtAuctionHouse().call())
 

@@ -20,7 +20,7 @@ from web3 import Web3, HTTPProvider
 
 from pyflex import Address
 from pyflex.auth import DSAuth
-from pyflex.governance import DSPause, VoteQuorum
+from pyflex.governance import DSPause#, VoteQuorum
 from pyflex.numeric import Wad
 from pyflex.deployment import GfDeployment
 from datetime import datetime, timedelta

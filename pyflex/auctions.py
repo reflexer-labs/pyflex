@@ -87,14 +87,14 @@ class AuctionContract(Contract):
 
     def active_auctions(self) -> list:
         active_auctions = []
-        auction_count = self.auctions_started() + 1
-        for index in range(1, auction_count):
+        auction_count = self.auctions_started()
+        for index in range(1, auction_count + 1):
             bid = self._bids(index)
             if bid.high_bidder != Address("0x0000000000000000000000000000000000000000"):
                 now = datetime.now().timestamp()
                 if (bid.bid_expiry == 0 or now < bid.bid_expiry) and now < bid.auction_deadline:
                     active_auctions.append(bid)
-            index += 1
+
         return active_auctions
 
 

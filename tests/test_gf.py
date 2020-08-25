@@ -287,8 +287,8 @@ class TestConfig:
         auctions = geb.active_auctions()
         assert "collateral_auctions" in auctions
         assert "surplus_auctions" in auctions
+        assert "post_surplus_auctions" in auctions
         assert "debt_auctions" in auctions
-
 
 class TestCDPEngine:
     @staticmethod
@@ -547,7 +547,6 @@ class TestCDPEngine:
         # rollback
         cleanup_cdp(geb, collateral, our_address)
 
-
 class TestLiquidationEngine:
     def test_getters(self, geb):
         assert isinstance(geb.liquidation_engine.contract_enabled(), bool)
@@ -603,7 +602,6 @@ class TestAccountingEngine:
     def test_cancel_auctioned_debt_with_surplus(self, geb):
         assert geb.accounting_engine.cancel_auctioned_debt_with_surplus(Rad(0)).transact()
 
-
 class TestTaxCollector:
     def test_getters(self, geb):
         c = geb.collaterals['ETH-A']
@@ -619,20 +617,6 @@ class TestTaxCollector:
 
         # then
         assert geb.tax_collector.tax_single(c.collateral_type).transact()
-"""
-class TestPot:
-    def test_getters(self, mcd):
-        assert isinstance(mcd.pot.pie(), Wad)
-        assert isinstance(mcd.pot.dsr(), Ray)
-        assert isinstance(mcd.pot.rho(), datetime)
-
-        assert mcd.pot.pie() >= Wad(0)
-        assert mcd.pot.dsr() > Ray(0)
-        assert datetime.fromtimestamp(0) < mcd.pot.rho() < datetime.utcnow()
-
-    def test_drip(self, mcd):
-        assert mcd.pot.drip().transact()
-"""
 
 class TestOsm:
     def test_price(self, web3, geb):
@@ -643,7 +627,6 @@ class TestOsm:
         raw_price = osm._extract_price(2)
         assert isinstance(raw_price, int)
         assert Wad.from_number(200) == Wad(raw_price)
-
 
 class TestGeb:
     def test_healthy_cdp(self, web3, geb, our_address):
