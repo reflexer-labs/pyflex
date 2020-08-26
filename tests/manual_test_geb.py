@@ -51,32 +51,32 @@ if collateral.collateral.balance_of(our_address) > collateral_amount:
         # Add collateral and allocate the desired amount of Dai
         collateral.approve(our_address)
         assert collateral.adapter.join(our_address, collateral_amount).transact()
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=collateral_amount,
+        assert geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=collateral_amount,
                                                            delta_debt=Wad(0)).transact()
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=Wad(0),
+        assert geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad(0),
                                                            delta_debt=system_coin_amount).transact()
 
-    print(f"CDP balance: {geb.cdp_engine.cdps(collateral_type, our_address)}")
-    print(f"System coin balance: {geb.cdp_engine.coin_balance(our_address)}")
+    print(f"SAFE balance: {geb.safe_engine.safes(collateral_type, our_address)}")
+    print(f"System coin balance: {geb.safe_engine.coin_balance(our_address)}")
 
     if run_transactions:
         # Mint and withdraw our system coin
         geb.approve_system_coin(our_address)
         assert geb.system_coin_adapter.exit(our_address, system_coin_amount).transact()
-        print(f"System coin balance after withdrawal:  {geb.cdp_engine.coin_balance(our_address)}")
+        print(f"System coin balance after withdrawal:  {geb.safe_engine.coin_balance(our_address)}")
 
         # Repay (and burn) our system coin
         assert geb.system_coin_adapter.join(our_address, system_coin_amount).transact()
-        print(f"System coin balance after repayment:   {geb.cdp_engine.coin_balance(our_address)}")
+        print(f"System coin balance after repayment:   {geb.safe_engine.coin_balance(our_address)}")
 
         # Withdraw our collateral; stability fee accumulation may make these revert
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=Wad(0),
+        assert geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad(0),
                                                            delta_debt=system_coin_amount*-1).transact()
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral_type, our_address, delta_collateral=collateral_amount*-1,
+        assert geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=collateral_amount*-1,
                                                            delta_debt=Wad(0)).transact()
         assert collateral.adapter.exit(our_address, collateral_amount).transact()
-        print(f"System coin balance w/o collateral:    {geb.cdp_engine.coin_balance(our_address)}")
+        print(f"System coin balance w/o collateral:    {geb.safe_engine.coin_balance(our_address)}")
 else:
-    print(f"Not enough {collateral_type.name} to join to the cdp_engine")
+    print(f"Not enough {collateral_type.name} to join to the safe_engine")
 
-print(f"Collateral balance: {geb.cdp_engine.collateral(collateral_type, our_address)}")
+print(f"Collateral balance: {geb.safe_engine.collateral(collateral_type, our_address)}")

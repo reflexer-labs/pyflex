@@ -22,9 +22,9 @@ from datetime import datetime
 from web3 import Web3
 
 from pyflex import Address
-from pyflex.approval import approve_cdp_modification_directly
+from pyflex.approval import approve_safe_modification_directly
 from pyflex.deployment import GfDeployment
-from pyflex.gf import Collateral, CoinJoin, BasicCollateralJoin, CollateralType, CDPEngine, AccountingEngine
+from pyflex.gf import Collateral, CoinJoin, BasicCollateralJoin, CollateralType, SAFEEngine, AccountingEngine
 from pyflex.feed import DSValue
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.oracles import OSM
@@ -33,9 +33,9 @@ from tests.conftest import validate_contracts_loaded
 
 
 @pytest.fixture
-def cdp(our_address: Address, geb: GfDeployment):
+def safe(our_address: Address, geb: GfDeployment):
     collateral = geb.collaterals['ETH-A']
-    return geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+    return geb.safe_engine.safe(collateral.collateral_type, our_address)
 
 
 def wrap_eth(geb: GfDeployment, address: Address, amount: Wad):
@@ -91,8 +91,8 @@ def wait(geb: GfDeployment, address: Address, seconds: int):
     wrap_eth(geb, address, Wad(1))
 
 
-def wrap_modify_cdp_collateralization(geb: GfDeployment, collateral: Collateral, address: Address, delta_collateral: Wad, delta_debt: Wad):
-    """Wraps CDPEngine.modify_cdp_collateralization for debugging purposes"""
+def wrap_modify_safe_collateralization(geb: GfDeployment, collateral: Collateral, address: Address, delta_collateral: Wad, delta_debt: Wad):
+    """Wraps SAFEEngine.modify_safe_collateralization for debugging purposes"""
     # given
     assert isinstance(geb, GfDeployment)
     assert isinstance(collateral, Collateral)
@@ -102,100 +102,100 @@ def wrap_modify_cdp_collateralization(geb: GfDeployment, collateral: Collateral,
     collateral_type = collateral.collateral_type
 
     # when
-    collateral_before = geb.cdp_engine.cdp(collateral_type, address).locked_collateral
-    debt_before = geb.cdp_engine.cdp(collateral_type, address).generated_debt
+    collateral_before = geb.safe_engine.safe(collateral_type, address).locked_collateral
+    debt_before = geb.safe_engine.safe(collateral_type, address).generated_debt
 
     # then
-    assert geb.cdp_engine.modify_cdp_collateralization(collateral_type=collateral_type, cdp_address=address,
+    assert geb.safe_engine.modify_safe_collateralization(collateral_type=collateral_type, safe_address=address,
                                                        delta_collateral=delta_collateral,
                                                        delta_debt=delta_debt).transact(from_address=address)
 
-    assert geb.cdp_engine.cdp(collateral_type, address).locked_collateral == collateral_before + delta_collateral
-    assert geb.cdp_engine.cdp(collateral_type, address).generated_debt == debt_before + delta_debt
+    assert geb.safe_engine.safe(collateral_type, address).locked_collateral == collateral_before + delta_collateral
+    assert geb.safe_engine.safe(collateral_type, address).generated_debt == debt_before + delta_debt
 
 
 def max_delta_debt(geb: GfDeployment, collateral: Collateral, our_address: Address) -> Wad:
-    """Determines how much stablecoin should be reserved in an `cdp` to make it as poorly collateralized as
+    """Determines how much stablecoin should be reserved in an `safe` to make it as poorly collateralized as
     possible, such that a small change to the collateral price could trip the liquidation ratio."""
     assert isinstance(geb, GfDeployment)
     assert isinstance(collateral, Collateral)
     assert isinstance(our_address, Address)
 
-    cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
-    collateral_type = geb.cdp_engine.collateral_type(collateral.collateral_type.name)
+    safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
+    collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 
-    # change in generated debt = (collateral balance * collateral price with safety margin) - CDP's stablecoin debt
-    delta_debt = cdp.locked_collateral * collateral_type.safety_price - Wad(Ray(cdp.generated_debt) * collateral_type.accumulated_rates)
+    # change in generated debt = (collateral balance * collateral price with safety margin) - SAFE's stablecoin debt
+    delta_debt = safe.locked_collateral * collateral_type.safety_price - Wad(Ray(safe.generated_debt) * collateral_type.accumulated_rates)
 
     # change in debt must also take the rate into account
     delta_debt = delta_debt * Wad(Ray.from_number(1) / collateral_type.accumulated_rates)
 
     # prevent the change in debt from exceeding the collateral debt ceiling
-    if (Rad(cdp.generated_debt) + Rad(delta_debt)) >= collateral_type.debt_ceiling:
+    if (Rad(safe.generated_debt) + Rad(delta_debt)) >= collateral_type.debt_ceiling:
         print("max_delta_debt is avoiding collateral debt ceiling")
-        delta_debt = Wad(collateral_type.debt_ceiling - Rad(cdp.generated_debt))
+        delta_debt = Wad(collateral_type.debt_ceiling - Rad(safe.generated_debt))
 
     # prevent the change in debt from exceeding the total debt ceiling
-    debt = geb.cdp_engine.global_debt() + Rad(collateral_type.accumulated_rates * delta_debt)
+    debt = geb.safe_engine.global_debt() + Rad(collateral_type.accumulated_rates * delta_debt)
     debt_ceiling = Rad(collateral_type.debt_ceiling)
     if (debt + Rad(delta_debt)) >= debt_ceiling:
         print("max_delta_debt is avoiding total debt ceiling")
-        delta_debt = Wad(debt - Rad(cdp.generated_debt))
+        delta_debt = Wad(debt - Rad(safe.generated_debt))
 
     assert delta_debt > Wad(0)
     return delta_debt
 
 
-def cleanup_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
+def cleanup_safe(geb: GfDeployment, collateral: Collateral, address: Address):
     assert isinstance(geb, GfDeployment)
     assert isinstance(collateral, Collateral)
     assert isinstance(address, Address)
-    cdp = geb.cdp_engine.cdp(collateral.collateral_type, address)
-    collateral_type = geb.cdp_engine.collateral_type(collateral.collateral_type.name)
+    safe = geb.safe_engine.safe(collateral.collateral_type, address)
+    collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 
-    # If tax_collector.tax_single has been called, we won't have sufficient system_coin to repay the CDP
+    # If tax_collector.tax_single has been called, we won't have sufficient system_coin to repay the SAFE
     #if collateral_type.accumulated_rates > Ray.from_number(1):
     #    return
 
     # Repay borrowed system coin
     geb.approve_system_coin(address)
 
-    # Put all the user's system coin back into the cdp engine
+    # Put all the user's system coin back into the safe engine
     if geb.system_coin.balance_of(address) >= Wad(0):
         assert geb.system_coin_adapter.join(address, geb.system_coin.balance_of(address)).transact(from_address=address)
 
-    # tab = Ray(cdp.generated_debt) * collateral_type.accumulated_rates
-    # print(f'amount_to_raise={str(amount_to_raise)}, rate={str(collateral_type.accumulated_rates)}, system_coin={str(geb.cdp_engine.coin_balance(address))}')
-    if cdp.generated_debt > Wad(0) and geb.cdp_engine.coin_balance(address) >= Rad(cdp.generated_debt):
-        wrap_modify_cdp_collateralization(geb, collateral, address, Wad(0), cdp.generated_debt * -1)
+    # tab = Ray(safe.generated_debt) * collateral_type.accumulated_rates
+    # print(f'amount_to_raise={str(amount_to_raise)}, rate={str(collateral_type.accumulated_rates)}, system_coin={str(geb.safe_engine.coin_balance(address))}')
+    if safe.generated_debt > Wad(0) and geb.safe_engine.coin_balance(address) >= Rad(safe.generated_debt):
+        wrap_modify_safe_collateralization(geb, collateral, address, Wad(0), safe.generated_debt * -1)
 
     # Withdraw collateral
     collateral.approve(address)
-    cdp = geb.cdp_engine.cdp(collateral.collateral_type, address)
-    # delta_collateral = Wad((Ray(cdp.generated_debt) * collateral_type.accumulated_rates) / collateral_type.safety_price)
-    # print(f'delta_collateral={str(delta_collateral)}, locked_collateral={str(cdp.locked_collateral)}')
-    if cdp.generated_debt == Wad(0) and cdp.locked_collateral > Wad(0):
-        wrap_modify_cdp_collateralization(geb, collateral, address, cdp.locked_collateral * -1, Wad(0))
-    assert collateral.adapter.exit(address, geb.cdp_engine.token_collateral(collateral.collateral_type, address)).transact(from_address=address)
-    # TestCDPEngine.ensure_clean_cdp(geb, collateral, address)
+    safe = geb.safe_engine.safe(collateral.collateral_type, address)
+    # delta_collateral = Wad((Ray(safe.generated_debt) * collateral_type.accumulated_rates) / collateral_type.safety_price)
+    # print(f'delta_collateral={str(delta_collateral)}, locked_collateral={str(safe.locked_collateral)}')
+    if safe.generated_debt == Wad(0) and safe.locked_collateral > Wad(0):
+        wrap_modify_safe_collateralization(geb, collateral, address, safe.locked_collateral * -1, Wad(0))
+    assert collateral.adapter.exit(address, geb.safe_engine.token_collateral(collateral.collateral_type, address)).transact(from_address=address)
+    # TestSAFEEngine.ensure_clean_safe(geb, collateral, address)
 
 
-def simulate_liquidate_cdp(geb: GfDeployment, collateral: Collateral, our_address: Address):
+def simulate_liquidate_safe(geb: GfDeployment, collateral: Collateral, our_address: Address):
     assert isinstance(geb, GfDeployment)
     assert isinstance(collateral, Collateral)
     assert isinstance(our_address, Address)
 
-    collateral_type = geb.cdp_engine.collateral_type(collateral.collateral_type.name)
-    cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+    collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
+    safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
 
     # Collateral value should be less than the product of our stablecoin debt and the debt multiplier
-    assert (Ray(cdp.locked_collateral) * collateral_type.safety_price) < (Ray(cdp.generated_debt) * collateral_type.accumulated_rates)
+    assert (Ray(safe.locked_collateral) * collateral_type.safety_price) < (Ray(safe.generated_debt) * collateral_type.accumulated_rates)
 
     # Lesser of our collateral balance and the liquidation quantity
-    lot = min(cdp.locked_collateral, geb.liquidation_engine.collateral_to_sell(collateral_type))  # Wad
+    lot = min(safe.locked_collateral, Wad(geb.liquidation_engine.liquidation_quantity(collateral_type)))  # Wad
 
     # Lesser of our stablecoin debt and the canceled debt pro rata the seized collateral
-    generated_debt = min(cdp.generated_debt, (lot * cdp.generated_debt) / cdp.locked_collateral)  # Wad
+    generated_debt = min(safe.generated_debt, (lot * safe.generated_debt) / safe.locked_collateral)  # Wad
 
     # Stablecoin to be raised in collateral auction
     amount_to_raise = Ray(generated_debt) * collateral_type.accumulated_rates # Ray
@@ -208,24 +208,24 @@ def simulate_liquidate_cdp(geb: GfDeployment, collateral: Collateral, our_addres
 def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     collateral = geb.collaterals['ETH-A']
 
-    # Add collateral to our CDP
+    # Add collateral to our SAFE
     delta_collateral = Wad.from_number(1)
     wrap_eth(geb, our_address, delta_collateral)
     assert collateral.collateral.balance_of(our_address) >= delta_collateral
     assert collateral.adapter.join(our_address, delta_collateral).transact()
-    wrap_modify_cdp_collateralization(geb, collateral, our_address, delta_collateral, Wad(0))
+    wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral, Wad(0))
 
     # Define required liquidation parameters
     to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
 
-    # Manipulate price to make our CDP underwater
+    # Manipulate price to make our SAFE underwater
     # Note this will only work on a testchain deployed with fixed prices, where PIP is a DSValue
-    wrap_modify_cdp_collateralization(geb, collateral, our_address, Wad(0), max_delta_debt(geb, collateral, our_address))
+    wrap_modify_safe_collateralization(geb, collateral, our_address, Wad(0), max_delta_debt(geb, collateral, our_address))
     set_collateral_price(geb, collateral, to_price)
 
-    # Liquidate the CDP
+    # Liquidate the SAFE
     simulate_liquidation(geb, collateral, our_address)
-    assert geb.liquidation_engine.liquidate_cdp(collateral.collateral_type, Urn(our_address)).transact()
+    assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, Urn(our_address)).transact()
 
 
 @pytest.fixture(scope="session")
@@ -290,45 +290,45 @@ class TestConfig:
         assert "post_surplus_auctions" in auctions
         assert "debt_auctions" in auctions
 
-class TestCDPEngine:
+class TestSAFEEngine:
     @staticmethod
-    def ensure_clean_cdp(geb: GfDeployment, collateral: Collateral, address: Address):
+    def ensure_clean_safe(geb: GfDeployment, collateral: Collateral, address: Address):
         assert isinstance(geb, GfDeployment)
         assert isinstance(collateral, Collateral)
         assert isinstance(address, Address)
 
-        cdp = geb.cdp_engine.cdp(collateral.collateral_type, address)
-        assert cdp.locked_collateral == Wad(0)
-        assert cdp.generated_debt == Wad(0)
-        assert geb.cdp_engine.token_collateral(collateral.collateral_type, address) == Wad(0)
+        safe = geb.safe_engine.safe(collateral.collateral_type, address)
+        assert safe.locked_collateral == Wad(0)
+        assert safe.generated_debt == Wad(0)
+        assert geb.safe_engine.token_collateral(collateral.collateral_type, address) == Wad(0)
 
     def test_getters(self, geb):
-        assert isinstance(geb.cdp_engine.contract_enabled(), bool)
+        assert isinstance(geb.safe_engine.contract_enabled(), bool)
 
     def test_collateral_type(self, geb):
-        assert geb.cdp_engine.collateral_type('XXX') == CollateralType('XXX',
-                                         accumulated_rates=Ray(0), cdp_collateral=Wad(0), cdp_debt=Wad(0),
+        assert geb.safe_engine.collateral_type('XXX') == CollateralType('XXX',
+                                         accumulated_rates=Ray(0), safe_collateral=Wad(0), safe_debt=Wad(0),
                                          safety_price=Ray(0), debt_ceiling=Rad(0), debt_floor=Rad(0))
 
     def test_collateral(self, web3: Web3, geb: GfDeployment, our_address: Address):
         # given
         collateral = geb.collaterals['ETH-A']
         amount_to_join = Wad(10)
-        our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+        our_safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
         assert isinstance(collateral.collateral_type, CollateralType)
         assert isinstance(collateral.adapter, BasicCollateralJoin)
         assert collateral.collateral_type == collateral.adapter.collateral_type()
-        assert our_cdp.address == our_address
+        assert our_safe.address == our_address
         wrap_eth(geb, our_address, amount_to_join)
         assert collateral.collateral.balance_of(our_address) >= amount_to_join
 
         # when
-        before_join = geb.cdp_engine.token_collateral(collateral.collateral_type, our_cdp.address)
+        before_join = geb.safe_engine.token_collateral(collateral.collateral_type, our_safe.address)
         collateral.approve(our_address)
         assert collateral.adapter.join(our_address, amount_to_join).transact()
-        after_join = geb.cdp_engine.token_collateral(collateral.collateral_type, our_cdp.address)
+        after_join = geb.safe_engine.token_collateral(collateral.collateral_type, our_safe.address)
         assert collateral.adapter.exit(our_address, amount_to_join).transact()
-        after_exit = geb.cdp_engine.token_collateral(collateral.collateral_type, our_cdp.address)
+        after_exit = geb.safe_engine.token_collateral(collateral.collateral_type, our_safe.address)
 
         # then
         assert after_join - before_join == amount_to_join
@@ -341,73 +341,73 @@ class TestCDPEngine:
         #assert collateral_bat.adapter.dec() == 18
 
 
-    def test_coin_balance(self, geb, cdp):
-        coin_balance = geb.cdp_engine.coin_balance(cdp.address)
+    def test_coin_balance(self, geb, safe):
+        coin_balance = geb.safe_engine.coin_balance(safe.address)
         assert coin_balance >= Rad(0)
 
-    def test_debt_balance(self, geb, cdp):
-        debt_balance = geb.cdp_engine.debt_balance(cdp.address)
+    def test_debt_balance(self, geb, safe):
+        debt_balance = geb.safe_engine.debt_balance(safe.address)
         assert isinstance(debt_balance, Rad)
         assert debt_balance == Rad(0)
 
     def test_debt(self, geb):
-        debt = geb.cdp_engine.global_debt()
+        debt = geb.safe_engine.global_debt()
         assert debt >= Rad(0)
-        assert debt < geb.cdp_engine.global_debt_ceiling()
+        assert debt < geb.safe_engine.global_debt_ceiling()
 
-    def test_modify_cdp_collateralization_noop(self, geb, our_address):
+    def test_modify_safe_collateralization_noop(self, geb, our_address):
         # given
         collateral = geb.collaterals['ETH-A']
-        our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+        our_safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
 
         # when
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral.collateral_type, our_address, Wad(0), Wad(0)).transact()
+        assert geb.safe_engine.modify_safe_collateralization(collateral.collateral_type, our_address, Wad(0), Wad(0)).transact()
 
         # then
-        assert geb.cdp_engine.cdp(collateral.collateral_type, our_address) == our_cdp
+        assert geb.safe_engine.safe(collateral.collateral_type, our_address) == our_safe
 
-    def test_modify_cdp_collateralization_add_collateral(self, geb, our_address):
+    def test_modify_safe_collateralization_add_collateral(self, geb, our_address):
         # given
         collateral = geb.collaterals['ETH-A']
         collateral.approve(our_address)
-        our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+        our_safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
 
         # when
         wrap_eth(geb, our_address, Wad(10))
         assert collateral.adapter.join(our_address, Wad(10)).transact()
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral.collateral_type, our_address, Wad(10), Wad(0)).transact()
+        assert geb.safe_engine.modify_safe_collateralization(collateral.collateral_type, our_address, Wad(10), Wad(0)).transact()
 
         # then
-        assert geb.cdp_engine.cdp(collateral.collateral_type, our_address).locked_collateral == our_cdp.locked_collateral + Wad(10)
+        assert geb.safe_engine.safe(collateral.collateral_type, our_address).locked_collateral == our_safe.locked_collateral + Wad(10)
 
         # rollback
-        cleanup_cdp(geb, collateral, our_address)
+        cleanup_safe(geb, collateral, our_address)
 
-    def test_modify_cdp_collateralization_add_debt(self, geb, our_address: Address):
+    def test_modify_safe_collateralization_add_debt(self, geb, our_address: Address):
         # given
         collateral = geb.collaterals['ETH-A']
         collateral.approve(our_address)
-        our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+        our_safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
 
         # when
         wrap_eth(geb, our_address, Wad.from_number(30))
 
         assert collateral.adapter.join(our_address, Wad.from_number(30)).transact()
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral.collateral_type, our_address, Wad.from_number(30), Wad.from_number(20)).transact()
+        assert geb.safe_engine.modify_safe_collateralization(collateral.collateral_type, our_address, Wad.from_number(30), Wad.from_number(20)).transact()
 
         # then
-        assert geb.cdp_engine.cdp(collateral.collateral_type, our_address).generated_debt == our_cdp.generated_debt + Wad.from_number(20)
+        assert geb.safe_engine.safe(collateral.collateral_type, our_address).generated_debt == our_safe.generated_debt + Wad.from_number(20)
 
         # rollback
-        cleanup_cdp(geb, collateral, our_address)
+        cleanup_safe(geb, collateral, our_address)
 
-    def test_modify_cdp_collateralization_other_account(self, web3, geb, other_address):
+    def test_modify_safe_collateralization_other_account(self, web3, geb, other_address):
         # given
         collateral = geb.collaterals['ETH-A']
         collateral.approve(other_address)
-        geb.system_coin_adapter.approve(approve_cdp_modification_directly(from_address=other_address), geb.cdp_engine.address)
-        cdp = geb.cdp_engine.cdp(collateral.collateral_type, other_address)
-        assert cdp.address == other_address
+        geb.system_coin_adapter.approve(approve_safe_modification_directly(from_address=other_address), geb.safe_engine.address)
+        safe = geb.safe_engine.safe(collateral.collateral_type, other_address)
+        assert safe.address == other_address
 
         # when
         wrap_eth(geb, other_address, Wad.from_number(100 ))
@@ -415,16 +415,16 @@ class TestCDPEngine:
         assert collateral.collateral == collateral.adapter.collateral()
         collateral.collateral.approve(collateral.adapter.address)
         assert collateral.adapter.join(other_address, Wad.from_number(30)).transact(from_address=other_address)
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral.collateral_type, other_address,
+        assert geb.safe_engine.modify_safe_collateralization(collateral.collateral_type, other_address,
                                                            Wad.from_number(30), Wad.from_number(20)).transact(from_address=other_address)
 
         # then
-        assert geb.cdp_engine.cdp(collateral.collateral_type, other_address).generated_debt == cdp.generated_debt + Wad.from_number(20)
+        assert geb.safe_engine.safe(collateral.collateral_type, other_address).generated_debt == safe.generated_debt + Wad.from_number(20)
 
         # rollback
-        cleanup_cdp(geb, collateral, other_address)
+        cleanup_safe(geb, collateral, other_address)
 
-    def test_past_modify_cdp_collateralization(self, geb, our_address, other_address):
+    def test_past_modify_safe_collateralization(self, geb, our_address, other_address):
         # given
         collateral0 = geb.collaterals['ETH-B']
         collateral_type0 = collateral0.collateral_type
@@ -438,124 +438,124 @@ class TestCDPEngine:
 
             collateral0.approve(our_address)
             assert collateral0.adapter.join(our_address, Wad.from_number(90)).transact()
-            assert geb.cdp_engine.modify_cdp_collateralization(collateral_type0, our_address, Wad.from_number(30), Wad(0)).transact()
+            assert geb.safe_engine.modify_safe_collateralization(collateral_type0, our_address, Wad.from_number(30), Wad(0)).transact()
 
             collateral1.approve(other_address)
             assert collateral1.adapter.join(other_address, Wad.from_number(90)).transact(from_address=other_address)
-            assert geb.cdp_engine.modify_cdp_collateralization(collateral_type1, other_address, Wad.from_number(90), Wad(0)).transact(from_address=other_address)
-            assert geb.cdp_engine.modify_cdp_collateralization(collateral_type1, other_address, Wad.from_number(-30), Wad(0)).transact(from_address=other_address)
+            assert geb.safe_engine.modify_safe_collateralization(collateral_type1, other_address, Wad.from_number(90), Wad(0)).transact(from_address=other_address)
+            assert geb.safe_engine.modify_safe_collateralization(collateral_type1, other_address, Wad.from_number(-30), Wad(0)).transact(from_address=other_address)
 
-            assert geb.cdp_engine.modify_cdp_collateralization(collateral_type1, our_address, Wad.from_number(30), Wad(0),
+            assert geb.safe_engine.modify_safe_collateralization(collateral_type1, our_address, Wad.from_number(30), Wad(0),
                                 collateral_owner=other_address, system_coin_recipient=other_address).transact(
                 from_address=other_address)
 
             # then
             current_block = geb.web3.eth.blockNumber
             from_block = current_block - 6
-            mods = geb.cdp_engine.past_cdp_modifications(from_block)
+            mods = geb.safe_engine.past_safe_modifications(from_block)
             assert len(mods) == 4
             assert mods[0].collateral_type == collateral_type0.name
-            assert mods[0].cdp == our_address
+            assert mods[0].safe == our_address
             assert mods[0].delta_collateral == Wad.from_number(30)
             assert mods[0].delta_debt == Wad(0)
             assert mods[1].collateral_type == collateral_type1.name
-            assert mods[1].cdp == other_address
+            assert mods[1].safe == other_address
             assert mods[1].delta_collateral == Wad.from_number(90)
             assert mods[1].delta_debt == Wad(0)
             assert mods[2].collateral_type == collateral_type1.name
-            assert mods[2].cdp == other_address
+            assert mods[2].safe == other_address
             assert mods[2].delta_collateral == Wad.from_number(-30)
             assert mods[2].delta_debt == Wad(0)
-            assert mods[3].cdp == our_address
+            assert mods[3].safe == our_address
             assert mods[3].collateral_source == other_address
             assert mods[3].delta_collateral == Wad.from_number(30)
             assert mods[3].delta_debt == Wad(0)
 
-            assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=collateral_type0)) == 1
-            assert len(geb.cdp_engine.past_cdp_modifications(from_block, collateral_type=collateral_type1)) == 3
+            assert len(geb.safe_engine.past_safe_modifications(from_block, collateral_type=collateral_type0)) == 1
+            assert len(geb.safe_engine.past_safe_modifications(from_block, collateral_type=collateral_type1)) == 3
 
         finally:
             # teardown
-            cleanup_cdp(geb, collateral0, our_address)
-            TestCDPEngine.ensure_clean_cdp(geb, collateral0, our_address)
-            cleanup_cdp(geb, collateral1, other_address)
-            TestCDPEngine.ensure_clean_cdp(geb, collateral1, other_address)
+            cleanup_safe(geb, collateral0, our_address)
+            TestSAFEEngine.ensure_clean_safe(geb, collateral0, our_address)
+            cleanup_safe(geb, collateral1, other_address)
+            TestSAFEEngine.ensure_clean_safe(geb, collateral1, other_address)
 
     def test_settle_debt(self, geb):
-        assert geb.cdp_engine.settle_debt(Rad(0)).transact()
+        assert geb.safe_engine.settle_debt(Rad(0)).transact()
 
     def test_transfer_collateral(self, geb, our_address, other_address):
         # given
         collateral = geb.collaterals['ETH-A']
         collateral.approve(our_address)
-        other_balance_before = geb.cdp_engine.token_collateral(collateral.collateral_type, other_address)
+        other_balance_before = geb.safe_engine.token_collateral(collateral.collateral_type, other_address)
         amount = Wad(3)
         wrap_eth(geb, our_address, amount)
         assert collateral.adapter.join(our_address, amount).transact()
 
         # when
-        assert geb.cdp_engine.transfer_collateral(collateral.collateral_type, our_address, other_address, amount).transact()
+        assert geb.safe_engine.transfer_collateral(collateral.collateral_type, our_address, other_address, amount).transact()
 
         # then
-        other_balance_after = geb.cdp_engine.token_collateral(collateral.collateral_type, other_address)
+        other_balance_after = geb.safe_engine.token_collateral(collateral.collateral_type, other_address)
         assert Wad(other_balance_before) + amount == Wad(other_balance_after)
 
         # teardown
-        cleanup_cdp(geb, collateral, our_address)
+        cleanup_safe(geb, collateral, our_address)
 
     def test_transfer_internal_coins(self, geb, our_address, other_address):
         # given
         collateral = geb.collaterals['ETH-A']
         collateral.approve(our_address)
-        our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+        our_safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
         wrap_eth(geb, our_address, Wad.from_number(60))
 
         assert collateral.adapter.join(our_address, Wad.from_number(60)).transact()
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral.collateral_type, our_address, Wad.from_number(60), Wad.from_number(20)).transact()
-        other_balance_before = geb.cdp_engine.coin_balance(other_address)
+        assert geb.safe_engine.modify_safe_collateralization(collateral.collateral_type, our_address, Wad.from_number(60), Wad.from_number(20)).transact()
+        other_balance_before = geb.safe_engine.coin_balance(other_address)
 
         # when
-        assert geb.cdp_engine.transfer_internal_coins(our_address, other_address, Rad(Wad.from_number(20))).transact()
+        assert geb.safe_engine.transfer_internal_coins(our_address, other_address, Rad(Wad.from_number(20))).transact()
 
         # then
-        other_balance_after = geb.cdp_engine.coin_balance(other_address)
+        other_balance_after = geb.safe_engine.coin_balance(other_address)
         assert other_balance_before + Rad(Wad.from_number(20)) == other_balance_after
 
         # rollback
-        cleanup_cdp(geb, collateral, our_address)
+        cleanup_safe(geb, collateral, our_address)
 
-    def test_transfer_cdp_collateral_and_debt(self, geb, our_address, other_address):
+    def test_transfer_safe_collateral_and_debt(self, geb, our_address, other_address):
         # given
         collateral = geb.collaterals['ETH-A']
-        geb.cdp_engine.approve_cdp_modification(our_address).transact(from_address=other_address)
-        geb.cdp_engine.approve_cdp_modification(other_address).transact(from_address=our_address)
+        geb.safe_engine.approve_safe_modification(our_address).transact(from_address=other_address)
+        geb.safe_engine.approve_safe_modification(other_address).transact(from_address=our_address)
 
-        our_cdp = geb.cdp_engine.cdp(collateral.collateral_type, our_address)
+        our_safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
         wrap_eth(geb, our_address, Wad.from_number(60))
         assert collateral.adapter.join(our_address, Wad.from_number(60)).transact()
-        assert geb.cdp_engine.modify_cdp_collateralization(collateral.collateral_type, our_address, Wad.from_number(60), Wad.from_number(20)).transact()
-        cdp_before = geb.cdp_engine.cdp(collateral.collateral_type, other_address)
+        assert geb.safe_engine.modify_safe_collateralization(collateral.collateral_type, our_address, Wad.from_number(60), Wad.from_number(20)).transact()
+        safe_before = geb.safe_engine.safe(collateral.collateral_type, other_address)
 
         # when
-        assert geb.cdp_engine.transfer_cdp_collateral_and_debt(collateral.collateral_type, our_address, other_address, Wad.from_number(3), Wad.from_number(20)).transact()
+        assert geb.safe_engine.transfer_safe_collateral_and_debt(collateral.collateral_type, our_address, other_address, Wad.from_number(3), Wad.from_number(20)).transact()
 
         # then
-        cdp_after = geb.cdp_engine.cdp(collateral.collateral_type, other_address)
-        assert cdp_before.locked_collateral + Wad.from_number(3) == cdp_after.locked_collateral
-        assert cdp_before.generated_debt + Wad.from_number(20) == cdp_after.generated_debt
+        safe_after = geb.safe_engine.safe(collateral.collateral_type, other_address)
+        assert safe_before.locked_collateral + Wad.from_number(3) == safe_after.locked_collateral
+        assert safe_before.generated_debt + Wad.from_number(20) == safe_after.generated_debt
 
         # rollback
-        cleanup_cdp(geb, collateral, our_address)
+        cleanup_safe(geb, collateral, our_address)
 
 class TestLiquidationEngine:
     def test_getters(self, geb):
         assert isinstance(geb.liquidation_engine.contract_enabled(), bool)
-        assert isinstance(geb.liquidation_engine.cdp_engine, CDPEngine)
+        assert isinstance(geb.liquidation_engine.safe_engine, SAFEEngine)
         assert isinstance(geb.liquidation_engine.accounting_engine, AccountingEngine)
 
         collateral = geb.collaterals['ETH-C']
         assert geb.liquidation_engine.collateral_auction_house(collateral.collateral_type) == collateral.collateral_auction_house.address
-        assert isinstance(geb.liquidation_engine.collateral_to_sell(collateral.collateral_type), Wad)
+        assert isinstance(geb.liquidation_engine.liquidation_quantity(collateral.collateral_type), Rad)
         assert isinstance(geb.liquidation_engine.liquidation_penalty(collateral.collateral_type), Ray)
 
 
@@ -568,18 +568,18 @@ class TestOracleRelayer:
 
         geb.oracle_relayer.update_collateral_price(collateral_type)
 
-        cdp_collateral_type = geb.cdp_engine.collateral_type('ETH-A')
+        safe_collateral_type = geb.safe_engine.collateral_type('ETH-A')
 
         redemption_price = geb.oracle_relayer.redemption_price()
         safe_c_ratio = geb.oracle_relayer.safety_c_ratio(collateral_type)
         liquidation_c_ratio = geb.oracle_relayer.liquidation_c_ratio(collateral_type)
        
-        calc_ratio = Ray(collateral_price) / redemption_price / cdp_collateral_type.safety_price
+        calc_ratio = Ray(collateral_price) / redemption_price / safe_collateral_type.safety_price
         assert safe_c_ratio == calc_ratio
 
 class TestAccountingEngine:
     def test_getters(self, geb):
-        assert isinstance(geb.accounting_engine.cdp_engine, CDPEngine)
+        assert isinstance(geb.accounting_engine.safe_engine, SAFEEngine)
         assert isinstance(geb.accounting_engine.contract_enabled(), bool)
         assert isinstance(geb.accounting_engine.surplus_auction_house(), Address)
         assert isinstance(geb.accounting_engine.debt_auction_house(), Address)
@@ -605,7 +605,7 @@ class TestAccountingEngine:
 class TestTaxCollector:
     def test_getters(self, geb):
         c = geb.collaterals['ETH-A']
-        assert isinstance(geb.tax_collector.cdp_engine, CDPEngine)
+        assert isinstance(geb.tax_collector.safe_engine, SAFEEngine)
         assert isinstance(geb.tax_collector.accounting_engine, AccountingEngine)
         assert isinstance(geb.tax_collector.global_stability_fee(), Ray)
         assert isinstance(geb.tax_collector.stability_fee(c.collateral_type), Ray)
@@ -629,42 +629,42 @@ class TestOsm:
         assert Wad.from_number(200) == Wad(raw_price)
 
 class TestGeb:
-    def test_healthy_cdp(self, web3, geb, our_address):
+    def test_healthy_safe(self, web3, geb, our_address):
         collateral = geb.collaterals['ETH-B']
         collateral_type = collateral.collateral_type
-        TestCDPEngine.ensure_clean_cdp(geb, collateral, our_address)
-        initial_system_coin = geb.cdp_engine.coin_balance(our_address)
+        TestSAFEEngine.ensure_clean_safe(geb, collateral, our_address)
+        initial_system_coin = geb.safe_engine.coin_balance(our_address)
         wrap_eth(geb, our_address, Wad.from_number(90))
 
-        # Ensure our collateral enters the cdp
+        # Ensure our collateral enters the safe
         collateral_balance_before = collateral.collateral.balance_of(our_address)
         collateral.approve(our_address)
         assert collateral.adapter.join(our_address, Wad.from_number(90)).transact()
         assert collateral.collateral.balance_of(our_address) == collateral_balance_before - Wad.from_number(90)
 
         # Add collateral without generating system coin
-        wrap_modify_cdp_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(30), delta_debt=Wad(0))
-        print(f"After adding collateral:         {geb.cdp_engine.cdp(collateral_type, our_address)}")
-        assert geb.cdp_engine.cdp(collateral_type, our_address).locked_collateral == Wad.from_number(30)
-        assert geb.cdp_engine.cdp(collateral_type, our_address).generated_debt == Wad(0)
-        assert geb.cdp_engine.token_collateral(collateral_type, our_address) == Wad.from_number(90) - geb.cdp_engine.cdp(collateral_type, our_address).locked_collateral
-        assert geb.cdp_engine.coin_balance(our_address) == initial_system_coin
+        wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(30), delta_debt=Wad(0))
+        print(f"After adding collateral:         {geb.safe_engine.safe(collateral_type, our_address)}")
+        assert geb.safe_engine.safe(collateral_type, our_address).locked_collateral == Wad.from_number(30)
+        assert geb.safe_engine.safe(collateral_type, our_address).generated_debt == Wad(0)
+        assert geb.safe_engine.token_collateral(collateral_type, our_address) == Wad.from_number(90) - geb.safe_engine.safe(collateral_type, our_address).locked_collateral
+        assert geb.safe_engine.coin_balance(our_address) == initial_system_coin
 
         # Generate some system coin
-        wrap_modify_cdp_collateralization(geb, collateral, our_address, delta_collateral=Wad(0), delta_debt=Wad.from_number(153))
+        wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=Wad(0), delta_debt=Wad.from_number(153))
         return
-        print(f"After generating system_coin:            {geb.cdp_engine.cdp(collateral_type, our_address)}")
-        assert geb.cdp_engine.cdp(collateral_type, our_address).locked_collateral == Wad.from_number(30)
-        assert geb.cdp_engine.cdp(collateral_type, our_address).generated_debt == Wad.from_number(153)
-        assert geb.cdp_engine.coin_balance(our_address) == initial_system_coin + Rad.from_number(153)
+        print(f"After generating system_coin:            {geb.safe_engine.safe(collateral_type, our_address)}")
+        assert geb.safe_engine.safe(collateral_type, our_address).locked_collateral == Wad.from_number(30)
+        assert geb.safe_engine.safe(collateral_type, our_address).generated_debt == Wad.from_number(153)
+        assert geb.safe_engine.coin_balance(our_address) == initial_system_coin + Rad.from_number(153)
 
         # Add collateral and generate some more system coin
-        wrap_modify_cdp_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(60), delta_debt=Wad.from_number(180))
-        print(f"After adding collateral and system_coin: {geb.cdp_engine.cdp(collateral_type, our_address)}")
-        assert geb.cdp_engine.cdp(collateral_type, our_address).locked_collateral == Wad.from_number(90)
-        assert geb.cdp_engine.token_collateral(collateral_type, our_address) == Wad(0)
-        assert geb.cdp_engine.cdp(collateral_type, our_address).generated_debt == Wad.from_number(333)
-        assert geb.cdp_engine.coin_balance(our_address) == initial_system_coin + Rad.from_number(333)
+        wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(60), delta_debt=Wad.from_number(180))
+        print(f"After adding collateral and system_coin: {geb.safe_engine.safe(collateral_type, our_address)}")
+        assert geb.safe_engine.safe(collateral_type, our_address).locked_collateral == Wad.from_number(90)
+        assert geb.safe_engine.token_collateral(collateral_type, our_address) == Wad(0)
+        assert geb.safe_engine.safe(collateral_type, our_address).generated_debt == Wad.from_number(333)
+        assert geb.safe_engine.coin_balance(our_address) == initial_system_coin + Rad.from_number(333)
 
         # Mint and withdraw our system coin
         system_coin_balance_before = geb.system_coin.balance_of(our_address)
@@ -672,21 +672,21 @@ class TestGeb:
         assert isinstance(geb.system_coin_adapter, CoinJoin)
         assert geb.system_coin_adapter.exit(our_address, Wad.from_number(333)).transact()
         assert geb.system_coin.balance_of(our_address) == system_coin_balance_before + Wad.from_number(333)
-        assert geb.cdp_engine.coin_balance(our_address) == initial_system_coin
-        assert geb.cdp_engine.global_debt() >= initial_system_coin + Rad.from_number(333)
+        assert geb.safe_engine.coin_balance(our_address) == initial_system_coin
+        assert geb.safe_engine.global_debt() >= initial_system_coin + Rad.from_number(333)
 
         # Repay (and burn) our system coin
         assert geb.system_coin_adapter.join(our_address, Wad.from_number(333)).transact()
         assert geb.system_coin.balance_of(our_address) == Wad(0)
-        assert geb.cdp_engine.coin_balance(our_address) == initial_system_coin + Rad.from_number(333)
+        assert geb.safe_engine.coin_balance(our_address) == initial_system_coin + Rad.from_number(333)
 
         # Withdraw our collateral
-        wrap_modify_cdp_collateralization(geb, collateral, our_address, delta_collateral=Wad(0), delta_debt=Wad.from_number(-333))
-        wrap_modify_cdp_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(-90), delta_debt=Wad(0))
-        assert geb.cdp_engine.token_collateral(collateral_type, our_address) == Wad.from_number(90)
+        wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=Wad(0), delta_debt=Wad.from_number(-333))
+        wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(-90), delta_debt=Wad(0))
+        assert geb.safe_engine.token_collateral(collateral_type, our_address) == Wad.from_number(90)
         assert collateral.adapter.exit(our_address, Wad.from_number(90)).transact()
         collateral_balance_after = collateral.collateral.balance_of(our_address)
         assert collateral_balance_before == collateral_balance_after
 
         # Cleanup
-        cleanup_cdp(geb, collateral, our_address)
+        cleanup_safe(geb, collateral, our_address)
