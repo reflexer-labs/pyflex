@@ -30,7 +30,7 @@ from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
 
 from pyflex import Address, Contract, Transact
-from pyflex.approval import directly, approve_cdp_modification_directly
+from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
 from pyflex.auctions import EnglishCollateralAuctionHouse, DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
@@ -48,23 +48,23 @@ class CollateralType:
     """
 
     def __init__(self, name: str, accumulated_rates: Optional[Ray] = None,
-                 cdp_collateral: Optional[Wad] = None,
-                 cdp_debt: Optional[Wad] = None,
+                 safe_collateral: Optional[Wad] = None,
+                 safe_debt: Optional[Wad] = None,
                  safety_price: Optional[Ray] = None,
                  debt_ceiling: Optional[Rad] = None,
                  debt_floor: Optional[Rad] = None):
         assert (isinstance(name, str))
         assert (isinstance(accumulated_rates, Ray) or (accumulated_rates is None))
-        assert (isinstance(cdp_collateral, Wad) or (cdp_collateral is None))
-        assert (isinstance(cdp_debt, Wad) or (cdp_debt is None))
+        assert (isinstance(safe_collateral, Wad) or (safe_collateral is None))
+        assert (isinstance(safe_debt, Wad) or (safe_debt is None))
         assert (isinstance(safety_price, Ray) or (safety_price is None))
         assert (isinstance(debt_ceiling, Rad) or (debt_ceiling is None))
         assert (isinstance(debt_floor, Rad) or (debt_floor is None))
 
         self.name = name
         self.accumulated_rates = accumulated_rates 
-        self.cdp_collateral = cdp_collateral
-        self.cdp_debt = cdp_debt
+        self.safe_collateral = safe_collateral
+        self.safe_debt = safe_debt
         self.safety_price = safety_price
         self.debt_ceiling = debt_ceiling
         self.debt_floor = debt_floor
@@ -84,8 +84,8 @@ class CollateralType:
 
         return (self.name == other.name) \
            and (self.accumulated_rates == other.accumulated_rates) \
-           and (self.cdp_collateral == other.cdp_collateral) \
-           and (self.cdp_debt == other.cdp_debt) \
+           and (self.safe_collateral == other.safe_collateral) \
+           and (self.safe_debt == other.safe_debt) \
            and (self.safety_price == other.safety_price) \
            and (self.debt_ceiling == other.debt_ceiling) \
            and (self.debt_floor == other.debt_floor)
@@ -94,10 +94,10 @@ class CollateralType:
         repr = ''
         if self.accumulated_rates:
             repr += f' accumulated_rates={self.accumulated_rates}'
-        if self.cdp_collateral:
-            repr += f' cdp_collateral={self.cdp_collateral}'
-        if self.cdp_debt:
-            repr += f' cdp_debt={self.cdp_debt}'
+        if self.safe_collateral:
+            repr += f' safe_collateral={self.safe_collateral}'
+        if self.safe_debt:
+            repr += f' safe_debt={self.safe_debt}'
         if self.safety_price:
             repr += f' safety_price={self.safety_price}'
         if self.debt_ceiling:
@@ -110,9 +110,9 @@ class CollateralType:
         return f"CollateralType('{self.name}'){repr}"
 
 
-class CDP:
-    """Models one CDP for a single collateral type and account.
-    Note the "address of the CDP" is merely the address of the CDP holder.
+class SAFE:
+    """Models one SAFE for a single collateral type and account.
+    Note the "address of the SAFE" is merely the address of the SAFE holder.
     """
 
     def __init__(self, address: Address, collateral_type: CollateralType = None,
@@ -132,14 +132,14 @@ class CDP:
         return Web3.toBytes(hexstr='0x' + addr_str[2:].zfill(64))
 
     @staticmethod
-    def fromBytes(cdp: bytes):
-        assert isinstance(cdp, bytes)
+    def fromBytes(safe: bytes):
+        assert isinstance(safe, bytes)
 
-        address = Address(Web3.toHex(cdp[-20:]))
-        return CDP(address)
+        address = Address(Web3.toHex(safe[-20:]))
+        return SAFE(address)
 
     def __eq__(self, other):
-        assert isinstance(other, CDP)
+        assert isinstance(other, SAFE)
 
         return (self.address == other.address) and (self.collateral_type == other.collateral_type)
 
@@ -153,7 +153,7 @@ class CDP:
             repr += f' generated_debt={self.generated_debt}'
         if repr:
             repr = f'[{repr.strip()}]'
-        return f"CDP('{self.address}'){repr}"
+        return f"SAFE('{self.address}'){repr}"
 
 
 class BasicTokenAdapter(Contract):
@@ -191,7 +191,7 @@ class BasicTokenAdapter(Contract):
 
 
 class CoinJoin(BasicTokenAdapter):
-    """A client for the `CoinJoin` contract, which allows the CDP holder to draw Dai from their CDP and repay it.
+    """A client for the `CoinJoin` contract, which allows the SAFE holder to draw Dai from their SAFE and repay it.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/BasicTokenAdapters.sol>
     """
@@ -254,26 +254,26 @@ class Collateral:
 
     def approve(self, usr: Address, **kwargs):
         """
-        Allows the user to move this collateral into and out of their CDP.
+        Allows the user to move this collateral into and out of their SAFE.
 
         Args
             usr: User making transactions with this collateral
         """
         gas_price = kwargs['gas_price'] if 'gas_price' in kwargs else DefaultGasPrice()
-        self.adapter.approve(approve_cdp_modification_directly(from_address=usr, gas_price=gas_price), self.collateral_auction_house.cdp_engine())
+        self.adapter.approve(approve_safe_modification_directly(from_address=usr, gas_price=gas_price), self.collateral_auction_house.safe_engine())
         self.adapter.approve_token(directly(from_address=usr, gas_price=gas_price))
 
-class CDPEngine(Contract):
-    """A client for the `CDPEngine` contract, which manages accounting for all CDPs (CDPs).
+class SAFEEngine(Contract):
+    """A client for the `SAFEEngine` contract, which manages accounting for all SAFEs (SAFEs).
 
-    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/CDPEngine.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/SAFEEngine.sol>
     """
 
-    # This information is read from the `LogModifyCDPCollateralization` event emitted from `CDPEngine.modifyCDPCollateralization`
-    class LogModifyCDPCollateralization:
+    # This information is read from the `LogModifySAFECollateralization` event emitted from `SAFEEngine.modifySAFECollateralization`
+    class LogModifySAFECollateralization:
         def __init__(self, log):
             self.collateral_type = CollateralType.fromBytes(log['args']['collateralType']).name
-            self.cdp = Address(log['args']['cdp'])
+            self.safe = Address(log['args']['safe'])
             self.collateral_source = Address(log['args']['collateralSource'])
             self.debt_destination = Address(log['args']['debtDestination'])
             self.delta_collateral = Wad(log['args']['deltaCollateral'])
@@ -288,21 +288,21 @@ class CDPEngine(Contract):
             assert isinstance(event, dict)
 
             topics = event.get('topics')
-            if topics and topics[0] == HexBytes('0xa14f3fdc5acb5eabb83dd585b63d8a914644435bdc0895c66e3c724dac497b9f'):
-                log_abi = [abi for abi in CDPEngine.abi if abi.get('name') == 'ModifyCDPCollateralization'][0]
+            if topics and topics[0] == HexBytes('0x182725621f9c0d485fb256f86699c82616bd6e4670325087fd08f643cab7d917'):
+                log_abi = [abi for abi in SAFEEngine.abi if abi.get('name') == 'ModifySAFECollateralization'][0]
                 codec = ABICodec(default_registry)
                 event_data = get_event_data(codec, log_abi, event)
-                return CDPEngine.LogModifyCDPCollateralization(event_data)
+                return SAFEEngine.LogModifySAFECollateralization(event_data)
 
         def __eq__(self, other):
-            assert isinstance(other, CDPEngine.LogModifyCDPCollateralization)
+            assert isinstance(other, SAFEEngine.LogModifySAFECollateralization)
             return self.__dict__ == other.__dict__
 
         def __repr__(self):
-            return f"LogModifyCDPCollateralization({pformat(vars(self))})"
+            return f"LogModifySAFECollateralization({pformat(vars(self))})"
 
-    abi = Contract._load_abi(__name__, 'abi/CDPEngine.abi')
-    bin = Contract._load_bin(__name__, 'abi/CDPEngine.bin')
+    abi = Contract._load_abi(__name__, 'abi/SAFEEngine.abi')
+    bin = Contract._load_bin(__name__, 'abi/SAFEEngine.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -325,50 +325,50 @@ class CDPEngine(Contract):
 
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
-    def approve_cdp_modification(self, address: Address):
+    def approve_safe_modification(self, address: Address):
         assert isinstance(address, Address)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'approveCDPModification', [address.address])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'approveSAFEModification', [address.address])
 
-    def cdp_rights(self, sender: Address, usr: Address):
+    def safe_rights(self, sender: Address, usr: Address):
         assert isinstance(sender, Address)
         assert isinstance(usr, Address)
 
-        return bool(self._contract.functions.cdpRights(sender.address, usr.address).call())
+        return bool(self._contract.functions.safeRights(sender.address, usr.address).call())
 
     def collateral_type(self, name: str) -> CollateralType:
         assert isinstance(name, str)
 
         b32_collateral_type = CollateralType(name).toBytes()
-        (cdp_debt, rate, safety_price, d_ceiling, d_floor, liq_price) = self._contract.functions.collateralTypes(b32_collateral_type).call()
+        (safe_debt, rate, safety_price, d_ceiling, d_floor, liq_price) = self._contract.functions.collateralTypes(b32_collateral_type).call()
 
-        # We could get "locked_collateral" from the CDP, but caller must provide an address.
+        # We could get "locked_collateral" from the SAFE, but caller must provide an address.
 
-        return CollateralType(name, accumulated_rates=Ray(rate), cdp_collateral=Wad(0), cdp_debt=Wad(cdp_debt),
+        return CollateralType(name, accumulated_rates=Ray(rate), safe_collateral=Wad(0), safe_debt=Wad(safe_debt),
                 safety_price=Ray(safety_price), debt_ceiling=Rad(d_ceiling), debt_floor=Rad(d_floor))
 
-    def token_collateral(self, collateral_type: CollateralType, cdp: Address) -> Wad:
+    def token_collateral(self, collateral_type: CollateralType, safe: Address) -> Wad:
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(cdp, Address)
+        assert isinstance(safe, Address)
 
-        return Wad(self._contract.functions.tokenCollateral(collateral_type.toBytes(), cdp.address).call())
+        return Wad(self._contract.functions.tokenCollateral(collateral_type.toBytes(), safe.address).call())
 
-    def coin_balance(self, cdp: Address) -> Rad:
-        assert isinstance(cdp, Address)
+    def coin_balance(self, safe: Address) -> Rad:
+        assert isinstance(safe, Address)
 
-        return Rad(self._contract.functions.coinBalance(cdp.address).call())
+        return Rad(self._contract.functions.coinBalance(safe.address).call())
 
-    def debt_balance(self, cdp: Address) -> Rad:
-        assert isinstance(cdp, Address)
+    def debt_balance(self, safe: Address) -> Rad:
+        assert isinstance(safe, Address)
 
-        return Rad(self._contract.functions.debtBalance(cdp.address).call())
+        return Rad(self._contract.functions.debtBalance(safe.address).call())
 
-    def cdp(self, collateral_type: CollateralType, address: Address) -> CDP:
+    def safe(self, collateral_type: CollateralType, address: Address) -> SAFE:
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
 
-        (locked_collateral, generated_debt) = self._contract.functions.cdps(collateral_type.toBytes(), address.address).call()
-        return CDP(address, collateral_type, Wad(locked_collateral), Wad(generated_debt))
+        (locked_collateral, generated_debt) = self._contract.functions.safes(collateral_type.toBytes(), address.address).call()
+        return SAFE(address, collateral_type, Wad(locked_collateral), Wad(generated_debt))
 
     def global_debt(self) -> Rad:
         return Rad(self._contract.functions.globalDebt().call())
@@ -381,7 +381,7 @@ class CDPEngine(Contract):
         return Rad(self._contract.functions.globalDebtCeiling().call())
 
     def transfer_collateral(self, collateral_type: CollateralType, src: Address, dst: Address, wad: Wad) -> Transact:
-        """Move CollateralType balance in CDPEngine from source address to destiny address
+        """Move CollateralType balance in SAFEEngine from source address to destiny address
 
         Args:
             collateral_type: Identifies the type of collateral.
@@ -398,7 +398,7 @@ class CDPEngine(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferCollateral', transfer_args)
 
     def transfer_internal_coins(self, src: Address, dst: Address, rad: Rad) -> Transact:
-        """Move system coin balance in CDPEngine from source address to destiny address
+        """Move system coin balance in SAFEEngine from source address to destiny address
 
         Args:
             src: Source of the system coin (address of the source).
@@ -412,14 +412,14 @@ class CDPEngine(Contract):
         move_args = [src.address, dst.address, rad.value]
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferInternalCoins', move_args)
 
-    def transfer_cdp_collateral_and_debt(self, collateral_type: CollateralType, src: Address,
+    def transfer_safe_collateral_and_debt(self, collateral_type: CollateralType, src: Address,
                                         dst: Address, delta_collateral: Wad, delta_debt: Wad) -> Transact:
         """Split a Vault - binary approval or splitting/merging Vault's
 
         Args:
             collateral_type: Identifies the type of collateral.
-            src: Address of the source CDP.
-            dst: Address of the destiny CDP.
+            src: Address of the source SAFE.
+            dst: Address of the destiny SAFE.
             delta_collateral: Amount of collateral to exchange.
             delta_debt: Amount of stable coin debt to exchange.
         """
@@ -430,48 +430,48 @@ class CDPEngine(Contract):
         assert isinstance(delta_debt, Wad)
 
         transfer_args = [collateral_type.toBytes(), src.address, dst.address, delta_collateral.value, delta_debt.value]
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferCDPCollateralAndDebt', transfer_args)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferSAFECollateralAndDebt', transfer_args)
 
-    def modify_cdp_collateralization(self, collateral_type: CollateralType, cdp_address: Address, delta_collateral: Wad, delta_debt: Wad,
+    def modify_safe_collateralization(self, collateral_type: CollateralType, safe_address: Address, delta_collateral: Wad, delta_debt: Wad,
                                    collateral_owner=None, system_coin_recipient=None):
-        """Adjust amount of collateral and reserved amount of system coin for the CDP
+        """Adjust amount of collateral and reserved amount of system coin for the SAFE
 
         Args:
             collateral_type: Identifies the type of collateral.
-            cdp_address: CDP holder (address of the CDP).
+            safe_address: SAFE holder (address of the SAFE).
             delta_collateral: Amount of collateral to add/remove.
-            delta_debt: Adjust CDP debt (amount of system coin available for borrowing).
-            collateral_owner: Holder of the collateral used to fund the CDP.
+            delta_debt: Adjust SAFE debt (amount of system coin available for borrowing).
+            collateral_owner: Holder of the collateral used to fund the SAFE.
             dai_recipient: Party receiving the system coin 
         """
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(cdp_address, Address)
+        assert isinstance(safe_address, Address)
         assert isinstance(delta_collateral, Wad)
         assert isinstance(delta_debt, Wad)
         assert isinstance(collateral_owner, Address) or (collateral_owner is None)
         assert isinstance(system_coin_recipient, Address) or (system_coin_recipient is None)
 
-        # Usually these addresses are the same as the account holding the cdp
-        v = collateral_owner or cdp_address
-        w = system_coin_recipient or cdp_address
+        # Usually these addresses are the same as the account holding the safe
+        v = collateral_owner or safe_address
+        w = system_coin_recipient or safe_address
         assert isinstance(v, Address)
         assert isinstance(w, Address)
 
-        self.validate_cdp_modification(collateral_type, cdp_address, delta_collateral, delta_debt)
+        self.validate_safe_modification(collateral_type, safe_address, delta_collateral, delta_debt)
 
-        if v == cdp_address and w == cdp_address:
-            logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} with "
+        if v == safe_address and w == safe_address:
+            logger.info(f"modifying {collateral_type.name} safe {safe_address.address} with "
                         f"delta_collateral={delta_collateral}, delta_debt={delta_debt}")
         else:
-            logger.info(f"modifying {collateral_type.name} cdp {cdp_address.address} "
+            logger.info(f"modifying {collateral_type.name} safe {safe_address.address} "
                         f"with delta_collateral={delta_collateral} from {v.address}, "
                         f"delta_debt={delta_debt} for {w.address}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'modifyCDPCollateralization',
-                        [collateral_type.toBytes(), cdp_address.address, v.address, w.address, delta_collateral.value, delta_debt.value])
+                        'modifySAFECollateralization',
+                        [collateral_type.toBytes(), safe_address.address, v.address, w.address, delta_collateral.value, delta_debt.value])
 
-    def validate_cdp_modification(self, collateral_type: CollateralType, address: Address, delta_collateral: Wad, delta_debt: Wad):
+    def validate_safe_modification(self, collateral_type: CollateralType, address: Address, delta_collateral: Wad, delta_debt: Wad):
         """Helps diagnose `frob` transaction failures by asserting on `require` conditions in the contract"""
 
         def r(value, decimals=1):  # rounding function
@@ -487,37 +487,37 @@ class CDPEngine(Contract):
 
         assert self.contract_enabled()  # system is live
 
-        cdp = self.cdp(collateral_type, address)
+        safe = self.safe(collateral_type, address)
         collateral_type = self.collateral_type(collateral_type.name)
         assert collateral_type.accumulated_rates != Ray(0)  # collateral_type has been initialised
 
-        locked_collateral = cdp.locked_collateral + delta_collateral
-        generated_debt = cdp.generated_debt + delta_debt
-        collateral_type_cdp_debt = collateral_type.cdp_debt + delta_debt
+        locked_collateral = safe.locked_collateral + delta_collateral
+        generated_debt = safe.generated_debt + delta_debt
+        collateral_type_safe_debt = collateral_type.safe_debt + delta_debt
 
         logger.debug(f"System     | debt {f(self.global_debt())} | ceiling {f(self.global_debt_ceiling())}")
-        logger.debug(f"Collateral | debt {f(Ray(collateral_type_cdp_debt) * collateral_type.accumulated_rates)} "
+        logger.debug(f"Collateral | debt {f(Ray(collateral_type_safe_debt) * collateral_type.accumulated_rates)} "
                      f"| ceiling {f(collateral_type.debt_ceiling)}")
 
         dtab = Rad(collateral_type.accumulated_rates * Ray(delta_debt))
         tab = collateral_type.accumulated_rates * generated_debt
         debt = self.global_debt() + dtab
-        logger.debug(f"Modifying CDP collateralization debt={r(collateral_type_cdp_debt)}, "
+        logger.debug(f"Modifying SAFE collateralization debt={r(collateral_type_safe_debt)}, "
                      f"locked_collateral={r(locked_collateral)}, delta_collateral={r(delta_collateral)}, "
                      f"delta_debt={r(delta_debt)}, " f"collateral_type.rate={r(collateral_type.accumulated_rates,8)}, "
                      f"rhs={r(Ray(locked_collateral) * collateral_type.safety_price)}, "
                      f"tab={r(tab)}, safety_price={r(collateral_type.safety_price, 4)}, debt={r(debt)}")
 
         # either debt has decreased, or debt ceilings are not exceeded
-        under_collateral_debt_ceiling = Rad(Ray(collateral_type_cdp_debt) * collateral_type.accumulated_rates) <= collateral_type.debt_ceiling
+        under_collateral_debt_ceiling = Rad(Ray(collateral_type_safe_debt) * collateral_type.accumulated_rates) <= collateral_type.debt_ceiling
         under_system_debt_ceiling = debt < self.global_debt_ceiling()
         calm = delta_debt <= Wad(0) or (under_collateral_debt_ceiling and under_system_debt_ceiling)
 
-        # cdp is either less risky than before, or it is safe
+        # safe is either less risky than before, or it is safe
         safe = (delta_debt <= Wad(0) and delta_collateral >= Wad(0)) or \
                 tab <= Ray(locked_collateral) * collateral_type.safety_price
 
-        # cdp has no debt, or a non-dusty amount
+        # safe has no debt, or a non-dusty amount
         neat = generated_debt == Wad(0) or Rad(tab) >= collateral_type.debt_floor
 
         if not under_collateral_debt_ceiling:
@@ -525,22 +525,22 @@ class CDPEngine(Contract):
         if not under_system_debt_ceiling:
             logger.warning("system debt ceiling would be exceeded")
         if not safe:
-            logger.warning("cdp would be unsafe")
+            logger.warning("safe would be unsafe")
         if not neat:
             logger.warning("debt would not exceed debt_floor cutoff")
         assert calm and safe and neat
 
-    def past_cdp_modifications(self, from_block: int, to_block: int = None, collateral_type: CollateralType = None,
-                               chunk_size=20000) -> List[LogModifyCDPCollateralization]:
-        """Synchronously retrieve a list showing which collateral types and cdps have been modified.
+    def past_safe_modifications(self, from_block: int, to_block: int = None, collateral_type: CollateralType = None,
+                               chunk_size=20000) -> List[LogModifySAFECollateralization]:
+        """Synchronously retrieve a list showing which collateral types and safes have been modified.
          Args:
             from_block: Oldest Ethereum block to retrieve the events from.
             to_block: Optional newest Ethereum block to retrieve the events from, defaults to current block
-            collateral_type: Optionally filter cdp modification by collateral_type.name
+            collateral_type: Optionally filter safe modification by collateral_type.name
             chunk_size: Number of blocks to fetch from chain at one time, for performance tuning
          Returns:
-            List of past `LogModifyCDPCollateralization` events represented as 
-            :py:class:`pyflex.gf.CDPEngine.LogModifyCDPCollateralization` class.
+            List of past `LogModifySAFECollateralization` events represented as 
+            :py:class:`pyflex.gf.SAFEEngine.LogModifySAFECollateralization` class.
         """
         current_block = self._contract.web3.eth.blockNumber
         assert isinstance(from_block, int)
@@ -554,7 +554,7 @@ class CDPEngine(Contract):
         assert isinstance(collateral_type, CollateralType) or collateral_type is None
         assert chunk_size > 0
 
-        logger.debug(f"Consumer requested cdp modification data from block {from_block} to {to_block}")
+        logger.debug(f"Consumer requested safe modification data from block {from_block} to {to_block}")
         start = from_block
         end = None
         chunks_queried = 0
@@ -568,18 +568,18 @@ class CDPEngine(Contract):
                 'fromBlock': start,
                 'toBlock': end
             }
-            logger.debug(f"Querying cdp modifications from block {start} to {end} ({end-start} blocks); "
-                         f"accumulated {len(retval)} cdp modification in {chunks_queried-1} requests")
+            logger.debug(f"Querying safe modifications from block {start} to {end} ({end-start} blocks); "
+                         f"accumulated {len(retval)} safe modification in {chunks_queried-1} requests")
 
             logs = self.web3.eth.getLogs(filter_params)
             logger.debug(f"Found {len(logs)} total logs from block {start} to {end}")
             logger.debug(logs)
 
-            log_modifications = list(map(lambda l: CDPEngine.LogModifyCDPCollateralization.from_event(l), logs))
+            log_modifications = list(map(lambda l: SAFEEngine.LogModifySAFECollateralization.from_event(l), logs))
 
             log_modifications = [l for l in log_modifications if l is not None]
 
-            logger.debug(f"Found {len(log_modifications)} total mod cdp logs from block {start} to {end}")
+            logger.debug(f"Found {len(log_modifications)} total mod safe logs from block {start} to {end}")
 
             if collateral_type is not None:
                 log_modifications = list(filter(lambda l: l.collateral_type == collateral_type.name, log_modifications))
@@ -587,7 +587,7 @@ class CDPEngine(Contract):
             retval.extend(log_modifications)
             start += chunk_size
 
-        logger.debug(f"Found {len(retval)} cdp modifications in {chunks_queried} requests")
+        logger.debug(f"Found {len(retval)} safe modifications in {chunks_queried} requests")
         return retval
 
     def settle_debt(self, vice: Rad) -> Transact:
@@ -596,15 +596,15 @@ class CDPEngine(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [vice.value])
 
     def __eq__(self, other):
-        assert isinstance(other, CDPEngine)
+        assert isinstance(other, SAFEEngine)
         return self.address == other.address
 
     def __repr__(self):
-        return f"CDPEngine('{self.address}')"
+        return f"SAFEEngine('{self.address}')"
 
 
 class OracleRelayer(Contract):
-    """A client for the `OracleRelayer` contract, which interacts with CDPEngine for the purpose of managing collateral prices.
+    """A client for the `OracleRelayer` contract, which interacts with SAFEEngine for the purpose of managing collateral prices.
     Users generally have no need to interact with this contract; it is included for unit testing purposes.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/OracleRelayer.sol>
@@ -642,8 +642,8 @@ class OracleRelayer(Contract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateCollateralPrice', [collateral_type.toBytes()])
 
-    def cdp_engine(self) -> Address:
-        return Address(self._contract.functions.cdpEngine().call())
+    def safe_engine(self) -> Address:
+        return Address(self._contract.functions.safeEngine().call())
 
     def redemption_price(self) -> Ray:
         return Ray(self._contract.functions.redemptionPrice().call())
@@ -686,7 +686,7 @@ class AccountingEngine(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
+        self.safe_engine = SAFEEngine(web3, Address(self._contract.functions.safeEngine().call()))
 
     def add_authorization(self, guy: Address) -> Transact:
         assert isinstance(guy, Address)
@@ -728,7 +728,7 @@ class AccountingEngine(Contract):
         return Rad(self._contract.functions.totalOnAuctionDebt().call())
 
     def unqueued_unauctioned_debt(self) -> Rad:
-        return (self.cdp_engine.debt_balance(self.address) - self.debt_queue()) - self.total_on_auction_debt()
+        return (self.safe_engine.debt_balance(self.address) - self.debt_queue()) - self.total_on_auction_debt()
 
     def pop_debt_delay(self) -> int:
         return int(self._contract.functions.popDebtDelay().call())
@@ -758,7 +758,7 @@ class AccountingEngine(Contract):
 
     def settle_debt(self, rad: Rad) -> Transact:
         assert isinstance(rad, Rad)
-        logger.info(f"Settling debt joy={self.cdp_engine.coin_balance(self.address)} unqueued_enauctioned_debt={self.unqueued_unauctioned_debt()}")
+        logger.info(f"Settling debt joy={self.safe_engine.coin_balance(self.address)} unqueued_enauctioned_debt={self.unqueued_unauctioned_debt()}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [rad.value])
 
@@ -775,7 +775,7 @@ class AccountingEngine(Contract):
 
     def auction_surplus(self) -> Transact:
         """Initiate a surplus auction"""
-        logger.info(f"Initiating a surplus auction with joy={self.cdp_engine.coin_balance(self.address)}")
+        logger.info(f"Initiating a surplus auction with joy={self.safe_engine.coin_balance(self.address)}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionSurplus', [])
 
@@ -799,7 +799,7 @@ class TaxCollector(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
+        self.safe_engine = SAFEEngine(web3, Address(self._contract.functions.safeEngine().call()))
         self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.primaryTaxReceiver().call()))
 
     def initialize_collateral_type(self, collateral_type: CollateralType) -> Transact:
@@ -834,17 +834,17 @@ class TaxCollector(Contract):
         return f"TaxCollector('{self.address}')"
 
 class LiquidationEngine(Contract):
-    """A client for the `LiquidationEngine` contract, used to liquidate unsafe CDPs (CDPs).
+    """A client for the `LiquidationEngine` contract, used to liquidate unsafe SAFEs (SAFEs).
     Specifically, this contract is useful for EnglishCollateralAuctionHouse auctions.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/LiquidationEngine.sol>
     """
 
-    # This information is read from the `Liquidate` event emitted from `LiquidationEngine.liquidateCDP`
+    # This information is read from the `Liquidate` event emitted from `LiquidationEngine.liquidateSAFE`
     class LogLiquidate:
         def __init__(self, log):
             self.collateral_type = CollateralType.fromBytes(log['args']['collateralType'])
-            self.cdp = CDP(Address(log['args']['cdp']))
+            self.safe = SAFE(Address(log['args']['safe']))
             self.collateral_amount = Wad(log['args']['collateralAmount'])
             self.debt_amount = Wad(log['args']['debtAmount'])
             self.amount_to_raise = Rad(log['args']['amountToRaise'])
@@ -882,7 +882,7 @@ class LiquidationEngine(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.cdp_engine = CDPEngine(web3, Address(self._contract.functions.cdpEngine().call()))
+        self.safe_engine = SAFEEngine(web3, Address(self._contract.functions.safeEngine().call()))
         self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.accountingEngine().call()))
 
     def contract_enabled(self) -> bool:
@@ -893,24 +893,25 @@ class LiquidationEngine(Contract):
 
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
-    def liquidate_cdp(self, collateral_type: CollateralType, cdp: CDP) -> Transact:
-        """ Initiate liquidation of a CDP, kicking off a collateral auction
+    def liquidate_safe(self, collateral_type: CollateralType, safe: SAFE) -> Transact:
+        """ Initiate liquidation of a SAFE, kicking off a collateral auction
 
         Args:
             collateral_type: Identifies the type of collateral.
-            cdp: CDP
+            safe: SAFE
         """
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(cdp, CDP)
+        assert isinstance(safe, SAFE)
 
-        collateral_type = self.cdp_engine.collateral_type(collateral_type.name)
-        cdp = self.cdp_engine.cdp(collateral_type, cdp.address)
-        rate = self.cdp_engine.collateral_type(collateral_type.name).accumulated_rates
-        logger.info(f'Liquidating {collateral_type.name} CDP {cdp.address.address} with locked_collateral={cdp.locked_collateral} safety_price={collateral_type.safety_price} '
-                    f'generated_debt={cdp.generated_debt} accumulatedRates={rate}')
+        collateral_type = self.safe_engine.collateral_type(collateral_type.name)
+        safe = self.safe_engine.safe(collateral_type, safe.address)
+        rate = self.safe_engine.collateral_type(collateral_type.name).accumulated_rates
+        logger.info(f'Liquidating {collateral_type.name} SAFE {safe.address.address} with '
+                    f'locked_collateral={safe.locked_collateral} safety_price={collateral_type.safety_price} '
+                    f'generated_debt={safe.generated_debt} accumulatedRates={rate}')
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'liquidateCDP', [collateral_type.toBytes(), cdp.address.address])
+                        'liquidateSAFE', [collateral_type.toBytes(), safe.address.address])
 
     def collateral_auction_house(self, collateral_type: CollateralType) -> Address:
         assert isinstance(collateral_type, CollateralType)
@@ -925,11 +926,21 @@ class LiquidationEngine(Contract):
         (_, liquidation_penalty, _) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
         return Ray(liquidation_penalty)
 
-    def collateral_to_sell(self, collateral_type: CollateralType) -> Wad:
+    def liquidation_quantity(self, collateral_type: CollateralType) -> Rad:
         assert isinstance(collateral_type, CollateralType)
 
-        (_, _, collateral_to_sell) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
-        return Wad(collateral_to_sell)
+        (_, _, liquidation_quantity) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
+        return Rad(liquidation_quantity)
+
+    def on_auction_system_coin_limit(self) -> Rad:
+        assert isinstance(collateral_type, CollateralType)
+
+        return Rad(self._contract.functions.onAuctionSystemCoinLimit().call())
+
+    def current_on_auction_system_coins(self) -> Rad:
+        assert isinstance(collateral_type, CollateralType)
+
+        return Rad(self._contract.functions.currentOnAuctionSystemCoins().call())
 
     def modify_parameters_accountingEngine(self, acctEngine: AccountingEngine) -> Transact:
         assert isinstance(acctEngine, AccountingEngine)
@@ -941,7 +952,7 @@ class LiquidationEngine(Contract):
     def past_liquidations(self, number_of_past_blocks: int, event_filter: dict = None) -> List[LogLiquidate]:
         """Synchronously retrieve past LogLiquidate events.
 
-        `LogLiquidate` events are emitted every time someone liquidates a CDP.
+        `LogLiquidate` events are emitted every time someone liquidates a SAFE.
 
         Args:
             number_of_past_blocks: Number of past Ethereum blocks to retrieve the events from.
@@ -977,7 +988,7 @@ class CoinSavingsAccount(Contract):
         self._contract = self._get_contract(web3, self.abi, address)
 
     def approve(self, source: Address, approval_function, **kwargs):
-        """Approve the CoinSavingsAccount to access systemCoin from our CDPs"""
+        """Approve the CoinSavingsAccount to access systemCoin from our SAFEs"""
         assert isinstance(source, Address)
         assert(callable(approval_function))
 

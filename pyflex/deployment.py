@@ -27,10 +27,10 @@ from pyflex.auctions import SettlementSurplusAuctioneer
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
-from pyflex.approval import directly, approve_cdp_modification_directly
+from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auth import DSGuard
 from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, BasicCollateralJoin, CollateralType
-from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, CDPEngine, AccountingEngine
+from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, SAFEEngine, AccountingEngine
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
@@ -39,7 +39,7 @@ from pyflex.numeric import Wad, Ray
 from pyflex.oracles import OSM
 from pyflex.shutdown import ESM, GlobalSettlement
 from pyflex.token import DSToken, DSEthToken
-from pyflex.cdpmanager import CdpManager
+from pyflex.safemanager import SafeManager
 
 def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None) -> Address:
     """Deploys a new contract.
@@ -78,16 +78,16 @@ class GfDeployment:
     }
 
     class Config:
-        def __init__(self, pause: DSPause, cdp_engine: CDPEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
+        def __init__(self, pause: DSPause, safe_engine: SAFEEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
                      liquidation_engine: LiquidationEngine, surplus_auction_house: PreSettlementSurplusAuctionHouse,
                      post_surplus_auction_house: PostSettlementSurplusAuctionHouse,
                      surplus_auctioneer: SettlementSurplusAuctioneer, debt_auction_house: DebtAuctionHouse,
                      coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
                      prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
-                     proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, cdp_manager: CdpManager,
+                     proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
                      collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
-            self.cdp_engine = cdp_engine
+            self.safe_engine = safe_engine
             self.accounting_engine = accounting_engine
             self.tax_collector = tax_collector
             self.liquidation_engine = liquidation_engine
@@ -105,14 +105,14 @@ class GfDeployment:
             self.global_settlement = global_settlement
             self.proxy_registry = proxy_registry
             self.proxy_actions = proxy_actions
-            self.cdp_manager = cdp_manager
+            self.safe_manager = safe_manager
             self.collaterals = collaterals or {}
 
         @staticmethod
         def from_json(web3: Web3, conf: str):
             conf = json.loads(conf)
             pause = DSPause(web3, Address(conf['GEB_PAUSE']))
-            cdp_engine = CDPEngine(web3, Address(conf['GEB_CDP_ENGINE']))
+            safe_engine = SAFEEngine(web3, Address(conf['GEB_SAFE_ENGINE']))
             accounting_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
             tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
@@ -130,7 +130,7 @@ class GfDeployment:
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
-            cdp_manager = CdpManager(web3, Address(conf['CDP_MANAGER']))
+            safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
             #dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
 
             collaterals = {}
@@ -159,11 +159,11 @@ class GfDeployment:
                                         pip=pip)
                 collaterals[collateral_type.name] = collateral
 
-            return GfDeployment.Config(pause, cdp_engine, accounting_engine, tax_collector, liquidation_engine,
+            return GfDeployment.Config(pause, safe_engine, accounting_engine, tax_collector, liquidation_engine,
                                         surplus_auction_house, post_surplus_auction_house, surplus_auctioneer,
                                         debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
                                         prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
-                                        cdp_manager, collaterals)
+                                        safe_manager, collaterals)
 
         @staticmethod
         def _infer_collaterals_from_addresses(keys: []) -> List:
@@ -182,7 +182,7 @@ class GfDeployment:
         def to_dict(self) -> dict:
             conf_dict = {
                 'GEB_PAUSE': self.pause.address.address,
-                'GEB_CDP_ENGINE': self.cdp_engine.address.address,
+                'GEB_SAFE_ENGINE': self.safe_engine.address.address,
                 'GEB_ACCOUNTING_ENGINE': self.accounting_engine.address.address,
                 'GEB_TAX_COLLECTOR': self.tax_collector.address.address,
                 'GEB_LIQUIDATION_ENGINE': self.liquidation_engine.address.address,
@@ -200,7 +200,7 @@ class GfDeployment:
                 'GEB_GLOBAL_SETTLEMENT': self.global_settlement.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
                 'PROXY_ACTIONS': self.proxy_actions.address.address,
-                'CDP_MANAGER': self.cdp_manager.address.address
+                'SAFE_MANAGER': self.safe_manager.address.address
                  #'DSR_MANAGER': self.dsr_manager.address.address
             }
 
@@ -225,7 +225,7 @@ class GfDeployment:
         self.web3 = web3
         self.config = config
         self.pause = config.pause
-        self.cdp_engine = config.cdp_engine
+        self.safe_engine = config.safe_engine
         self.accounting_engine = config.accounting_engine
         self.tax_collector = config.tax_collector
         self.liquidation_engine = config.liquidation_engine
@@ -244,7 +244,7 @@ class GfDeployment:
         self.global_settlement = config.global_settlement
         self.proxy_registry = config.proxy_registry
         self.proxy_actions = config.proxy_actions
-        self.cdp_manager = config.cdp_manager
+        self.safe_manager = config.safe_manager
         #self.dsr_manager = config.dsr_manager
 
     @staticmethod
@@ -274,16 +274,16 @@ class GfDeployment:
 
     def approve_system_coin(self, usr: Address, **kwargs):
         """
-        Allows the user to draw system coin from and repay system coin to their CDPs.
+        Allows the user to draw system coin from and repay system coin to their SAFEs.
 
         Args
-            usr: Recipient of system coin from one or more CDPs
+            usr: Recipient of system coin from one or more SAFEs
         """
         assert isinstance(usr, Address)
 
         gas_price = kwargs['gas_price'] if 'gas_price' in kwargs else DefaultGasPrice()
-        self.system_coin_adapter.approve(approval_function=approve_cdp_modification_directly(from_address=usr, gas_price=gas_price),
-                                 source=self.cdp_engine.address)
+        self.system_coin_adapter.approve(approval_function=approve_safe_modification_directly(from_address=usr, gas_price=gas_price),
+                                 source=self.safe_engine.address)
         self.system_coin.approve(self.system_coin_adapter.address).transact(from_address=usr, gas_price=gas_price)
 
     def active_auctions(self) -> dict:

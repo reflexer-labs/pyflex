@@ -17,32 +17,32 @@
 
 from pyflex import Address
 from pyflex.deployment import GfDeployment
-from pyflex.cdpmanager import CDP
+from pyflex.safemanager import SAFE
 
 
-class TestCdpManager:
+class TestSafeManager:
 
     def test_existing(self, geb: GfDeployment):
-        # 3 cdps are opened on deployment
-        assert isinstance(geb.cdp_manager.cdp(1), CDP)
-        assert isinstance(geb.cdp_manager.cdp(2), CDP)
-        assert isinstance(geb.cdp_manager.cdp(3), CDP)
+        # 3 safes are opened on deployment
+        assert isinstance(geb.safe_manager.safe(1), SAFE)
+        assert isinstance(geb.safe_manager.safe(2), SAFE)
+        assert isinstance(geb.safe_manager.safe(3), SAFE)
 
     def test_none(self, our_address: Address, geb: GfDeployment):
-        assert geb.cdp_manager.first_cdp_id(our_address) == 0
-        assert geb.cdp_manager.last_cdp_id(our_address) == 0
-        assert geb.cdp_manager.cdp_count(our_address) == 0
+        assert geb.safe_manager.first_safe_id(our_address) == 0
+        assert geb.safe_manager.last_safe_id(our_address) == 0
+        assert geb.safe_manager.safe_count(our_address) == 0
 
     def test_open(self, our_address: Address, geb: GfDeployment):
         collateral_type = geb.collaterals['ETH-A'].collateral_type
-        assert geb.cdp_manager.open_cdp(collateral_type, our_address).transact()
+        assert geb.safe_manager.open_safe(collateral_type, our_address).transact()
 
-        assert geb.cdp_manager.last_cdp_id(our_address) == 1
-        assert geb.cdp_manager.collateral_type(1).name == collateral_type.name
-        assert geb.cdp_manager.owns_cdp(1) == our_address
-        assert isinstance(geb.cdp_manager.cdp(1), CDP)
+        assert geb.safe_manager.last_safe_id(our_address) == 1
+        assert geb.safe_manager.collateral_type(1).name == collateral_type.name
+        assert geb.safe_manager.owns_safe(1) == our_address
+        assert isinstance(geb.safe_manager.safe(1), SAFE)
 
     def test_one(self, our_address: Address, geb: GfDeployment):
-        assert geb.cdp_manager.first_cdp_id(our_address) == 1
-        assert geb.cdp_manager.last_cdp_id(our_address) == 1
-        assert geb.cdp_manager.cdp_count(our_address) == 1
+        assert geb.safe_manager.first_safe_id(our_address) == 1
+        assert geb.safe_manager.last_safe_id(our_address) == 1
+        assert geb.safe_manager.safe_count(our_address) == 1

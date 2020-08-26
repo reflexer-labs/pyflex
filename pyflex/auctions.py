@@ -60,22 +60,22 @@ class AuctionContract(Contract):
             elif not self.settle_auction_abi and member.get('name') == 'SettleAuction':
                 self.settle_auction_abi = member
 
-    def cdp_engine(self) -> Address:
-        """Returns the `cdpEngine` address.
+    def safe_engine(self) -> Address:
+        """Returns the `safeEngine` address.
          Returns:
-            The address of the `cdpEngine` contract.
+            The address of the `safeEngine` contract.
         """
-        return Address(self._contract.functions.cdpEngine().call())
+        return Address(self._contract.functions.safeEngine().call())
 
     def approve(self, source: Address, approval_function):
         """Approve the auction to access our collateral, Dai, or MKR so we can participate in auctions.
 
-        For available approval functions (i.e. approval modes) see `directly` and `approve_cdp_modifications_directly`
+        For available approval functions (i.e. approval modes) see `directly` and `approve_safe_modifications_directly`
         in `pyflex.approval`.
 
         Args:
             source: Address of the contract or token relevant to the auction 
-                    (for EnglishCollateralAuctionHouse and DebtAuctionHouse pass CDPEngine address,
+                    (for EnglishCollateralAuctionHouse and DebtAuctionHouse pass SAFEEngine address,
                     for PreSettlementSurplusAuctionHouse pass FLX token address)
             approval_function: Approval function (i.e. approval mode)
         """
@@ -1185,11 +1185,11 @@ class SettlementSurplusAuctioneer(Contract):
         """
         return Address(self._contract.functions.surplusAuctionHouse().call())
 
-    def cdp_engine(self) -> Address:
+    def safe_engine(self) -> Address:
         """
-        Address of CDPEngine
+        Address of SAFEEngine
 
         Returns:
             Address
         """
-        return Address(self._contract.functions.cdpEngine().call())
+        return Address(self._contract.functions.safeEngine().call())

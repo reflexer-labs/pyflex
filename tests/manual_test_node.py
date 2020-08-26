@@ -64,22 +64,22 @@ class TestApp:
 
     def on_block(self):
         if run_transactions:
-            logging.info(f"Found block {web3.eth.blockNumber}, joining {self.amount} {collateral_type.name}  to our cdp")
+            logging.info(f"Found block {web3.eth.blockNumber}, joining {self.amount} {collateral_type.name}  to our safe")
             collateral.collateral.deposit(self.amount).transact()
             assert collateral.adapter.join(our_address, self.amount).transact()
             self.joined += self.amount
         else:
             logging.info(f"Found block {web3.eth.blockNumber}")
-        logging.info(f"CDP balance is {geb.cdp_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
+        logging.info(f"SAFE balance is {geb.safe_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
         self.request_history()
 
     def request_history(self):
-        logs = geb.cdp_engine.past_cdp_modifications(web3.eth.blockNumber - past_blocks)
-        logging.info(f"Found {len(logs)} cdp modifications in the past {past_blocks} blocks")
+        logs = geb.safe_engine.past_safe_modifications(web3.eth.blockNumber - past_blocks)
+        logging.info(f"Found {len(logs)} safe modifications in the past {past_blocks} blocks")
 
     def on_shutdown(self):
         if run_transactions and self.joined > Wad(0):
-            logging.info(f"Exiting {self.joined} {collateral_type.name} from our cdp")
+            logging.info(f"Exiting {self.joined} {collateral_type.name} from our safe")
             assert collateral.adapter.exit(our_address, self.joined).transact()
             assert collateral.collateral.withdraw(self.joined).transact()
 

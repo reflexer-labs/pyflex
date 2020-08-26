@@ -1,0 +1,1 @@
+[{"inputs":[],"name":"newSAFEEngine","outputs":[{"internalType":"contract SAFEEngine","name":"safeEngine","type":"address"}],"stateMutability":"nonpayable","type":"function"}]

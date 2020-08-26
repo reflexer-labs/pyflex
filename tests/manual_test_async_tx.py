@@ -84,11 +84,11 @@ class TestApp:
         asyncio.sleep(6)
 
     def shutdown(self):
-        logging.info(f"Exiting {collateral_type.name} from our cdp")
-        # balance = geb.cdp_engine.collateral(collateral_type our_address)
+        logging.info(f"Exiting {collateral_type.name} from our safe")
+        # balance = geb.safe_engine.collateral(collateral_type our_address)
         # assert collateral.adapter.exit(our_address, balance).transact()
         assert collateral.adapter.exit(our_address, Wad(6)).transact()
-        logging.info(f"Balance is {geb.cdp_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
+        logging.info(f"Balance is {geb.safe_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
         logging.info(f"Unwrapping {self.wrap_amount} ETH")
         assert collateral.collateral.withdraw(self.wrap_amount).transact()
 
