@@ -32,7 +32,8 @@ from eth_abi.registry import registry as default_registry
 from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
-from pyflex.auctions import EnglishCollateralAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
+from pyflex.auctions import DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
 from pyflex.token import DSToken, ERC20Token
 from pyflex.numeric import Wad, Ray, Rad
@@ -242,7 +243,8 @@ class Collateral:
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, BasicCollateralJoin)
-        assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse)
+        assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse) or \
+               isinstance(collateral_auction_house, FixedDiscountCollateralAuctionHouse)
 
         self.collateral_type = collateral_type
         self.collateral = collateral
