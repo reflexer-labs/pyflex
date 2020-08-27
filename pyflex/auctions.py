@@ -98,14 +98,6 @@ class AuctionContract(Contract):
         return active_auctions
 
 
-    def bid_duration(self) -> int:
-        """Returns the bid lifetime.
-
-        Returns:
-            The bid lifetime (in seconds).
-        """
-        return int(self._contract.functions.bidDuration().call())
-
     def total_auction_length(self) -> int:
         """Returns the total auction length.
 
@@ -257,6 +249,14 @@ class EnglishCollateralAuctionHouse(AuctionContract):
 
         super(EnglishCollateralAuctionHouse, self).__init__(web3, address, EnglishCollateralAuctionHouse.abi, self.bids)
 
+    def bid_duration(self) -> int:
+        """Returns the bid lifetime.
+
+        Returns:
+            The bid lifetime (in seconds).
+        """
+        return int(self._contract.functions.bidDuration().call())
+
     def bid_to_market_price_ratio(self) -> Wad:
         """Returns the minimum bid to market price ratio for new bids.
 
@@ -377,43 +377,30 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
     abi = Contract._load_abi(__name__, 'abi/FixedDiscountCollateralAuctionHouse.abi')
     bin = Contract._load_bin(__name__, 'abi/FixedDiscountCollateralAuctionHouse.bin')
 
-    """ DONT need this in FixedDiscout ? """
     class Bid:
-        def __init__(self, id: int, bid_amount: Rad, amount_to_sell: Wad, high_bidder: Address, bid_expiry: int, auction_deadline: int,
-                     forgone_collateral_receiver: Address, auction_income_recipient: Address, amount_to_raise: Rad):
+        def __init__(self, id: int, raised_amount: Rad, sold_amount: Wad, amount_to_sell: Wad, amount_to_raise: Rad,
+                auction_deadline: int, forgone_collateral_receiver: Address, auction_income_recipient: Address):
             assert(isinstance(id, int))
-            assert(isinstance(bid_amount, Rad))
+            assert(isinstance(raised_amount, Rad))
+            assert(isinstance(sold_amount, Wad))
             assert(isinstance(amount_to_sell, Wad))
-            assert(isinstance(high_bidder, Address))
-            assert(isinstance(bid_expiry, int))
+            assert(isinstance(amount_to_raise, Rad))
             assert(isinstance(auction_deadline, int))
             assert(isinstance(forgone_collateral_receiver, Address))
             assert(isinstance(auction_income_recipient, Address))
-            assert(isinstance(amount_to_raise, Rad))
 
             self.id = id
-            self.bid_amount = bid_amount
+            self.raised_amount = raised_amount
+            self.sold_amount = sold_amount
             self.amount_to_sell = amount_to_sell
-            self.high_bidder = high_bidder
-            self.bid_expiry = bid_expiry
+            self.amount_to_raise = amount_to_raise
             self.auction_deadline = auction_deadline
             self.forgone_collateral_receiver = forgone_collateral_receiver
             self.auction_income_recipient = auction_income_recipient
-            self.amount_to_raise = amount_to_raise
 
+        def __repr__(self):
+            return f"FixedDiscountCollateralAuctionHouse.Bid({pformat(vars(self))})"
 
-    '''
-        event StartAuction(
-        uint256 id,
-        uint256 auctionsStarted,
-        uint256 amountToSell,
-        uint256 initialBid,
-        uint256 amountToRaise,
-        address indexed forgoneCollateralReceiver,
-        address indexed auctionIncomeRecipient,
-        uint256 auctionDeadline
-    );
-    '''
     class StartAuctionLog:
         def __init__(self, log):
             args = log['args']
@@ -455,20 +442,13 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
             return f"FixedDiscountCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
 
     def active_auctions(self) -> list:
-        """ TODO Change this for FixedDiscount """
         active_auctions = []
-        auction_count = self.auctions_started() + 1
-        for index in range(1, auction_count):
+        auction_count = self.auctions_started()
+        for index in range(1, auction_count + 1):
             bid = self._bids(index)
-            if bid.high_bidder != Address("0x0000000000000000000000000000000000000000"):
-                now = datetime.now().timestamp()
-                if (bid.bid_expiry == 0 or now < bid.bid_expiry) and now < bid.auction_deadline:
-                    active_auctions.append(bid)
-            index += 1
+            if bid.amount_to_sell > 0 and bid.amount_to_raise > 0:
+                active_auctions.append(bid)
         return active_auctions
-
-        def __repr__(self):
-            return f"FixedDiscountCollateralAuctionHouse.Bid({pformat(vars(self))})"
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -476,11 +456,17 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
 
         # Set ABIs for event names that are not in AuctionContract
         self.buy_collateral_abi = None
-        for member in FixedCollateralAuctionHouse.abi:
+        for member in FixedDiscountCollateralAuctionHouse.abi:
             if not self.buy_collateral_abi and member.get('name') == 'BuyCollateral':
                 self.buy_collateral_abi = member
 
-        super(FixedCollateralAuctionHouse, self).__init__(web3, address, FixedCollateralAuctionHouse.abi, self.bids)
+        super(FixedDiscountCollateralAuctionHouse, self).__init__(web3, address, FixedDiscountCollateralAuctionHouse.abi, self.bids)
+
+    def collateral_type(self) -> CollateralType:
+        '''Returns CollateralType for this auction'''
+
+        collateral_type = CollateralType.fromBytes(self._contract.functions.collateralType().call())
+        return collateral_type
 
     def bid_to_market_price_ratio(self) -> Wad:
         """Returns the minimum bid to market price ratio for new bids.
@@ -510,16 +496,14 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         assert(isinstance(id, int))
 
         array = self._contract.functions.bids(id).call()
-
-        return EnglishCollateralAuctionHouse.Bid(id=id,
-                           bid_amount=Rad(array[0]),
-                           amount_to_sell=Wad(array[1]),
-                           high_bidder=Address(array[2]),
-                           bid_expiry=int(array[3]),
+        return FixedDiscountCollateralAuctionHouse.Bid(id=id,
+                           raised_amount=Rad(array[0]),
+                           sold_amount=Wad(array[1]),
+                           amount_to_sell=Wad(array[2]),
+                           amount_to_raise=Wad(array[3]),
                            auction_deadline=int(array[4]),
                            forgone_collateral_receiver=Address(array[5]),
-                           auction_income_recipient=Address(array[6]),
-                           amount_to_raise=Rad(array[7]))
+                           auction_income_recipient=Address(array[6]))
 
     def start_auction(self, forgone_collateral_receiver: Address, auction_income_recipient: Address,
                       amount_to_raise: Rad, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
@@ -535,20 +519,17 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
                                                                                           amount_to_sell.value,
                                                                                           bid_amount.value])
 
-    def increase_bid_size(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+    def buy_collateral(self, id: int, wad: Wad) -> Transact:
         assert(isinstance(id, int))
-        assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid_amount, Rad))
+        assert(isinstance(wad, Wad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_sell.value, bid_amount.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'buyCollateral', [id, wad])
 
-    def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+    def get_collateral_bought(self, id: int, wad: Wad) -> Transact:
         assert(isinstance(id, int))
-        assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid_amount, Rad))
+        assert(isinstance(wad, Wad))
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount',
-                        [id, amount_to_sell.value, bid_amount.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'getCollateralBought', [id, wad])
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
@@ -665,6 +646,14 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
                 self.increase_bid_size_abi = member
 
         super(PreSettlementSurplusAuctionHouse, self).__init__(web3, address, PreSettlementSurplusAuctionHouse.abi, self.bids)
+
+    def bid_duration(self) -> int:
+        """Returns the bid lifetime.
+
+        Returns:
+            The bid lifetime (in seconds).
+        """
+        return int(self._contract.functions.bidDuration().call())
 
     def bid_increase(self) -> Wad:
         """Returns the percentage minimum bid increase.
@@ -843,6 +832,14 @@ class DebtAuctionHouse(AuctionContract):
                 self.decrease_sold_amount_abi = member
 
         super(DebtAuctionHouse, self).__init__(web3, address, DebtAuctionHouse.abi, self.bids)
+
+    def bid_duration(self) -> int:
+        """Returns the bid lifetime.
+
+        Returns:
+            The bid lifetime (in seconds).
+        """
+        return int(self._contract.functions.bidDuration().call())
 
     def bid_decrease(self) -> Wad:
         """Returns the percentage minimum bid decrease.
