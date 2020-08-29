@@ -22,7 +22,8 @@ from typing import Dict, List, Optional
 
 import pkg_resources
 from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
-from pyflex.auctions import DebtAuctionHouse, EnglishCollateralAuctionHouse
+from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
+from pyflex.auctions import DebtAuctionHouse
 from pyflex.auctions import SettlementSurplusAuctioneer
 from web3 import Web3, HTTPProvider
 
@@ -155,7 +156,7 @@ class GfDeployment:
                     pip = OSM(web3, pip_address)
 
                 collateral = Collateral(collateral_type=collateral_type, collateral=collateral, adapter=adapter,
-                                        collateral_auction_house=EnglishCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'])),
+                                        collateral_auction_house=FixedDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'])),
                                         pip=pip)
                 collaterals[collateral_type.name] = collateral
 

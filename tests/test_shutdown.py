@@ -167,10 +167,10 @@ class TestGlobalSettlement:
 
     def test_terminate_auction_prematurely(self, geb):
         last_surplus_auction = geb.surplus_auction_house.bids(geb.surplus_auction_house.auctions_started())
-        last_collateral_auction = geb.debt_auction_house.bids(geb.debt_auction_house.auctions_started())
+        last_debt_auction = geb.debt_auction_house.bids(geb.debt_auction_house.auctions_started())
         if last_surplus_auction.auction_deadline > 0 and last_surplus_auction.high_bidder is not nobody:
             auction = geb.surplus_auction_house
-        elif last_collateral_auction.auction_deadline > 0 and last_collatera_auction.high_bidder is not nobody:
+        elif last_debt_auction.auction_deadline > 0 and last_debt_auction.high_bidder is not nobody:
             auction = geb.debt_auction_house
         else:
             auction = None

@@ -32,7 +32,8 @@ from eth_abi.registry import registry as default_registry
 from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
-from pyflex.auctions import EnglishCollateralAuctionHouse, DebtAuctionHouse
+from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
+from pyflex.auctions import DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
 from pyflex.token import DSToken, ERC20Token
 from pyflex.numeric import Wad, Ray, Rad
@@ -242,7 +243,8 @@ class Collateral:
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, BasicCollateralJoin)
-        assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse)
+        assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse) or \
+               isinstance(collateral_auction_house, FixedDiscountCollateralAuctionHouse)
 
         self.collateral_type = collateral_type
         self.collateral = collateral
@@ -892,6 +894,20 @@ class LiquidationEngine(Contract):
         assert isinstance(address, Address)
 
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
+
+    def collateral_type(self, name: str) -> CollateralType:
+        assert isinstance(name, str)
+
+        b32_collateral_type = CollateralType(name).toBytes()
+        (collateral_auction_house, liquidation_penalty, liquidation_quantity) = self._contract.functions.collateralTypes(b32_collateral_type).call()
+
+        return Address(collateral_auction_house), Wad(liquidation_penalty), Rad(liquidation_quantity)
+
+    def safe_saviours(self, collateral_type: CollateralType, safe: Address):
+
+        b32_collateral_type = collateral_type.toBytes()
+        return Address(self._contract.functions.chosenSAFESaviour(b32_collateral_type,safe.address).call())
+
 
     def liquidate_safe(self, collateral_type: CollateralType, safe: SAFE) -> Transact:
         """ Initiate liquidation of a SAFE, kicking off a collateral auction
