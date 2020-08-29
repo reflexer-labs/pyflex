@@ -829,6 +829,14 @@ class PostSettlementSurplusAuctionHouse(AuctionContract):
         """
         return Wad(self._contract.functions.bidIncrease().call())
 
+    def bid_duration(self) -> int:
+        """Returns the bid lifetime.
+
+        Returns:
+            The bid lifetime (in seconds).
+        """
+        return int(self._contract.functions.bidDuration().call())
+
     def bids(self, id: int) -> Bid:
         """Returns the auction details.
 

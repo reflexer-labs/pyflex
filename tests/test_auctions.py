@@ -379,6 +379,7 @@ class TestEnglishCollateralAuctionHouse:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_safe(geb, collateral, other_address)
 
+@pytest.mark.skip(reason="tmp")
 class TestFixedDiscountCollateralAuctionHouse:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
@@ -537,7 +538,6 @@ class TestFixedDiscountCollateralAuctionHouse:
         safe = geb.safe_engine.safe(collateral.collateral_type, other_address)
         assert Rad(safe.generated_debt) >= current_bid.amount_to_raise
 
-
         # First bid 
         first_bid_amount = Wad(current_bid.amount_to_raise) / Wad.from_number(2)
 
@@ -561,35 +561,23 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert after_first_bid.raised_amount == Rad(first_bid_amount)
         assert after_first_bid.sold_amount == log.bought_collateral
 
-        print("bid after_first_bid")
-        print(after_first_bid)
-
         # Second bid to buy the remaining collateral
         second_bid_amount = Wad(after_first_bid.amount_to_raise) - first_bid_amount
-        print("second bid amount")
-        print(second_bid_amount)
-        #assert second_bid_amount > fixed_collateral_auction_house.minimum_bid()
+        assert second_bid_amount > fixed_collateral_auction_house.minimum_bid()
         assert geb.safe_engine.coin_balance(other_address) > Rad(second_bid_amount)
         TestFixedDiscountCollateralAuctionHouse.buy_collateral(fixed_collateral_auction_house, auction_id,
                                                                other_address, second_bid_amount)
-        return
 
         # Ensure auction has ended
         assert len(fixed_collateral_auction_house.active_auctions()) == 0
 
-        """
         # Check results of second bid
         after_second_bid = fixed_collateral_auction_house.bids(auction_id)
         assert isinstance(after_second_bid, FixedDiscountCollateralAuctionHouse.Bid)
-        #assert after_second_bid.amount_to_sell > Wad(0) # Still more to sell
-        #assert after_second_bid.amount_to_raise > Rad(0) # Still more to raise
-        assert after_second_bid.amount_to_sell == Wad(0) # Still more to sell
-        assert after_second_bid.amount_to_raise == Rad(0) # Still more to raise
-        assert after_second_bid.raised_amount == after_second_bid.amount_to_raise
-        assert after_second_bid.sold_amount == after_second_bid.amount_to_sell
-        assert after_second_bid.raised_amount == Rad(first_bid_amount + second_bid_amount)
-        assert after_second_bid.sold_amount == after_first_bid.sold_amount + log.bought_collateral
-        """
+        assert after_second_bid.amount_to_sell == Wad(0)
+        assert after_second_bid.amount_to_raise == Rad(0)
+        assert after_second_bid.raised_amount == Rad(0)
+        assert after_second_bid.sold_amount == Wad(0)
 
         log = fixed_collateral_auction_house.past_logs(1)[1]
         assert isinstance(log, FixedDiscountCollateralAuctionHouse.BuyCollateralLog)
@@ -602,60 +590,10 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert log.id == auction_id
         assert log.leftover_collateral == Wad(0)
 
-
-
-
-
-        return
-
-
-        # Bid the amount_to_raise to instantly transition to decreaseSoldAmount stage
-        #TestEnglishCollateralAuctionHouse.increase_bid_size(fixed_collateral_auction_house, geb.oracle_relayer, collateral, start_auction, other_address, current_bid.amount_to_sell, current_bid.amount_to_raise)
-        current_bid = fixed_collateral_auction_house.bids(start_auction)
-        assert current_bid.high_bidder == other_address
-        assert current_bid.bid_amount == current_bid.amount_to_raise
-        assert len(fixed_collateral_auction_house.active_auctions()) == 1
-        check_active_auctions(fixed_collateral_auction_house)
-        log = fixed_collateral_auction_house.past_logs(1)[0]
-        assert isinstance(log, EnglishCollateralAuctionHouse.IncreaseBidSizeLog)
-        assert log.high_bidder == current_bid.high_bidder
-        assert log.id == current_bid.id
-        assert log.amount_to_buy == current_bid.amount_to_sell
-        assert log.rad == current_bid.bid_amount
-
-        # Test the _decreaseSoldAmount_ phase of the auction
-        fixed_collateral_auction_house.approve(geb.safe_engine.address, approval_function=approve_safe_modification_directly(from_address=our_address))
-        wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=eth_required,
-                                          delta_debt=Wad(current_bid.amount_to_raise) + Wad(1))
-        amount_to_sell = current_bid.amount_to_sell - Wad.from_number(0.2)
-        assert fixed_collateral_auction_house.bid_increase() * amount_to_sell <= current_bid.amount_to_sell
-        assert geb.safe_engine.safe_rights(our_address, fixed_collateral_auction_house.address)
-        TestEnglishCollateralAuctionHouse.decrease_sold_amount(fixed_collateral_auction_house, start_auction, our_address,
-                                                        amount_to_sell, current_bid.amount_to_raise)
-        current_bid = fixed_collateral_auction_house.bids(start_auction)
-        assert current_bid.high_bidder == our_address
-        assert current_bid.bid_amount == current_bid.amount_to_raise
-        assert current_bid.amount_to_sell == amount_to_sell
-        log = fixed_collateral_auction_house.past_logs(1)[0]
-        assert isinstance(log, EnglishCollateralAuctionHouse.DecreaseSoldAmountLog)
-        assert log.high_bidder == current_bid.high_bidder
-        assert log.id == current_bid.id
-        assert log.amount_to_buy == current_bid.amount_to_sell
-        assert log.rad == current_bid.bid_amount
-
-        # Exercise _settleAuction_ after bid has expired
-        wait(geb, our_address, fixed_collateral_auction_house.bid_duration()+1)
-        now = datetime.now().timestamp()
-        assert 0 < current_bid.bid_expiry < now or current_bid.auction_deadline < now
-        assert fixed_collateral_auction_house.settle_auction(start_auction).transact(from_address=our_address)
-        assert len(fixed_collateral_auction_house.active_auctions()) == 0
-        log = fixed_collateral_auction_house.past_logs(1)[0]
-        assert isinstance(log, EnglishCollateralAuctionHouse.SettleAuctionLog)
-
         # Grab our collateral
-        collateral_before = collateral.collateral.balance_of(our_address)
-        assert collateral.adapter.exit(our_address, current_bid.amount_to_sell).transact(from_address=our_address)
-        collateral_after = collateral.collateral.balance_of(our_address)
+        collateral_before = collateral.collateral.balance_of(other_address)
+        assert collateral.adapter.exit(other_address, current_bid.amount_to_sell).transact(from_address=other_address)
+        collateral_after = collateral.collateral.balance_of(other_address)
         assert collateral_before < collateral_after
 
         # Cleanup
@@ -849,7 +787,7 @@ class TestDebtAuctionHouse:
         cleanup_safe(geb, geb.collaterals['ETH-A'], our_address)
         cleanup_safe(geb, geb.collaterals['ETH-A'], deployment_address)
 
-@pytest.mark.skip(reason="tmp")
+#@pytest.mark.skip(reason="tmp")
 class TestPostSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def post_surplus_auction_house(self, geb: GfDeployment) -> PostSettlementSurplusAuctionHouse:
@@ -887,6 +825,7 @@ class TestPostSettlementSurplusAuctionHouse:
         assert post_surplus_auction_house.total_auction_length() > post_surplus_auction_house.bid_duration()
         assert post_surplus_auction_house.auctions_started() >= 0
 
+    #@pytest.mark.skip(reason="tmp")
     def test_scenario(self, web3, geb, post_surplus_auction_house, our_address, other_address, deployment_address):
         # Generate some system coin with deployment_addresses so we can start an auction
         collateral = geb.collaterals['ETH-A']
@@ -929,7 +868,8 @@ class TestPostSettlementSurplusAuctionHouse:
         assert log.initial_bid == current_bid.bid_amount
 
         # Allow the auction to expire
-        wait(geb, our_address, post_surplus_auction_house.total_auction_length()+1)
+        print("Waiting %d seconds for auction to expire" % post_surplus_auction_house.total_auction_length())
+        wait(geb, our_address, post_surplus_auction_house.total_auction_length() + 1)
 
         # Can't settle with no other bids
         assert geb.post_surplus_auction_house.settle_auction(1).transact() == None
@@ -961,6 +901,7 @@ class TestPostSettlementSurplusAuctionHouse:
         assert current_bid.high_bidder == our_address
 
         # Exercise _settleAuction_ after bid has expired
+        print("Waiting %d seconds for bid to expire" % post_surplus_auction_house.bid_duration())
         wait(geb, our_address, post_surplus_auction_house.bid_duration() + 1)
         now = datetime.now().timestamp()
 
