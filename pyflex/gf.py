@@ -895,6 +895,21 @@ class LiquidationEngine(Contract):
 
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
+    def collateral_type(self, name: str) -> CollateralType:
+        """ TODO delete? just added for debugging """
+        assert isinstance(name, str)
+
+        b32_collateral_type = CollateralType(name).toBytes()
+        (collateral_auction_house, liquidation_penalty, liquidation_quantity) = self._contract.functions.collateralTypes(b32_collateral_type).call()
+
+        return Address(collateral_auction_house), Wad(liquidation_penalty), Rad(liquidation_quantity)
+
+    def safe_saviours(self, collateral_type: CollateralType, safe: Address):
+
+        b32_collateral_type = collateral_type.toBytes()
+        return Address(self._contract.functions.chosenSAFESaviour(b32_collateral_type,safe.address).call())
+
+
     def liquidate_safe(self, collateral_type: CollateralType, safe: SAFE) -> Transact:
         """ Initiate liquidation of a SAFE, kicking off a collateral auction
 

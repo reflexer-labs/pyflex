@@ -50,20 +50,6 @@ class TestDSValue:
         assert self.dsvalue.has_value() is True
         assert self.dsvalue.read() == 500
 
-    """
-    def test_update_result_with_int(self):
-        # when
-        self.dsvalue.update_result_with_int(500).transact()
-
-        # then
-        assert self.dsvalue.has_value() is True
-        assert self.dsvalue.read_as_int() == 500
-        assert self.dsvalue.read() == bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4])
-    """
-
     def test_restart_value(self):
         # given
         self.dsvalue.update_result(250).transact()

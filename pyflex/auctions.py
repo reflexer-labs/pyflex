@@ -117,9 +117,10 @@ class AuctionContract(Contract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
 
-    def get_past_logs(self, number_of_past_blocks: int, abi: list) -> List:
+    #def get_past_logs(self, number_of_past_blocks: int, abi: list) -> List:
+    def get_past_logs(self, number_of_past_blocks: int) -> List:
         assert isinstance(number_of_past_blocks, int)
-        assert isinstance(abi, list)
+        #assert isinstance(abi, list)
 
         block_number = self._contract.web3.eth.blockNumber
         filter_params = {
@@ -324,7 +325,8 @@ class EnglishCollateralAuctionHouse(AuctionContract):
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
 
-        logs = super().get_past_logs(number_of_past_blocks, EnglishCollateralAuctionHouse.abi)
+        #logs = super().get_past_logs(number_of_past_blocks, EnglishCollateralAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks)
 
         history = []
         for log in logs:
@@ -510,7 +512,8 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_logs(number_of_past_blocks, PreSettlementSurplusAuctionHouse.abi)
+        #logs = super().get_past_logs(number_of_past_blocks, PreSettlementSurplusAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks)
 
         history = []
         for log in logs:
@@ -702,7 +705,8 @@ class DebtAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_logs(number_of_past_blocks, DebtAuctionHouse.abi)
+        #logs = super().get_past_logs(number_of_past_blocks, DebtAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks)
 
         history = []
         for log in logs:
@@ -868,7 +872,8 @@ class PostSettlementSurplusAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_logs(number_of_past_blocks, PostSettlementSurplusAuctionHouse.abi)
+        #logs = super().get_past_logs(number_of_past_blocks, PostSettlementSurplusAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks)
 
         history = []
         for log in logs:
@@ -1051,9 +1056,10 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
             self.bought_collateral = Wad(args['boughtCollateral'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
+            self.raw = log
 
         def __repr__(self):
-            return f"FixedDiscountCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+            return f"FixedDiscountCollateralAuctionHouse.BuyCollateralLog({pformat(vars(self))})"
 
     class SettleAuctionLog:
         def __init__(self, log):
@@ -1062,9 +1068,10 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
             self.leftover_collateral = Wad(args['leftoverCollateral'])
             self.block = log['blockNumber']
             self.tx_hash = log['transactionHash'].hex()
+            self.raw = log
 
         def __repr__(self):
-            return f"FixedDiscountCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+            return f"FixedDiscountCollateralAuctionHouse.SettleAuctionLog({pformat(vars(self))})"
 
     def active_auctions(self) -> list:
         active_auctions = []
@@ -1073,6 +1080,7 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
             bid = self._bids(index)
             if bid.amount_to_sell > Wad(0) and bid.amount_to_raise > Rad(0):
                 active_auctions.append(bid)
+
         return active_auctions
 
     def __init__(self, web3: Web3, address: Address):
@@ -1123,6 +1131,7 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         assert(isinstance(id, int))
 
         array = self._contract.functions.bids(id).call()
+
         return FixedDiscountCollateralAuctionHouse.Bid(id=id,
                            raised_amount=Rad(array[0]),
                            sold_amount=Wad(array[1]),
@@ -1160,7 +1169,8 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
 
     def past_logs(self, number_of_past_blocks: int):
         assert isinstance(number_of_past_blocks, int)
-        logs = super().get_past_logs(number_of_past_blocks, FixedDiscountCollateralAuctionHouse.abi)
+        #logs = super().get_past_logs(number_of_past_blocks, FixedDiscountCollateralAuctionHouse.abi)
+        logs = super().get_past_logs(number_of_past_blocks)
 
         history = []
         for log in logs:

@@ -401,8 +401,9 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert (isinstance(address, Address))
         assert (isinstance(wad, Wad))
 
+        assert wad >= fixed_collateral_auction_house.minimum_bid()
+
         current_bid = fixed_collateral_auction_house.bids(id)
-        #require(both(bids[id].amountToSell > 0, bids[id].amountToRaise > 0),
         assert current_bid.amount_to_sell > Wad(0)
         assert current_bid.amount_to_raise > Rad(0)
         assert current_bid.auction_deadline > datetime.now().timestamp()
@@ -417,25 +418,18 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert fixed_collateral_auction_house.auctions_started() >= 0
 
     def test_scenario(self, web3, geb, collateral, fixed_collateral_auction_house, our_address, other_address, deployment_address):
-        '''
-        start_auction()
-        get_collateral_bought()
-        buy_collateral()
-        settle_auction()
-        '''
-        # Create a SAFE
         collateral = geb.collaterals['ETH-A']
         auctions_started_before = fixed_collateral_auction_house.auctions_started()
         collateral_type = collateral.collateral_type
 
         # Generate eth and join
-        wrap_eth(geb, deployment_address, Wad.from_number(1))
+        wrap_eth(geb, deployment_address, Wad.from_number(100))
         collateral.approve(deployment_address)
-        assert collateral.adapter.join(deployment_address, Wad.from_number(1)).transact(
+        assert collateral.adapter.join(deployment_address, Wad.from_number(100)).transact(
             from_address=deployment_address)
  
         # generate the maximum debt possible
-        wrap_modify_safe_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(1), delta_debt=Wad(0))
+        wrap_modify_safe_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(100), delta_debt=Wad(0))
         delta_debt = max_delta_debt(geb, collateral, deployment_address) - Wad(1)
         debt_before = geb.safe_engine.safe(collateral_type, deployment_address).generated_debt
         wrap_modify_safe_collateralization(geb, collateral, deployment_address, delta_collateral=Wad(0), delta_debt=delta_debt)
@@ -452,27 +446,37 @@ class TestFixedDiscountCollateralAuctionHouse:
         set_collateral_price(geb, collateral, to_price)
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
         collateral_type = geb.safe_engine.collateral_type(collateral_type.name)
+
+        # Make sure the SAFE is not safe
         assert collateral_type.accumulated_rates is not None
         assert collateral_type.safety_price is not None
         safe = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rates <= \
                Ray(safe.locked_collateral) * collateral_type.safety_price
+
         assert not safe
 
         assert len(fixed_collateral_auction_house.active_auctions()) == 0
 
-        # Liquidate the SAFE, which moves debt to the accounting engine and auctions_started the fixed_collateral_auction_house
+        saviour = geb.liquidation_engine.safe_saviours(collateral.collateral_type, deployment_address)
+        # Ensure there is no saviour
+        assert saviour == Address('0x0000000000000000000000000000000000000000')
+
+        # Liquidate the SAFE, which moves debt to the accounting engine and starts auction in the fixed_collateral_auction_house
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
         assert safe.locked_collateral > Wad(0)
         amount_to_sell = min(safe.locked_collateral, Wad(geb.liquidation_engine.liquidation_quantity(collateral_type)))  # Wad
         generated_debt = min(safe.generated_debt, (amount_to_sell * safe.generated_debt) / safe.locked_collateral)  # Wad
         amount_to_raise = generated_debt * collateral_type.accumulated_rates  # Wad
         assert amount_to_raise == delta_debt
+
         simulate_liquidate_safe(geb, collateral, deployment_address)
         assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, SAFE(deployment_address)).transact()
+
         # Ensure auction has been started
+        assert fixed_collateral_auction_house.auctions_started() == auctions_started_before + 1
         assert len(fixed_collateral_auction_house.active_auctions()) == 1
-        start_auction = fixed_collateral_auction_house.auctions_started()
-        assert start_auction == auctions_started_before + 1
+        auction_id = fixed_collateral_auction_house.auctions_started()
+        assert auction_id == auctions_started_before + 1
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
 
         # Check safe_engine, accounting_engine, and liquidation_engine
@@ -486,7 +490,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert last_liquidation.amount_to_raise > Rad(0)
 
         # Check the fixed_collateral_auction_house
-        current_bid = fixed_collateral_auction_house.bids(start_auction)
+        current_bid = fixed_collateral_auction_house.bids(auction_id)
         assert isinstance(current_bid, FixedDiscountCollateralAuctionHouse.Bid)
         assert current_bid.amount_to_sell > Wad(0)
         assert current_bid.amount_to_raise > Rad(0)
@@ -498,7 +502,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         #assert last_liquidation.amount_to_raise == current_bid.amount_to_raise
         log = fixed_collateral_auction_house.past_logs(1)[0]
         assert isinstance(log, FixedDiscountCollateralAuctionHouse.StartAuctionLog)
-        assert log.id == start_auction
+        assert log.id == auction_id
         assert log.initial_bid == Rad(0)
         assert log.amount_to_sell == current_bid.amount_to_sell
         assert log.amount_to_raise == current_bid.amount_to_raise
@@ -507,7 +511,8 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert log.auction_income_recipient == geb.accounting_engine.address
 
         # Wrap some eth and handle approvals before bidding
-        eth_required = Wad(current_bid.amount_to_raise / Rad(collateral_type.safety_price)) * Wad.from_number(1.1)
+        #eth_required = Wad(current_bid.amount_to_raise / Rad(collateral_type.safety_price)) * Wad.from_number(1.1)
+        eth_required = Wad(current_bid.amount_to_raise / Rad(collateral_type.safety_price)) * Wad.from_number(2)
 
         wrap_eth(geb, other_address, eth_required)
         collateral.approve(other_address)
@@ -532,29 +537,73 @@ class TestFixedDiscountCollateralAuctionHouse:
         safe = geb.safe_engine.safe(collateral.collateral_type, other_address)
         assert Rad(safe.generated_debt) >= current_bid.amount_to_raise
 
-        # First bid 
-        first_bid = Wad(current_bid.amount_to_raise) - Wad(100)
-        TestFixedDiscountCollateralAuctionHouse.buy_collateral(fixed_collateral_auction_house, start_auction,
-                                                               other_address, first_bid)
 
-        log = fixed_collateral_auction_house.past_logs(1)[1]
+        # First bid 
+        first_bid_amount = Wad(current_bid.amount_to_raise) / Wad.from_number(2)
+
+        TestFixedDiscountCollateralAuctionHouse.buy_collateral(fixed_collateral_auction_house, auction_id,
+                                                               other_address, first_bid_amount)
+
+        log = fixed_collateral_auction_house.past_logs(1)[0]
         assert isinstance(log, FixedDiscountCollateralAuctionHouse.BuyCollateralLog)
-        assert log.id == start_auction
-        assert log.wad == first_bid
+        assert log.id == auction_id
+        assert log.wad == first_bid_amount
         assert log.bought_collateral > Wad(0)
 
         # Ensure it's still running
         assert len(fixed_collateral_auction_house.active_auctions()) == 1
 
-        # Second bid 
-        second_bid = Wad(100)
-        TestFixedDiscountCollateralAuctionHouse.buy_collateral(fixed_collateral_auction_house, start_auction,
-                                                               other_address, second_bid)
+        # Check results of first bid
+        after_first_bid = fixed_collateral_auction_house.bids(auction_id)
+        assert isinstance(after_first_bid, FixedDiscountCollateralAuctionHouse.Bid)
+        assert after_first_bid.amount_to_sell > Wad(0)
+        assert after_first_bid.amount_to_raise > Rad(0) 
+        assert after_first_bid.raised_amount == Rad(first_bid_amount)
+        assert after_first_bid.sold_amount == log.bought_collateral
 
-        logs = fixed_collateral_auction_house.past_logs(1)
-        assert isinstance(logs[0], FixedDiscountCollateralAuctionHouse.SettleAuctionLog)
-        assert log.id == start_auction
+        print("bid after_first_bid")
+        print(after_first_bid)
+
+        # Second bid to buy the remaining collateral
+        second_bid_amount = Wad(after_first_bid.amount_to_raise) - first_bid_amount
+        print("second bid amount")
+        print(second_bid_amount)
+        #assert second_bid_amount > fixed_collateral_auction_house.minimum_bid()
+        assert geb.safe_engine.coin_balance(other_address) > Rad(second_bid_amount)
+        TestFixedDiscountCollateralAuctionHouse.buy_collateral(fixed_collateral_auction_house, auction_id,
+                                                               other_address, second_bid_amount)
+        return
+
+        # Ensure auction has ended
+        assert len(fixed_collateral_auction_house.active_auctions()) == 0
+
+        """
+        # Check results of second bid
+        after_second_bid = fixed_collateral_auction_house.bids(auction_id)
+        assert isinstance(after_second_bid, FixedDiscountCollateralAuctionHouse.Bid)
+        #assert after_second_bid.amount_to_sell > Wad(0) # Still more to sell
+        #assert after_second_bid.amount_to_raise > Rad(0) # Still more to raise
+        assert after_second_bid.amount_to_sell == Wad(0) # Still more to sell
+        assert after_second_bid.amount_to_raise == Rad(0) # Still more to raise
+        assert after_second_bid.raised_amount == after_second_bid.amount_to_raise
+        assert after_second_bid.sold_amount == after_second_bid.amount_to_sell
+        assert after_second_bid.raised_amount == Rad(first_bid_amount + second_bid_amount)
+        assert after_second_bid.sold_amount == after_first_bid.sold_amount + log.bought_collateral
+        """
+
+        log = fixed_collateral_auction_house.past_logs(1)[1]
+        assert isinstance(log, FixedDiscountCollateralAuctionHouse.BuyCollateralLog)
+        assert log.id == auction_id
+        assert log.wad == second_bid_amount
+        assert log.bought_collateral > Wad(0)
+
+        log = fixed_collateral_auction_house.past_logs(1)[0]
+        assert isinstance(log, FixedDiscountCollateralAuctionHouse.SettleAuctionLog)
+        assert log.id == auction_id
         assert log.leftover_collateral == Wad(0)
+
+
+
 
 
         return
