@@ -896,7 +896,6 @@ class LiquidationEngine(Contract):
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
     def collateral_type(self, name: str) -> CollateralType:
-        """ TODO delete? just added for debugging """
         assert isinstance(name, str)
 
         b32_collateral_type = CollateralType(name).toBytes()
