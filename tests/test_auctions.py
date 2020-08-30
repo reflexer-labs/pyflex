@@ -110,25 +110,10 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
 
     # Cancel out surplus and debt
     acct_engine_coin_balance = geb.safe_engine.coin_balance(geb.accounting_engine.address)
-    '''
-    print("acct_engine_coin_balance")
-    print(float(acct_engine_coin_balance))
-    print("geb.accounting_engine.unqueued_unauctioned_debt()")
-    print(float(geb.accounting_engine.unqueued_unauctioned_debt()))
-    '''
 
     assert acct_engine_coin_balance <= geb.accounting_engine.unqueued_unauctioned_debt()
     assert geb.accounting_engine.settle_debt(acct_engine_coin_balance).transact()
     assert geb.accounting_engine.unqueued_unauctioned_debt() >= geb.accounting_engine.debt_auction_bid_size()
-
-    '''
-    print("after settle_debt(): geb.accounting_engine.unqueued_unauctioned_debt()")
-    print(float(geb.accounting_engine.unqueued_unauctioned_debt()))
-    print("total queued debt")
-    print(float(geb.accounting_engine.debt_queue()))
-    print("total on auction debt")
-    print(float(geb.accounting_engine.total_on_auction_debt()))
-    '''
 
 def check_active_auctions(auction: AuctionContract):
     for bid in auction.active_auctions():
