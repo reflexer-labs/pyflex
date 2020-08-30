@@ -166,7 +166,7 @@ class TestEnglishCollateralAuctionHouse:
         assert english_collateral_auction_house.increase_bid_size(id, amount_to_sell, bid_amount).transact(from_address=address)
 
     @staticmethod
-    def ecrease_sold_amount(english_collateral_auction_house: EnglishCollateralAuctionHouse, id: int, address: Address, amount_to_sell: Wad, bid: Rad):
+    def decrease_sold_amount(english_collateral_auction_house: EnglishCollateralAuctionHouse, id: int, address: Address, amount_to_sell: Wad, bid: Rad):
         assert (isinstance(english_collateral_auction_house, EnglishCollateralAuctionHouse))
         assert (isinstance(id, int))
         assert (isinstance(amount_to_sell, Wad))
@@ -343,7 +343,6 @@ class TestEnglishCollateralAuctionHouse:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_safe(geb, collateral, other_address)
 
-#@pytest.mark.skip(reason="tmp")
 class TestFixedDiscountCollateralAuctionHouse:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
@@ -564,7 +563,6 @@ class TestFixedDiscountCollateralAuctionHouse:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_safe(geb, collateral, other_address)
 
-#@pytest.mark.skip(reason="tmp")
 class TestPreSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def surplus_auction_house(self, geb: GfDeployment) -> PreSettlementSurplusAuctionHouse:
@@ -662,7 +660,6 @@ class TestPreSettlementSurplusAuctionHouse:
 
         cleanup_safe(geb, geb.collaterals['ETH-A'], deployment_address)
 
-#@pytest.mark.skip(reason="tmp")
 class TestDebtAuctionHouse:
     @pytest.fixture(scope="session")
     def debt_auction_house(self, geb: GfDeployment) -> DebtAuctionHouse:
@@ -762,7 +759,6 @@ class TestDebtAuctionHouse:
         cleanup_safe(geb, collateral, our_address)
         cleanup_safe(geb, collateral, deployment_address)
 
-#@pytest.mark.skip(reason="tmp")
 class TestPostSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def post_surplus_auction_house(self, geb: GfDeployment) -> PostSettlementSurplusAuctionHouse:
@@ -800,7 +796,6 @@ class TestPostSettlementSurplusAuctionHouse:
         assert post_surplus_auction_house.total_auction_length() > post_surplus_auction_house.bid_duration()
         assert post_surplus_auction_house.auctions_started() >= 0
 
-    #@pytest.mark.skip(reason="tmp")
     def test_scenario(self, web3, geb, post_surplus_auction_house, our_address, other_address, deployment_address):
         # Generate some system coin with deployment_addresses so we can start an auction
         collateral = geb.collaterals['ETH-A']
