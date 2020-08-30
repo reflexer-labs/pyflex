@@ -683,7 +683,6 @@ class TestDebtAuctionHouse:
         assert Wad(0) < amount_to_sell < current_bid.amount_to_sell
         assert debt_auction_house.bid_decrease() * amount_to_sell <= current_bid.amount_to_sell
 
-        #assert geb.safe_engine.coin_balance(address) > bid_amount
         assert debt_auction_house.decrease_sold_amount(id, amount_to_sell, bid_amount).transact(from_address=address)
         log = debt_auction_house.past_logs(1)[0]
         assert isinstance(log, DebtAuctionHouse.DecreaseSoldAmountLog)
