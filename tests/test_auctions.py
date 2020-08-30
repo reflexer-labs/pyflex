@@ -96,31 +96,6 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
 
     auction_id = collateral.collateral_auction_house.auctions_started()
 
-    # Generate some system coin, bid on and win the collateral auction without covering all the debt
-    wrap_eth(geb, our_address, Wad.from_number(600))
-    collateral.approve(our_address)
-    assert collateral.adapter.join(our_address, Wad.from_number(600)).transact(from_address=our_address)
-
-    web3.eth.defaultAccount = our_address.address
-    wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(600),
-                                      delta_debt=Wad.from_number(10000))
-
-    collateral.collateral_auction_house.approve(geb.safe_engine.address, approval_function=approve_safe_modification_directly())
-
-    current_bid = collateral.collateral_auction_house.bids(auction_id)
-    safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
-    assert Rad(safe.generated_debt) > current_bid.amount_to_raise
-
-    bid_amount = Rad.from_number(3710)
-    TestEnglishCollateralAuctionHouse.increase_bid_size(collateral.collateral_auction_house, geb.oracle_relayer,
-                                                        collateral, auction_id, our_address,
-                                                        current_bid.amount_to_sell, bid_amount)
-
-    geb.safe_engine.safe_rights(our_address, collateral.collateral_auction_house.address)
-    print("waiting for bid_duration: %d" % collateral.collateral_auction_house.bid_duration())
-    wait(geb, our_address, collateral.collateral_auction_house.bid_duration()+1)
-    assert collateral.collateral_auction_house.settle_auction(auction_id).transact()
-
     # Raise debt from the queue (note that accounting_engine.pop_debt_delay is 0 on our testchain)
     # TODO: Account for existing liquidations on testchain
     liquidations = geb.liquidation_engine.past_liquidations(100)
@@ -135,21 +110,10 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
 
     # Cancel out surplus and debt
     acct_engine_coin_balance = geb.safe_engine.coin_balance(geb.accounting_engine.address)
-    print("acct_engine_coin_balance")
-    print(float(acct_engine_coin_balance))
-    print("geb.accounting_engine.unqueued_unauctioned_debt()")
-    print(float(geb.accounting_engine.unqueued_unauctioned_debt()))
 
     assert acct_engine_coin_balance <= geb.accounting_engine.unqueued_unauctioned_debt()
     assert geb.accounting_engine.settle_debt(acct_engine_coin_balance).transact()
     assert geb.accounting_engine.unqueued_unauctioned_debt() >= geb.accounting_engine.debt_auction_bid_size()
-
-    print("after settle_debt(): geb.accounting_engine.unqueued_unauctioned_debt()")
-    print(float(geb.accounting_engine.unqueued_unauctioned_debt()))
-    print("total queued debt")
-    print(float(geb.accounting_engine.debt_queue()))
-    print("total on auction debt")
-    print(float(geb.accounting_engine.total_on_auction_debt()))
 
 def check_active_auctions(auction: AuctionContract):
     for bid in auction.active_auctions():
@@ -379,7 +343,6 @@ class TestEnglishCollateralAuctionHouse:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_safe(geb, collateral, other_address)
 
-@pytest.mark.skip(reason="tmp")
 class TestFixedDiscountCollateralAuctionHouse:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
@@ -600,7 +563,6 @@ class TestFixedDiscountCollateralAuctionHouse:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_safe(geb, collateral, other_address)
 
-@pytest.mark.skip(reason="tmp")
 class TestPreSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def surplus_auction_house(self, geb: GfDeployment) -> PreSettlementSurplusAuctionHouse:
@@ -698,7 +660,6 @@ class TestPreSettlementSurplusAuctionHouse:
 
         cleanup_safe(geb, geb.collaterals['ETH-A'], deployment_address)
 
-@pytest.mark.skip(reason="tmp")
 class TestDebtAuctionHouse:
     @pytest.fixture(scope="session")
     def debt_auction_house(self, geb: GfDeployment) -> DebtAuctionHouse:
@@ -738,7 +699,8 @@ class TestDebtAuctionHouse:
         assert debt_auction_house.auctions_started() >= 0
 
     def test_scenario(self, web3, geb, debt_auction_house, our_address, other_address, deployment_address):
-        create_debt(web3, geb, our_address, deployment_address, geb.collaterals['ETH-A'])
+        collateral = geb.collaterals['ETH-A']
+        create_debt(web3, geb, our_address, deployment_address, collateral)
 
         # start the debt auction
         assert debt_auction_house.auctions_started() == 0
@@ -762,9 +724,18 @@ class TestDebtAuctionHouse:
         assert debt_auction_house.restart_auction(start_auction).transact()
         assert debt_auction_house.bids(start_auction).amount_to_sell == current_bid.amount_to_sell * debt_auction_house.amount_sold_increase()
 
+        # Generate some system coin
+        wrap_eth(geb, our_address, Wad.from_number(10))
+        collateral.approve(our_address)
+        assert collateral.adapter.join(our_address, Wad.from_number(10)).transact(from_address=our_address)
+
+        web3.eth.defaultAccount = our_address.address
+        wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral=Wad.from_number(10),
+                                      delta_debt=Wad.from_number(50))
+
         # Bid on the resurrected auction
         bid_amount = Wad.from_number(0.000005)
-        debt_auction_house.approve(geb.safe_engine.address, approve_safe_modification_directly())
+        debt_auction_house.approve(geb.safe_engine.address, approve_safe_modification_directly(from_address=our_address))
         assert geb.safe_engine.safe_rights(our_address, debt_auction_house.address)
         TestDebtAuctionHouse.decrease_sold_amount(debt_auction_house, start_auction, our_address, bid_amount, current_bid.bid_amount)
         current_bid = debt_auction_house.bids(start_auction)
@@ -784,10 +755,9 @@ class TestDebtAuctionHouse:
         # Not present in SettleAuctionLog
         #assert log.forgone_collateral_receiver == our_address
         assert log.id == start_auction
-        cleanup_safe(geb, geb.collaterals['ETH-A'], our_address)
-        cleanup_safe(geb, geb.collaterals['ETH-A'], deployment_address)
+        cleanup_safe(geb, collateral, our_address)
+        cleanup_safe(geb, collateral, deployment_address)
 
-#@pytest.mark.skip(reason="tmp")
 class TestPostSettlementSurplusAuctionHouse:
     @pytest.fixture(scope="session")
     def post_surplus_auction_house(self, geb: GfDeployment) -> PostSettlementSurplusAuctionHouse:
@@ -825,7 +795,6 @@ class TestPostSettlementSurplusAuctionHouse:
         assert post_surplus_auction_house.total_auction_length() > post_surplus_auction_house.bid_duration()
         assert post_surplus_auction_house.auctions_started() >= 0
 
-    #@pytest.mark.skip(reason="tmp")
     def test_scenario(self, web3, geb, post_surplus_auction_house, our_address, other_address, deployment_address):
         # Generate some system coin with deployment_addresses so we can start an auction
         collateral = geb.collaterals['ETH-A']
