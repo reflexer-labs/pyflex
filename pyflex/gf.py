@@ -192,7 +192,7 @@ class BasicTokenAdapter(Contract):
 
 
 class CoinJoin(BasicTokenAdapter):
-    """A client for the `CoinJoin` contract, which allows the SAFE holder to draw Dai from their SAFE and repay it.
+    """A client for the `CoinJoin` contract, which allows the SAFE holder to draw system coin from their SAFE and repay it.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/BasicTokenAdapters.sol>
     """
@@ -444,7 +444,7 @@ class SAFEEngine(Contract):
             delta_collateral: Amount of collateral to add/remove.
             delta_debt: Adjust SAFE debt (amount of system coin available for borrowing).
             collateral_owner: Holder of the collateral used to fund the SAFE.
-            dai_recipient: Party receiving the system coin 
+            system_coin_recipient: Party receiving the system coin 
         """
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(safe_address, Address)

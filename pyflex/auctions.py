@@ -67,7 +67,7 @@ class AuctionContract(Contract):
         return Address(self._contract.functions.safeEngine().call())
 
     def approve(self, source: Address, approval_function):
-        """Approve the auction to access our collateral, Dai, or MKR so we can participate in auctions.
+        """Approve the auction to access our collateral, system coin, or protocol token so we can participate in auctions.
 
         For available approval functions (i.e. approval modes) see `directly` and `approve_safe_modifications_directly`
         in `pyflex.approval`.
@@ -75,7 +75,7 @@ class AuctionContract(Contract):
         Args:
             source: Address of the contract or token relevant to the auction 
                     (for EnglishCollateralAuctionHouse, FixedDiscountCollateralAuctionHouse and DebtAuctionHouse pass SAFEEngine address,
-                    for PreSettlementSurplusAuctionHouse pass FLX token address)
+                    for PreSettlementSurplusAuctionHouse pass protocol token address)
             approval_function: Approval function (i.e. approval mode)
         """
         assert isinstance(source, Address)

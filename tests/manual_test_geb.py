@@ -38,7 +38,7 @@ our_address = Address(web3.eth.defaultAccount)
 collateral = geb.collaterals['ETH-A']
 collateral_type = collateral.collateral_type
 
-# Set an amount of collateral to join and an amount of Dai to draw
+# Set an amount of collateral to join and an amount of system coin to draw
 collateral_amount = Wad.from_number(0.2)
 system_coin_amount = Wad.from_number(20.0)
 
@@ -48,7 +48,7 @@ if collateral.collateral.balance_of(our_address) > collateral_amount:
         assert collateral.collateral.deposit(collateral_amount).transact()
 
     if run_transactions:
-        # Add collateral and allocate the desired amount of Dai
+        # Add collateral and allocate the desired amount of system coin
         collateral.approve(our_address)
         assert collateral.adapter.join(our_address, collateral_amount).transact()
         assert geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=collateral_amount,
