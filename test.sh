@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # Pull the docker image
-docker pull reflexer/testchain-pyflex:unit-testing
+docker pull reflexer/testchain-pyflex:unit-testing-testchain-value-fixed-discount-governance-median-multisig
+#docker pull reflexer/testchain-pyflex:unit-testing-testchain-value-english-governance-median-vote-quorum
+#docker pull reflexer/testchain-pyflex:unit-testing-testchain-value-english-governance-median-multisig#
+#docker pull reflexer/testchain-pyflex:unit-testing-testchain-value-fixed-discount-uniswap-vote-quorum
+#docker pull reflexer/testchain-pyflex:unit-testing-testchain-value-fixed-discount-uniswap-multisig
 
 # Remove existing container if tests not gracefully stopped
 docker-compose down

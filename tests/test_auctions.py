@@ -83,7 +83,7 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
                                       delta_debt=delta_debt)
 
     # Undercollateralize and liquidation the SAFE
-    to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
+    to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
     set_collateral_price(geb, collateral, to_price)
     safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
     collateral_type = geb.safe_engine.collateral_type(collateral_type.name)
@@ -97,7 +97,6 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     auction_id = collateral.collateral_auction_house.auctions_started()
 
     # Raise debt from the queue (note that accounting_engine.pop_debt_delay is 0 on our testchain)
-    # TODO: Account for existing liquidations on testchain
     liquidations = geb.liquidation_engine.past_liquidations(100)
     for liquidation in liquidations:
         era_liquidation = liquidation.era(web3)
@@ -154,7 +153,7 @@ class TestEnglishCollateralAuctionHouse:
         assert bid_amount > current_bid.bid_amount
         assert (bid_amount >= Rad(english_collateral_auction_house.bid_increase()) * current_bid.bid_amount) or (bid_amount == current_bid.amount_to_raise)
 
-        price_feed = Wad(Web3.toInt(collateral.pip.read()))
+        price_feed = Wad(Web3.toInt(collateral.osm.read()))
         redemption_price = Wad(Ray(oracle_relayer.redemption_price()))
         bid_to_market_price_ratio = english_collateral_auction_house.bid_to_market_price_ratio()
 
@@ -219,7 +218,7 @@ class TestEnglishCollateralAuctionHouse:
         assert geb.safe_engine.coin_balance(deployment_address) == Rad(0)
 
         # Undercollateralize the SAFE
-        to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
+        to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
         set_collateral_price(geb, collateral, to_price)
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
         collateral_type = geb.safe_engine.collateral_type(collateral_type.name)
@@ -406,7 +405,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert geb.safe_engine.coin_balance(deployment_address) == Rad(0)
 
         # Undercollateralize the SAFE
-        to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
+        to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
         set_collateral_price(geb, collateral, to_price)
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
         collateral_type = geb.safe_engine.collateral_type(collateral_type.name)
@@ -421,8 +420,8 @@ class TestFixedDiscountCollateralAuctionHouse:
 
         assert len(fixed_collateral_auction_house.active_auctions()) == 0
 
-        saviour = geb.liquidation_engine.safe_saviours(collateral.collateral_type, deployment_address)
         # Ensure there is no saviour
+        saviour = geb.liquidation_engine.safe_saviours(collateral.collateral_type, deployment_address)
         assert saviour == Address('0x0000000000000000000000000000000000000000')
 
         # Liquidate the SAFE, which moves debt to the accounting engine and starts auction in the fixed_collateral_auction_house
@@ -461,9 +460,6 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert current_bid.raised_amount == Rad(0)
         assert current_bid.sold_amount == Wad(0)
 
-        # Cat doesn't incorporate the liquidation penalty (chop), but the start_auctioner includes it.
-        # Awaiting word from @dc why this is so.
-        #assert last_liquidation.amount_to_raise == current_bid.amount_to_raise
         log = fixed_collateral_auction_house.past_logs(1)[0]
         assert isinstance(log, FixedDiscountCollateralAuctionHouse.StartAuctionLog)
         assert log.id == auction_id
@@ -475,7 +471,6 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert log.auction_income_recipient == geb.accounting_engine.address
 
         # Wrap some eth and handle approvals before bidding
-        #eth_required = Wad(current_bid.amount_to_raise / Rad(collateral_type.safety_price)) * Wad.from_number(1.1)
         eth_required = Wad(current_bid.amount_to_raise / Rad(collateral_type.safety_price)) * Wad.from_number(2)
 
         wrap_eth(geb, other_address, eth_required)
@@ -525,6 +520,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert after_first_bid.sold_amount == log.bought_collateral
 
         # Second bid to buy the remaining collateral
+        # TODO Check rounding if bid > remainingToRaise) 
         second_bid_amount = Wad(after_first_bid.amount_to_raise) - first_bid_amount
         assert second_bid_amount > fixed_collateral_auction_house.minimum_bid()
         assert geb.safe_engine.coin_balance(other_address) > Rad(second_bid_amount)

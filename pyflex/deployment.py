@@ -147,17 +147,17 @@ class GfDeployment:
                 else:
                     adapter = BasicCollateralJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
 
-                # PIP contract may be a DSValue, OSM, or bogus address.
-                pip_address = Address(conf[f'ORACLE_SECURITY_MODULE_{name[1]}'])
+                # osm_address contract may be a DSValue, OSM, or bogus address.
+                osm_address = Address(conf[f'ORACLE_SECURITY_MODULE_{name[1]}'])
                 network = GfDeployment.NETWORKS.get(web3.net.version, "testnet")
                 if network == "testnet":
-                    pip = DSValue(web3, pip_address)
+                    osm = DSValue(web3, osm_address)
                 else:
-                    pip = OSM(web3, pip_address)
+                    osm = OSM(web3, osm_address)
 
                 collateral = Collateral(collateral_type=collateral_type, collateral=collateral, adapter=adapter,
                                         collateral_auction_house=FixedDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'])),
-                                        pip=pip)
+                                        osm=osm)
                 collaterals[collateral_type.name] = collateral
 
             return GfDeployment.Config(pause, safe_engine, accounting_engine, tax_collector, liquidation_engine,
@@ -202,15 +202,14 @@ class GfDeployment:
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
                 'PROXY_ACTIONS': self.proxy_actions.address.address,
                 'SAFE_MANAGER': self.safe_manager.address.address
-                 #'DSR_MANAGER': self.dsr_manager.address.address
             }
 
             for collateral in self.collaterals.values():
                 match = re.search(r'(\w+)(?:-\w+)?', collateral.collateral_type.name)
                 name = (collateral.collateral_type.name.replace('-', '_'), match.group(1))
                 conf_dict[name[1]] = collateral.collateral.address.address
-                if collateral.pip:
-                    conf_dict[f'PIP_{name[1]}'] = collateral.pip.address.address
+                if collateral.osm:
+                    conf_dict[f'OSM_{name[1]}'] = collateral.osm.address.address
                 conf_dict[f'GEB_JOIN_{name[0]}'] = collateral.adapter.address.address
                 conf_dict[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'] = collateral.collateral_auction_house.address.address
 
