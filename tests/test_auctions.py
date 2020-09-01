@@ -529,7 +529,6 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert after_first_bid.sold_amount == log.bought_collateral
 
         # Second bid to buy the remaining collateral
-        # TODO Check rounding if bid > remainingToRaise) 
         second_bid_amount = Wad(after_first_bid.amount_to_raise) - first_bid_amount
         assert second_bid_amount > fixed_collateral_auction_house.minimum_bid()
         assert geb.safe_engine.coin_balance(other_address) > Rad(second_bid_amount)
