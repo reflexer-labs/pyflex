@@ -142,22 +142,26 @@ class GfDeployment:
                 else:
                     collateral = DSToken(web3, Address(conf[name[1]]))
 
-                if name[1] in ['USDC', 'WBTC', 'TUSD']:
-                    adapter = BasicCollateralJoin5(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
-                else:
-                    adapter = BasicCollateralJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
-
                 # osm_address contract may be a DSValue, OSM, or bogus address.
                 osm_address = Address(conf[f'ORACLE_SECURITY_MODULE_{name[1]}'])
                 network = GfDeployment.NETWORKS.get(web3.net.version, "testnet")
-                if network == "testnet":
-                    osm = DSValue(web3, osm_address)
-                else:
-                    osm = OSM(web3, osm_address)
+
+                osm = DSValue(web3, osm_address) if network == "testnet" else OSM(web3, osm_address)
+
+                adapter = BasicCollateralJoin(web3, Address(conf[f'GEB_JOIN_{name[0]}']))
+
+                # Detect which auction house is used
+                try:
+                    coll_auction_house = FixedDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))
+                except:
+                    try:
+                        coll_auction_house = EnglishCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))
+                    except:
+                        raise ValueError(f"Unknown auction house: GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}")
 
                 collateral = Collateral(collateral_type=collateral_type, collateral=collateral, adapter=adapter,
-                                        collateral_auction_house=FixedDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}'])),
-                                        osm=osm)
+                                        collateral_auction_house=coll_auction_house, osm=osm)
+
                 collaterals[collateral_type.name] = collateral
 
             return GfDeployment.Config(pause, safe_engine, accounting_engine, tax_collector, liquidation_engine,

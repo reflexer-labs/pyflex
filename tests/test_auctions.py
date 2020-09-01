@@ -121,7 +121,6 @@ def check_active_auctions(auction: AuctionContract):
         assert isinstance(bid.high_bidder, Address)
         assert bid.high_bidder != Address("0x0000000000000000000000000000000000000000")
 
-@pytest.mark.skip(reason="tmp")
 class TestEnglishCollateralAuctionHouse:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
@@ -184,6 +183,9 @@ class TestEnglishCollateralAuctionHouse:
         assert english_collateral_auction_house.decrease_sold_amount(id, amount_to_sell, bid).transact(from_address=address)
 
     def test_getters(self, geb, english_collateral_auction_house):
+        if not isinstance(english_collateral_auction_house, EnglishCollateralAuctionHouse):
+            return
+
         assert english_collateral_auction_house.safe_engine() == geb.safe_engine.address
         assert english_collateral_auction_house.bid_increase() > Wad.from_number(1)
         assert english_collateral_auction_house.bid_duration() > 0
@@ -191,6 +193,8 @@ class TestEnglishCollateralAuctionHouse:
         assert english_collateral_auction_house.auctions_started() >= 0
 
     def test_scenario(self, web3, geb, collateral, english_collateral_auction_house, our_address, other_address, deployment_address):
+        if not isinstance(english_collateral_auction_house, EnglishCollateralAuctionHouse):
+            return
         prev_balance = geb.system_coin.balance_of(deployment_address)
         prev_coin_balance = geb.safe_engine.coin_balance(deployment_address)
         # Create a SAFE
@@ -376,11 +380,16 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert fixed_collateral_auction_house.buy_collateral(id, wad).transact(from_address=address)
 
     def test_getters(self, geb, fixed_collateral_auction_house):
+        if not isinstance(fixed_collateral_auction_house, FixedDiscountCollateralAuctionHouse):
+            return
         assert fixed_collateral_auction_house.safe_engine() == geb.safe_engine.address
         assert fixed_collateral_auction_house.total_auction_length() > 0
         assert fixed_collateral_auction_house.auctions_started() >= 0
 
     def test_scenario(self, web3, geb, collateral, fixed_collateral_auction_house, our_address, other_address, deployment_address):
+        if not isinstance(fixed_collateral_auction_house, FixedDiscountCollateralAuctionHouse):
+            return
+
         collateral = geb.collaterals['ETH-A']
         auctions_started_before = fixed_collateral_auction_house.auctions_started()
         collateral_type = collateral.collateral_type
