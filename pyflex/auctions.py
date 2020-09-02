@@ -40,6 +40,7 @@ class AuctionContract(Contract):
         if self.__class__ == AuctionContract:
             raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, FixedDiscountAuctionHouse, \
                                  PreSettlementSurplusAuctionHouse, or DebtAuctionHouse')
+
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
         assert isinstance(abi, list)
@@ -51,12 +52,10 @@ class AuctionContract(Contract):
         self._bids = bids
 
         # Set ABIs for event names that are present in all auctions 
-        self.start_auction_abi = None
-        self.settle_auction_abi = None
         for member in abi:
-            if not self.start_auction_abi and member.get('name') == 'StartAuction':
+            if member.get('name') == 'StartAuction':
                 self.start_auction_abi = member
-            elif not self.settle_auction_abi and member.get('name') == 'SettleAuction':
+            elif member.get('name') == 'SettleAuction':
                 self.settle_auction_abi = member
 
     def safe_engine(self) -> Address:
@@ -117,10 +116,8 @@ class AuctionContract(Contract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [id])
 
-    #def get_past_logs(self, number_of_past_blocks: int, abi: list) -> List:
-    def get_past_logs(self, number_of_past_blocks: int) -> List:
+    def past_logs(self, number_of_past_blocks: int) -> List:
         assert isinstance(number_of_past_blocks, int)
-        #assert isinstance(abi, list)
 
         block_number = self._contract.web3.eth.blockNumber
         filter_params = {
@@ -131,6 +128,7 @@ class AuctionContract(Contract):
 
         logs = self.web3.eth.getLogs(filter_params)
         events = list(map(lambda l: self.parse_event(l), logs))
+
         return list(filter(lambda l: l is not None, events))
 
     def parse_event(self, event):
@@ -324,24 +322,6 @@ class EnglishCollateralAuctionHouse(AuctionContract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount',
                         [id, amount_to_sell.value, bid_amount.value])
 
-    def past_logs(self, number_of_past_blocks: int):
-        assert isinstance(number_of_past_blocks, int)
-
-        #logs = super().get_past_logs(number_of_past_blocks, EnglishCollateralAuctionHouse.abi)
-        logs = super().get_past_logs(number_of_past_blocks)
-
-        history = []
-        for log in logs:
-            if log is None:
-                continue
-            if isinstance(log, EnglishCollateralAuctionHouse.StartAuctionLog) or \
-               isinstance(log, EnglishCollateralAuctionHouse.IncreaseBidSizeLog) or \
-               isinstance(log, EnglishCollateralAuctionHouse.DecreaseSoldAmountLog) or \
-               isinstance(log, EnglishCollateralAuctionHouse.SettleAuctionLog):
-               history.append(log)
-
-        return history
-
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
@@ -511,23 +491,6 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
         assert (isinstance(id, int))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'terminateAuctionPrematurely', [id])
-
-    def past_logs(self, number_of_past_blocks: int):
-        assert isinstance(number_of_past_blocks, int)
-        #logs = super().get_past_logs(number_of_past_blocks, PreSettlementSurplusAuctionHouse.abi)
-        logs = super().get_past_logs(number_of_past_blocks)
-
-        history = []
-        for log in logs:
-            if log is None:
-                continue
-
-            if isinstance(log, PreSettlementSurplusAuctionHouse.StartAuctionLog) or \
-               isinstance(log, PreSettlementSurplusAuctionHouse.IncreaseBidSizeLog) or \
-               isinstance(log, PreSettlementSurplusAuctionHouse.SettleAuctionLog):
-                history.append(log)
-
-        return history
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
@@ -705,22 +668,6 @@ class DebtAuctionHouse(AuctionContract):
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'terminateAuctionPrematurely', [id])
 
-    def past_logs(self, number_of_past_blocks: int):
-        assert isinstance(number_of_past_blocks, int)
-        #logs = super().get_past_logs(number_of_past_blocks, DebtAuctionHouse.abi)
-        logs = super().get_past_logs(number_of_past_blocks)
-
-        history = []
-        for log in logs:
-            if log is None:
-                continue
-            if isinstance(log, DebtAuctionHouse.StartAuctionLog) or \
-               isinstance(log, DebtAuctionHouse.DecreaseSoldAmountLog) or \
-               isinstance(log, DebtAuctionHouse.SettleAuctionLog):
-                history.append(log)
-
-        return history
-
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)
@@ -879,23 +826,6 @@ class PostSettlementSurplusAuctionHouse(AuctionContract):
         assert (isinstance(id, int))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
-
-    def past_logs(self, number_of_past_blocks: int):
-        assert isinstance(number_of_past_blocks, int)
-        #logs = super().get_past_logs(number_of_past_blocks, PostSettlementSurplusAuctionHouse.abi)
-        logs = super().get_past_logs(number_of_past_blocks)
-
-        history = []
-        for log in logs:
-            if log is None:
-                continue
-
-            if isinstance(log, PostSettlementSurplusAuctionHouse.StartAuctionLog) or \
-               isinstance(log, PostSettlementSurplusAuctionHouse.IncreaseBidSizeLog) or \
-               isinstance(log, PostSettlementSurplusAuctionHouse.SettleAuctionLog):
-                history.append(log)
-
-        return history
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
@@ -1178,22 +1108,6 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         assert(isinstance(wad, Wad))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'getCollateralBought', [id, wad.value])
-
-    def past_logs(self, number_of_past_blocks: int):
-        assert isinstance(number_of_past_blocks, int)
-        #logs = super().get_past_logs(number_of_past_blocks, FixedDiscountCollateralAuctionHouse.abi)
-        logs = super().get_past_logs(number_of_past_blocks)
-
-        history = []
-        for log in logs:
-            if log is None:
-                continue
-            if isinstance(log, FixedDiscountCollateralAuctionHouse.StartAuctionLog) or \
-               isinstance(log, FixedDiscountCollateralAuctionHouse.BuyCollateralLog) or \
-               isinstance(log, FixedDiscountCollateralAuctionHouse.SettleAuctionLog):
-               history.append(log)
-
-        return history
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
