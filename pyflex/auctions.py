@@ -247,6 +247,8 @@ class EnglishCollateralAuctionHouse(AuctionContract):
 
         super(EnglishCollateralAuctionHouse, self).__init__(web3, address, EnglishCollateralAuctionHouse.abi, self.bids)
 
+        assert self._contract.functions.AUCTION_TYPE().call() == toBytes('ENGLISH')
+
     def bid_duration(self) -> int:
         """Returns the bid lifetime.
 
@@ -1102,6 +1104,8 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
                 self.buy_collateral_abi = member
 
         super(FixedDiscountCollateralAuctionHouse, self).__init__(web3, address, FixedDiscountCollateralAuctionHouse.abi, self.bids)
+
+        assert self._contract.functions.AUCTION_TYPE().call() == toBytes('FIXED_DISCOUNT')
 
     def minimum_bid(self) -> Wad:
         """Returns the minimum bid.

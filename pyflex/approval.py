@@ -68,7 +68,8 @@ def approve_safe_modification_directly(**kwargs):
     """Approval function: Approves the caller to access tokens directly.
 
     This function is meant to be passed as a parameter to the `approve(...)` method
-    of `CollateralAuctionHouse` and `PreSettlementSurplusAuctionHouse` and possibly others in the future.
+    of `EnglishCollateralAuctionHouse`, `FixedDiscountCollateralAuctionHouse` and `PreSettlementSurplusAuctionHouse`
+    and possibly others in the future.
     """
 
     move_abi = [{'constant': False, 'inputs': [{'name': 'account', 'type': 'address'}], 'name': 'approveSAFEModification', 'outputs': [],

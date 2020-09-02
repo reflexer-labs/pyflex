@@ -62,7 +62,7 @@ def mint_prot(prot: DSToken, recipient_address: Address, amount: Wad):
 
 def get_collateral_price(collateral: Collateral):
     assert isinstance(collateral, Collateral)
-    return Wad(Web3.toInt(collateral.pip.read()))
+    return Wad(Web3.toInt(collateral.osm.read()))
 
 
 def set_collateral_price(geb: GfDeployment, collateral: Collateral, price: Wad):
@@ -71,12 +71,12 @@ def set_collateral_price(geb: GfDeployment, collateral: Collateral, price: Wad):
     assert isinstance(price, Wad)
     assert price > Wad(0)
 
-    pip = collateral.pip
-    assert isinstance(pip, DSValue)
+    osm = collateral.osm
+    assert isinstance(osm, DSValue)
 
     print(f"Changing price of {collateral.collateral_type.name} to {price}")
-    assert pip.update_result(price.value).transact(from_address=pip.get_owner())
-    assert geb.oracle_relayer.update_collateral_price(collateral_type=collateral.collateral_type).transact(from_address=pip.get_owner())
+    assert osm.update_result(price.value).transact(from_address=osm.get_owner())
+    assert geb.oracle_relayer.update_collateral_price(collateral_type=collateral.collateral_type).transact(from_address=osm.get_owner())
 
     assert get_collateral_price(collateral) == price
 
@@ -216,10 +216,10 @@ def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     wrap_modify_safe_collateralization(geb, collateral, our_address, delta_collateral, Wad(0))
 
     # Define required liquidation parameters
-    to_price = Wad(Web3.toInt(collateral.pip.read())) / Wad.from_number(2)
+    to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
 
     # Manipulate price to make our SAFE underwater
-    # Note this will only work on a testchain deployed with fixed prices, where PIP is a DSValue
+    # Note this will only work on a testchain deployed with fixed prices, where OSM is a DSValue
     wrap_modify_safe_collateralization(geb, collateral, our_address, Wad(0), max_delta_debt(geb, collateral, our_address))
     set_collateral_price(geb, collateral, to_price)
 
@@ -263,7 +263,7 @@ class TestConfig:
             assert len(collateral.collateral.symbol()) > 0
             assert collateral.adapter is not None
             assert collateral.collateral_auction_house is not None
-            assert collateral.pip is not None
+            assert collateral.osm is not None
 
     def test_account_transfers(self, web3: Web3, geb, our_address, other_address):
         collateral = geb.collaterals['ETH-A']
@@ -564,7 +564,7 @@ class TestOracleRelayer:
     def test_exact_safety_c_ratio(self, geb):
         collateral_type = geb.collaterals['ETH-A'].collateral_type
         #set_collateral_price(geb, coll, Wad.from_number(250))
-        collateral_price = Wad(geb.collaterals['ETH-A'].pip.read())
+        collateral_price = Wad(geb.collaterals['ETH-A'].osm.read())
 
         geb.oracle_relayer.update_collateral_price(collateral_type)
 
@@ -623,7 +623,7 @@ class TestOsm:
         collateral = geb.collaterals['ETH-B']
         set_collateral_price(geb, collateral, Wad.from_number(200))
         # Note this isn't actually an OSM, but we can still read storage slots
-        osm = OSM(web3, collateral.pip.address)
+        osm = OSM(web3, collateral.osm.address)
         raw_price = osm._extract_price(2)
         assert isinstance(raw_price, int)
         assert Wad.from_number(200) == Wad(raw_price)

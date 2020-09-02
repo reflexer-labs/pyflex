@@ -239,7 +239,7 @@ class Collateral:
     """
 
     def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: BasicCollateralJoin,
-                 collateral_auction_house: EnglishCollateralAuctionHouse, pip):
+                 collateral_auction_house: EnglishCollateralAuctionHouse, osm):
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, BasicCollateralJoin)
@@ -251,8 +251,8 @@ class Collateral:
         self.adapter = adapter
         self.collateral_auction_house = collateral_auction_house
         # Points to `median` for official deployments, `DSValue` for testing purposes.
-        # Users generally have no need to interact with the pip.
-        self.pip = pip
+        # Users generally have no need to interact with the osm.
+        self.osm = osm
 
     def approve(self, usr: Address, **kwargs):
         """
