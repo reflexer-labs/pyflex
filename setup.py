@@ -48,7 +48,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'pytz==2017.3',
-        'web3==5.6.0',
+        'web3==5.12.0',
         'requests==2.22.0',
         'eth-keys<0.3.0,>=0.2.1'
         ],
