@@ -14,13 +14,13 @@ done
 docker pull reflexer/testchain-pyflex:${CONFIG}
 
 # Remove existing container if tests not gracefully stopped
-docker-compose -f ${CONFIG}.yml down
+docker-compose -f config/${CONFIG}.yml down
 
 # Start ganache
-docker-compose -f ${CONFIG}.yml up -d ganache
+docker-compose -f config/${CONFIG}.yml up -d ganache
 
 # Start parity and wait to initialize
-docker-compose -f ${CONFIG}.yml up -d parity
+docker-compose -f config/${CONFIG}.yml up -d parity
 sleep 2
 
 #Run the tests
@@ -29,6 +29,6 @@ py.test -s --cov=pyflex --cov-report=term --cov-append tests/${TEST_FILE}
 TEST_RESULT=$?
 
 # Cleanup
-docker-compose -f ${CONFIG}.yml down
+docker-compose -f config/${CONFIG}.yml down
 
 exit $TEST_RESULT
