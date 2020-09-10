@@ -209,7 +209,6 @@ def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     set_collateral_price(geb, collateral, to_price)
 
     # Liquidate the SAFE
-    #simulate_liquidation(geb, collateral, our_address)
     assert geb.liquidation_engine.can_liquidate(collateral.collateral_type, SAFE(our_address))
 
     assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, Urn(our_address)).transact()
@@ -298,8 +297,6 @@ class TestSAFEEngine:
                                          safety_price=Ray(0), debt_ceiling=Rad(0), debt_floor=Rad(0))
 
         collateral_type = geb.collaterals["ETH-C"].collateral_type
-        #assert ilk.line == Rad.from_number(1000000)
-        #assert ilk.dust == Rad.from_number(20)
 
         representation = repr(collateral_type)
         assert "ETH-C" in representation
