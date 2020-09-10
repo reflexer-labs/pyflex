@@ -557,7 +557,7 @@ class TestLiquidationEngine:
         collateral = geb.collaterals['ETH-C']
         assert geb.liquidation_engine.collateral_auction_house(collateral.collateral_type) == collateral.collateral_auction_house.address
         assert isinstance(geb.liquidation_engine.liquidation_quantity(collateral.collateral_type), Rad)
-        assert isinstance(geb.liquidation_engine.liquidation_penalty(collateral.collateral_type), Ray)
+        assert isinstance(geb.liquidation_engine.liquidation_penalty(collateral.collateral_type), Wad)
 
 
 class TestOracleRelayer:
