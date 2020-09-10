@@ -187,10 +187,10 @@ class TestGlobalSettlement:
 
         safe = geb.safe_engine.safe(collateral_type, our_address)
         assert safe.generated_debt > Wad(0)
-        assert geb.safe_engine.collateral_type(collateral_type.name).accumulated_rates > Ray(0)
+        assert geb.safe_engine.collateral_type(collateral_type.name).accumulated_rate > Ray(0)
         assert geb.global_settlement.final_coin_per_collateral_price(collateral_type) > Ray(0)
 
-        owe = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rates * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
+        owe = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rate * geb.global_settlement.final_coin_per_collateral_price(collateral_type)
 
         assert owe > Ray(0)
         wad = min(Ray(safe.locked_collateral), owe)
