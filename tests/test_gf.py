@@ -35,7 +35,10 @@ from tests.conftest import validate_contracts_loaded
 @pytest.fixture
 def safe(our_address: Address, geb: GfDeployment):
     collateral = geb.collaterals['ETH-A']
-    return geb.safe_engine.safe(collateral.collateral_type, our_address)
+    safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
+    assert safe.collateral_type is not None
+    assert safe.collateral_type == collateral.collateral_type
+    return safe
 
 
 def wrap_eth(geb: GfDeployment, address: Address, amount: Wad):
@@ -125,10 +128,10 @@ def max_delta_debt(geb: GfDeployment, collateral: Collateral, our_address: Addre
     collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 
     # change in generated debt = (collateral balance * collateral price with safety margin) - SAFE's stablecoin debt
-    delta_debt = safe.locked_collateral * collateral_type.safety_price - Wad(Ray(safe.generated_debt) * collateral_type.accumulated_rates)
+    delta_debt = safe.locked_collateral * collateral_type.safety_price - Wad(Ray(safe.generated_debt) * collateral_type.accumulated_rate)
 
     # change in debt must also take the rate into account
-    delta_debt = delta_debt * Wad(Ray.from_number(1) / collateral_type.accumulated_rates)
+    delta_debt = delta_debt * Wad(Ray.from_number(1) / collateral_type.accumulated_rate)
 
     # prevent the change in debt from exceeding the collateral debt ceiling
     if (Rad(safe.generated_debt) + Rad(delta_debt)) >= collateral_type.debt_ceiling:
@@ -136,7 +139,7 @@ def max_delta_debt(geb: GfDeployment, collateral: Collateral, our_address: Addre
         delta_debt = Wad(collateral_type.debt_ceiling - Rad(safe.generated_debt))
 
     # prevent the change in debt from exceeding the total debt ceiling
-    debt = geb.safe_engine.global_debt() + Rad(collateral_type.accumulated_rates * delta_debt)
+    debt = geb.safe_engine.global_debt() + Rad(collateral_type.accumulated_rate * delta_debt)
     debt_ceiling = Rad(collateral_type.debt_ceiling)
     if (debt + Rad(delta_debt)) >= debt_ceiling:
         print("max_delta_debt is avoiding total debt ceiling")
@@ -154,8 +157,13 @@ def cleanup_safe(geb: GfDeployment, collateral: Collateral, address: Address):
     collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 
     # If tax_collector.tax_single has been called, we won't have sufficient system_coin to repay the SAFE
-    #if collateral_type.accumulated_rates > Ray.from_number(1):
+    #if collateral_type.accumulated_rate > Ray.from_number(1):
     #    return
+
+    # Return if this address doens't have enough system to coin to repay full debt
+    amount_to_raise = Wad(Ray(safe.generated_debt) * collateral_type.accumulated_rate)
+    if amount_to_raise > geb.system_coin.balance_of(address):
+        return
 
     # Repay borrowed system coin
     geb.approve_system_coin(address)
@@ -164,45 +172,22 @@ def cleanup_safe(geb: GfDeployment, collateral: Collateral, address: Address):
     if geb.system_coin.balance_of(address) >= Wad(0):
         assert geb.system_coin_adapter.join(address, geb.system_coin.balance_of(address)).transact(from_address=address)
 
-    # tab = Ray(safe.generated_debt) * collateral_type.accumulated_rates
-    # print(f'amount_to_raise={str(amount_to_raise)}, rate={str(collateral_type.accumulated_rates)}, system_coin={str(geb.safe_engine.coin_balance(address))}')
-    if safe.generated_debt > Wad(0) and geb.safe_engine.coin_balance(address) >= Rad(safe.generated_debt):
-        wrap_modify_safe_collateralization(geb, collateral, address, Wad(0), safe.generated_debt * -1)
+    amount_to_raise = Wad(Ray(safe.generated_debt) * collateral_type.accumulated_rate)
+
+    print(f'amount_to_raise={str(amount_to_raise)}, rate={str(collateral_type.accumulated_rate)}, system_coin={str(geb.safe_engine.coin_balance(address))}')
+    if safe.generated_debt > Wad(0):
+        wrap_modify_safe_collateralization(geb, collateral, address, Wad(0), amount_to_raise * -1)
 
     # Withdraw collateral
     collateral.approve(address)
     safe = geb.safe_engine.safe(collateral.collateral_type, address)
-    # delta_collateral = Wad((Ray(safe.generated_debt) * collateral_type.accumulated_rates) / collateral_type.safety_price)
+    # delta_collateral = Wad((Ray(safe.generated_debt) * collateral_type.accumulated_rate) / collateral_type.safety_price)
     # print(f'delta_collateral={str(delta_collateral)}, locked_collateral={str(safe.locked_collateral)}')
     if safe.generated_debt == Wad(0) and safe.locked_collateral > Wad(0):
         wrap_modify_safe_collateralization(geb, collateral, address, safe.locked_collateral * -1, Wad(0))
+
     assert collateral.adapter.exit(address, geb.safe_engine.token_collateral(collateral.collateral_type, address)).transact(from_address=address)
-    # TestSAFEEngine.ensure_clean_safe(geb, collateral, address)
-
-
-def simulate_liquidate_safe(geb: GfDeployment, collateral: Collateral, our_address: Address):
-    assert isinstance(geb, GfDeployment)
-    assert isinstance(collateral, Collateral)
-    assert isinstance(our_address, Address)
-
-    collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
-    safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
-
-    # Collateral value should be less than the product of our stablecoin debt and the debt multiplier
-    assert (Ray(safe.locked_collateral) * collateral_type.safety_price) < (Ray(safe.generated_debt) * collateral_type.accumulated_rates)
-
-    # Lesser of our collateral balance and the liquidation quantity
-    lot = min(safe.locked_collateral, Wad(geb.liquidation_engine.liquidation_quantity(collateral_type)))  # Wad
-
-    # Lesser of our stablecoin debt and the canceled debt pro rata the seized collateral
-    generated_debt = min(safe.generated_debt, (lot * safe.generated_debt) / safe.locked_collateral)  # Wad
-
-    # Stablecoin to be raised in collateral auction
-    amount_to_raise = Ray(generated_debt) * collateral_type.accumulated_rates # Ray
-
-    assert -int(lot) < 0 and -int(generated_debt) < 0
-    assert amount_to_raise > Ray(0)
-
+    TestSAFEEngine.ensure_clean_safe(geb, collateral, address)
 
 @pytest.fixture(scope="session")
 def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
@@ -224,7 +209,8 @@ def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     set_collateral_price(geb, collateral, to_price)
 
     # Liquidate the SAFE
-    simulate_liquidation(geb, collateral, our_address)
+    assert geb.liquidation_engine.can_liquidate(collateral.collateral_type, SAFE(our_address))
+
     assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, Urn(our_address)).transact()
 
 
@@ -307,8 +293,13 @@ class TestSAFEEngine:
 
     def test_collateral_type(self, geb):
         assert geb.safe_engine.collateral_type('XXX') == CollateralType('XXX',
-                                         accumulated_rates=Ray(0), safe_collateral=Wad(0), safe_debt=Wad(0),
+                                         accumulated_rate=Ray(0), safe_collateral=Wad(0), safe_debt=Wad(0),
                                          safety_price=Ray(0), debt_ceiling=Rad(0), debt_floor=Rad(0))
+
+        collateral_type = geb.collaterals["ETH-C"].collateral_type
+
+        representation = repr(collateral_type)
+        assert "ETH-C" in representation
 
     def test_collateral(self, web3: Web3, geb: GfDeployment, our_address: Address):
         # given
@@ -317,7 +308,7 @@ class TestSAFEEngine:
         our_safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
         assert isinstance(collateral.collateral_type, CollateralType)
         assert isinstance(collateral.adapter, BasicCollateralJoin)
-        assert collateral.collateral_type == collateral.adapter.collateral_type()
+        assert collateral.collateral_type.name == collateral.adapter.collateral_type().name
         assert our_safe.address == our_address
         wrap_eth(geb, our_address, amount_to_join)
         assert collateral.collateral.balance_of(our_address) >= amount_to_join
@@ -354,6 +345,13 @@ class TestSAFEEngine:
         debt = geb.safe_engine.global_debt()
         assert debt >= Rad(0)
         assert debt < geb.safe_engine.global_debt_ceiling()
+
+    def test_safe(self, safe):
+        time.sleep(11)
+        assert safe.collateral_type is not None
+        safe_bytes = safe.toBytes()
+        safe_from_bytes = safe.fromBytes(safe_bytes)
+        assert safe_from_bytes.address == safe.address
 
     def test_modify_safe_collateralization_noop(self, geb, our_address):
         # given
@@ -556,7 +554,7 @@ class TestLiquidationEngine:
         collateral = geb.collaterals['ETH-C']
         assert geb.liquidation_engine.collateral_auction_house(collateral.collateral_type) == collateral.collateral_auction_house.address
         assert isinstance(geb.liquidation_engine.liquidation_quantity(collateral.collateral_type), Rad)
-        assert isinstance(geb.liquidation_engine.liquidation_penalty(collateral.collateral_type), Ray)
+        assert isinstance(geb.liquidation_engine.liquidation_penalty(collateral.collateral_type), Wad)
 
 
 class TestOracleRelayer:
@@ -603,20 +601,25 @@ class TestAccountingEngine:
         assert geb.accounting_engine.cancel_auctioned_debt_with_surplus(Rad(0)).transact()
 
 class TestTaxCollector:
-    def test_getters(self, geb):
+    def test_getters(self, geb, our_address):
         c = geb.collaterals['ETH-A']
         assert isinstance(geb.tax_collector.safe_engine, SAFEEngine)
         assert isinstance(geb.tax_collector.accounting_engine, AccountingEngine)
         assert isinstance(geb.tax_collector.global_stability_fee(), Ray)
         assert isinstance(geb.tax_collector.stability_fee(c.collateral_type), Ray)
         assert isinstance(geb.tax_collector.update_time(c.collateral_type), int)
+        assert not geb.tax_collector.authorized_accounts(our_address)
 
     def test_tax_single(self, geb):
         # given
         c = geb.collaterals['ETH-A']
 
         # then
+        update_time_before = geb.tax_collector.update_time(c.collateral_type)
+        assert update_time_before > 0
         assert geb.tax_collector.tax_single(c.collateral_type).transact()
+        update_time_after = geb.tax_collector.update_time(c.collateral_type)
+        assert update_time_before < update_time_after
 
 class TestOsm:
     def test_price(self, web3, geb):

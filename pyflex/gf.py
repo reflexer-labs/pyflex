@@ -48,14 +48,14 @@ class CollateralType:
     token (WETH) but with different risk parameters.
     """
 
-    def __init__(self, name: str, accumulated_rates: Optional[Ray] = None,
+    def __init__(self, name: str, accumulated_rate: Optional[Ray] = None,
                  safe_collateral: Optional[Wad] = None,
                  safe_debt: Optional[Wad] = None,
                  safety_price: Optional[Ray] = None,
                  debt_ceiling: Optional[Rad] = None,
                  debt_floor: Optional[Rad] = None):
         assert (isinstance(name, str))
-        assert (isinstance(accumulated_rates, Ray) or (accumulated_rates is None))
+        assert (isinstance(accumulated_rate, Ray) or (accumulated_rate is None))
         assert (isinstance(safe_collateral, Wad) or (safe_collateral is None))
         assert (isinstance(safe_debt, Wad) or (safe_debt is None))
         assert (isinstance(safety_price, Ray) or (safety_price is None))
@@ -63,7 +63,7 @@ class CollateralType:
         assert (isinstance(debt_floor, Rad) or (debt_floor is None))
 
         self.name = name
-        self.accumulated_rates = accumulated_rates 
+        self.accumulated_rate = accumulated_rate 
         self.safe_collateral = safe_collateral
         self.safe_debt = safe_debt
         self.safety_price = safety_price
@@ -84,7 +84,7 @@ class CollateralType:
         assert isinstance(other, CollateralType)
 
         return (self.name == other.name) \
-           and (self.accumulated_rates == other.accumulated_rates) \
+           and (self.accumulated_rate == other.accumulated_rate) \
            and (self.safe_collateral == other.safe_collateral) \
            and (self.safe_debt == other.safe_debt) \
            and (self.safety_price == other.safety_price) \
@@ -93,8 +93,8 @@ class CollateralType:
 
     def __repr__(self):
         repr = ''
-        if self.accumulated_rates:
-            repr += f' accumulated_rates={self.accumulated_rates}'
+        if self.accumulated_rate:
+            repr += f' accumulated_rate={self.accumulated_rate}'
         if self.safe_collateral:
             repr += f' safe_collateral={self.safe_collateral}'
         if self.safe_debt:
@@ -346,7 +346,7 @@ class SAFEEngine(Contract):
 
         # We could get "locked_collateral" from the SAFE, but caller must provide an address.
 
-        return CollateralType(name, accumulated_rates=Ray(rate), safe_collateral=Wad(0), safe_debt=Wad(safe_debt),
+        return CollateralType(name, accumulated_rate=Ray(rate), safe_collateral=Wad(0), safe_debt=Wad(safe_debt),
                 safety_price=Ray(safety_price), debt_ceiling=Rad(d_ceiling), debt_floor=Rad(d_floor))
 
     def token_collateral(self, collateral_type: CollateralType, safe: Address) -> Wad:
@@ -491,27 +491,27 @@ class SAFEEngine(Contract):
 
         safe = self.safe(collateral_type, address)
         collateral_type = self.collateral_type(collateral_type.name)
-        assert collateral_type.accumulated_rates != Ray(0)  # collateral_type has been initialised
+        assert collateral_type.accumulated_rate != Ray(0)  # collateral_type has been initialised
 
         locked_collateral = safe.locked_collateral + delta_collateral
         generated_debt = safe.generated_debt + delta_debt
         collateral_type_safe_debt = collateral_type.safe_debt + delta_debt
 
         logger.debug(f"System     | debt {f(self.global_debt())} | ceiling {f(self.global_debt_ceiling())}")
-        logger.debug(f"Collateral | debt {f(Ray(collateral_type_safe_debt) * collateral_type.accumulated_rates)} "
+        logger.debug(f"Collateral | debt {f(Ray(collateral_type_safe_debt) * collateral_type.accumulated_rate)} "
                      f"| ceiling {f(collateral_type.debt_ceiling)}")
 
-        dtab = Rad(collateral_type.accumulated_rates * Ray(delta_debt))
-        tab = collateral_type.accumulated_rates * generated_debt
+        dtab = Rad(collateral_type.accumulated_rate * Ray(delta_debt))
+        tab = collateral_type.accumulated_rate * generated_debt
         debt = self.global_debt() + dtab
         logger.debug(f"Modifying SAFE collateralization debt={r(collateral_type_safe_debt)}, "
                      f"locked_collateral={r(locked_collateral)}, delta_collateral={r(delta_collateral)}, "
-                     f"delta_debt={r(delta_debt)}, " f"collateral_type.rate={r(collateral_type.accumulated_rates,8)}, "
+                     f"delta_debt={r(delta_debt)}, " f"collateral_type.rate={r(collateral_type.accumulated_rate,8)}, "
                      f"rhs={r(Ray(locked_collateral) * collateral_type.safety_price)}, "
                      f"tab={r(tab)}, safety_price={r(collateral_type.safety_price, 4)}, debt={r(debt)}")
 
         # either debt has decreased, or debt ceilings are not exceeded
-        under_collateral_debt_ceiling = Rad(Ray(collateral_type_safe_debt) * collateral_type.accumulated_rates) <= collateral_type.debt_ceiling
+        under_collateral_debt_ceiling = Rad(Ray(collateral_type_safe_debt) * collateral_type.accumulated_rate) <= collateral_type.debt_ceiling
         under_system_debt_ceiling = debt < self.global_debt_ceiling()
         calm = delta_debt <= Wad(0) or (under_collateral_debt_ceiling and under_system_debt_ceiling)
 
@@ -908,6 +908,39 @@ class LiquidationEngine(Contract):
         b32_collateral_type = collateral_type.toBytes()
         return Address(self._contract.functions.chosenSAFESaviour(b32_collateral_type,safe.address).call())
 
+    def can_liquidate(self, collateral_type: CollateralType, safe: SAFE) -> bool:
+        """ Determine whether a safe can be liquidated
+        Args:
+            collateral_type: CollateralType
+            safe: Identifies the safe holder or proxy
+        """
+        assert isinstance(collateral_type, CollateralType)
+        assert isinstance(safe, SAFE)
+        collateral_type = self.safe_engine.collateral_type(collateral_type.name)
+        safe = self.safe_engine.safe(collateral_type, safe.address)
+        rate = collateral_type.accumulated_rate
+
+        # Collateral value should be less than the product of our stablecoin debt and the debt multiplier
+        is_safe = Ray(safe.locked_collateral) * collateral_type.safety_price >= Ray(safe.generated_debt) * rate
+        if is_safe:
+            return False
+
+        # Ensure there's room
+        on_auction_system_coin_limit: Rad = self.on_auction_system_coin_limit()
+        current_on_auction_system_coins: Rad = self.current_on_auction_system_coins()
+        room: Rad = on_auction_system_coin_limit - current_on_auction_system_coins
+        if current_on_auction_system_coins >= on_auction_system_coin_limit:
+            logger.debug(f"liquidating {safe.address} would exceed maximum system coin out for liquidation")
+            return False
+        if room < collateral_type.debt_floor:
+            return False
+
+        # Prevent null auction (collateral_type.liquidation_quantity [Rad],
+        # collateral_type.accumulated_rate [Ray], collateral_type.liquidation_penalty [Wad])
+        delta_debt: Wad = min(safe.generated_debt, Wad(min(self.liquidation_quantity(collateral_type), room) / Rad(rate) / Rad(self.liquidation_penalty(collateral_type))))
+        delta_collateral: Wad = min(safe.locked_collateral, safe.locked_collateral * delta_debt / safe.generated_debt)
+
+        return delta_debt > Wad(0) and delta_collateral > Wad(0)
 
     def liquidate_safe(self, collateral_type: CollateralType, safe: SAFE) -> Transact:
         """ Initiate liquidation of a SAFE, kicking off a collateral auction
@@ -921,7 +954,7 @@ class LiquidationEngine(Contract):
 
         collateral_type = self.safe_engine.collateral_type(collateral_type.name)
         safe = self.safe_engine.safe(collateral_type, safe.address)
-        rate = self.safe_engine.collateral_type(collateral_type.name).accumulated_rates
+        rate = self.safe_engine.collateral_type(collateral_type.name).accumulated_rate
         logger.info(f'Liquidating {collateral_type.name} SAFE {safe.address.address} with '
                     f'locked_collateral={safe.locked_collateral} safety_price={collateral_type.safety_price} '
                     f'generated_debt={safe.generated_debt} accumulatedRates={rate}')
@@ -936,11 +969,11 @@ class LiquidationEngine(Contract):
 
         return Address(collateral_auction_house)
 
-    def liquidation_penalty(self, collateral_type: CollateralType) -> Ray:
+    def liquidation_penalty(self, collateral_type: CollateralType) -> Wad:
         assert isinstance(collateral_type, CollateralType)
 
         (_, liquidation_penalty, _) = self._contract.functions.collateralTypes(collateral_type.toBytes()).call()
-        return Ray(liquidation_penalty)
+        return Wad(liquidation_penalty)
 
     def liquidation_quantity(self, collateral_type: CollateralType) -> Rad:
         assert isinstance(collateral_type, CollateralType)
@@ -949,13 +982,9 @@ class LiquidationEngine(Contract):
         return Rad(liquidation_quantity)
 
     def on_auction_system_coin_limit(self) -> Rad:
-        assert isinstance(collateral_type, CollateralType)
-
         return Rad(self._contract.functions.onAuctionSystemCoinLimit().call())
 
     def current_on_auction_system_coins(self) -> Rad:
-        assert isinstance(collateral_type, CollateralType)
-
         return Rad(self._contract.functions.currentOnAuctionSystemCoins().call())
 
     def modify_parameters_accountingEngine(self, acctEngine: AccountingEngine) -> Transact:
@@ -1022,7 +1051,7 @@ class CoinSavingsAccount(Contract):
         dsr = self._contract.functions.savingsRate().call()
         return Ray(dsr)
 
-    def accumulated_rates(self) -> Ray:
+    def accumulated_rate(self) -> Ray:
         chi = self._contract.functions.accumulatedRates().call()
         return Ray(chi)
 
