@@ -17,6 +17,7 @@
 
 import math
 from typing import Optional
+from web3 import Web3
 
 
 class GasPrice(object):
