@@ -46,6 +46,17 @@ filter_threads = []
 node_is_parity = None
 transaction_lock = Lock()
 
+def web3_via_http(endpoint_uri: str, timeout=60, http_pool_size=20):
+    assert isinstance(endpoint_uri, str)
+    adapter = requests.adapters.HTTPAdapter(pool_connections=http_pool_size, pool_maxsize=http_pool_size)
+    session = requests.Session()
+    if endpoint_uri.startswith("http"):
+        # Mount over both existing adaptors created by default (rather than just the one which applies to our URI)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+    else:
+        raise ValueError("Unsupported protocol")
+    return Web3(HTTPProvider(endpoint_uri=endpoint_uri, request_kwargs={"timeout": timeout}, session=session))
 
 def register_filter_thread(filter_thread):
     filter_threads.append(filter_thread)
