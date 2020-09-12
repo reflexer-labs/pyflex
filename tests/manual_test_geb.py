@@ -56,7 +56,7 @@ if collateral.collateral.balance_of(our_address) > collateral_amount:
         assert geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad(0),
                                                            delta_debt=system_coin_amount).transact()
 
-    print(f"SAFE balance: {geb.safe_engine.safes(collateral_type, our_address)}")
+    print(f"Safe balance: {geb.safe_engine.safes(collateral_type, our_address)}")
     print(f"System coin balance: {geb.safe_engine.coin_balance(our_address)}")
 
     if run_transactions:

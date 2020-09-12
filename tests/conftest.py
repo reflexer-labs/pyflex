@@ -23,7 +23,7 @@ from web3 import Web3, HTTPProvider
 from pyflex import Address
 from pyflex.auctions import EnglishCollateralAuctionHouse, PreSettlementSurplusAuctionHouse, DebtAuctionHouse
 from pyflex.deployment import GfDeployment
-from pyflex.gf import SAFEEngine, AccountingEngine, LiquidationEngine, TaxCollector, CoinSavingsAccount
+from pyflex.gf import SafeEngine, AccountingEngine, LiquidationEngine, TaxCollector, CoinSavingsAccount
 from pyflex.keys import register_keys
 
 '''
@@ -82,7 +82,7 @@ def geb(web3) -> GfDeployment:
     return deployment
 
 def validate_contracts_loaded(deployment: GfDeployment):
-    assert isinstance(deployment.safe_engine, SAFEEngine)
+    assert isinstance(deployment.safe_engine, SafeEngine)
     assert deployment.safe_engine.address is not None
     assert isinstance(deployment.accounting_engine, AccountingEngine)
     assert deployment.accounting_engine.address is not None

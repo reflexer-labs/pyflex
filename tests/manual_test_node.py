@@ -70,7 +70,7 @@ class TestApp:
             self.joined += self.amount
         else:
             logging.info(f"Found block {web3.eth.blockNumber}")
-        logging.info(f"SAFE balance is {geb.safe_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
+        logging.info(f"Safe balance is {geb.safe_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
         self.request_history()
 
     def request_history(self):

@@ -272,7 +272,7 @@ class Rad:
     subtraction and division only work with other instances of `Rad`. Multiplication works with instances
     of `Rad`, `Ray and `Wad` and also with `int` numbers. The result of multiplication is always a `Rad`.
 
-    `Rad` is rad is a new unit that exists to prevent precision loss in the core SAFE engine of MCD.
+    `Rad` is rad is a new unit that exists to prevent precision loss in the core Safe engine of MCD.
 
     Notes:
         The internal representation of `Rad` is an unbounded integer, the last 45 digits of it being treated

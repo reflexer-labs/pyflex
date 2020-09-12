@@ -19,7 +19,7 @@
 
 from web3 import Web3
 from pyflex import Address, Contract, Transact
-from pyflex.gf import CollateralType, SAFE, SAFEEngine
+from pyflex.gf import CollateralType, Safe, SafeEngine
 from pyflex.numeric import Wad
 
 
@@ -39,17 +39,17 @@ class SafeManager(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.safe_engine = SAFEEngine(self.web3, Address(self._contract.functions.safeEngine().call()))
+        self.safe_engine = SafeEngine(self.web3, Address(self._contract.functions.safeEngine().call()))
 
     def open_safe(self, collateral_type: CollateralType, address: Address) -> Transact:
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'openSAFE',
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'openSafe',
                         [collateral_type.toBytes(), address.address])
 
-    def safe(self, safeid: int) -> SAFE:
-        '''Returns SAFE for respective SAFE ID'''
+    def safe(self, safeid: int) -> Safe:
+        '''Returns Safe for respective Safe ID'''
         assert isinstance(safeid, int)
 
         safe_address = Address(self._contract.functions.safes(safeid).call())
@@ -59,35 +59,35 @@ class SafeManager(Contract):
         return safe
 
     def owns_safe(self, safeid: int) -> Address:
-        '''Returns owner Address of respective SAFE ID'''
+        '''Returns owner Address of respective Safe ID'''
         assert isinstance(safeid, int)
 
-        owner = Address(self._contract.functions.ownsSAFE(safeid).call())
+        owner = Address(self._contract.functions.ownsSafe(safeid).call())
         return owner
 
     def collateral_type(self, safeid: int) -> CollateralType:
-        '''Returns CollateralType for respective SAFE ID'''
+        '''Returns CollateralType for respective Safe ID'''
         assert isinstance(safeid, int)
 
         collateral_type = CollateralType.fromBytes(self._contract.functions.collateralTypes(safeid).call())
         return collateral_type
 
     def first_safe_id(self, address: Address) -> int:
-        '''Returns first SAFE Id created by owner address'''
+        '''Returns first Safe Id created by owner address'''
         assert isinstance(address, Address)
 
-        safeid = int(self._contract.functions.firstSAFEID(address.address).call())
+        safeid = int(self._contract.functions.firstSafeID(address.address).call())
         return safeid
 
     def last_safe_id(self, address: Address) -> int:
-        '''Returns last SAFE Id created by owner address'''
+        '''Returns last Safe Id created by owner address'''
         assert isinstance(address, Address)
 
-        safeid = self._contract.functions.lastSAFEID(address.address).call()
+        safeid = self._contract.functions.lastSafeID(address.address).call()
         return int(safeid)
 
     def safe_count(self, address: Address) -> int:
-        '''Returns number of SAFE's created using the Geb-Safe-Manager contract specifically'''
+        '''Returns number of Safe's created using the Geb-Safe-Manager contract specifically'''
         assert isinstance(address, Address)
 
         count = int(self._contract.functions.safeCount(address.address).call())
