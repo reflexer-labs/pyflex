@@ -31,7 +31,7 @@ import eth_utils
 import pkg_resources
 from hexbytes import HexBytes
 
-from web3 import Web3
+from web3 import  HTTPProvider, Web3
 from web3._utils.contracts import get_function_info, encode_abi
 from web3._utils.events import get_event_data
 from web3.exceptions import TransactionNotFound
