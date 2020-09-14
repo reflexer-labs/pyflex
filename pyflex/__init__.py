@@ -25,6 +25,7 @@ from enum import Enum, auto
 from functools import total_ordering, wraps
 from threading import Lock
 from typing import Optional
+import requests
 
 import eth_utils
 import pkg_resources
