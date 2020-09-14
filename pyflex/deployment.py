@@ -113,7 +113,7 @@ class GfDeployment:
         def from_json(web3: Web3, conf: str):
             conf = json.loads(conf)
             pause = DSPause(web3, Address(conf['GEB_PAUSE']))
-            safe_engine = SafeEngine(web3, Address(conf['GEB_Safe_ENGINE']))
+            safe_engine = SafeEngine(web3, Address(conf['GEB_SAFE_ENGINE']))
             accounting_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
             tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
@@ -131,7 +131,7 @@ class GfDeployment:
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
-            safe_manager = SafeManager(web3, Address(conf['Safe_MANAGER']))
+            safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
             #dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
 
             collaterals = {}
@@ -187,7 +187,7 @@ class GfDeployment:
         def to_dict(self) -> dict:
             conf_dict = {
                 'GEB_PAUSE': self.pause.address.address,
-                'GEB_Safe_ENGINE': self.safe_engine.address.address,
+                'GEB_SAFE_ENGINE': self.safe_engine.address.address,
                 'GEB_ACCOUNTING_ENGINE': self.accounting_engine.address.address,
                 'GEB_TAX_COLLECTOR': self.tax_collector.address.address,
                 'GEB_LIQUIDATION_ENGINE': self.liquidation_engine.address.address,
@@ -205,7 +205,7 @@ class GfDeployment:
                 'GEB_GLOBAL_SETTLEMENT': self.global_settlement.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
                 'PROXY_ACTIONS': self.proxy_actions.address.address,
-                'Safe_MANAGER': self.safe_manager.address.address
+                'SAFE_MANAGER': self.safe_manager.address.address
             }
 
             for collateral in self.collaterals.values():
