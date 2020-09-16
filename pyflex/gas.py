@@ -21,6 +21,7 @@ from web3 import Web3
 
 
 class GasPrice(object):
+    GWEI = 1000000000
     """Abstract class, which can be inherited for implementing different gas price strategies.
 
     `GasPrice` class contains only one method, `get_gas_price`, which is responsible for
