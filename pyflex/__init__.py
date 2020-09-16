@@ -20,6 +20,7 @@ import json
 import logging
 import re
 import sys
+import requests
 import time
 from enum import Enum, auto
 from functools import total_ordering, wraps
