@@ -322,6 +322,12 @@ class EnglishCollateralAuctionHouse(AuctionContract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount',
                         [id, amount_to_sell.value, bid_amount.value])
 
+    def restart_auction(self, id: int) -> Transact:
+        """Resurrect an auction which expired without any bids."""
+        assert (isinstance(id, int))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
+
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
         codec = ABICodec(default_registry)

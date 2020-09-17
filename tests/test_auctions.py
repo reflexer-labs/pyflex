@@ -283,6 +283,10 @@ class TestEnglishCollateralAuctionHouse:
         assert log.forgone_collateral_receiver == deployment_address
         assert log.auction_income_recipient == geb.accounting_engine.address
 
+        # Allow the auction to expire, and then resurrect it
+        wait(geb, our_address, english_collateral_auction_house.total_auction_length()+1)
+        assert english_collateral_auction_house.restart_auction(start_auction).transact()
+
         # Wrap some eth and handle approvals before bidding
         eth_required = Wad(current_bid.amount_to_raise / Rad(collateral_type.safety_price)) * Wad.from_number(1.1)
         wrap_eth(geb, other_address, eth_required)
