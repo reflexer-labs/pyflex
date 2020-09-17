@@ -111,9 +111,9 @@ class CollateralType:
         return f"CollateralType('{self.name}'){repr}"
 
 
-class Safe:
-    """Models one Safe for a single collateral type and account.
-    Note the "address of the Safe" is merely the address of the Safe holder.
+class SAFE:
+    """Models one SAFE for a single collateral type and account.
+    Note the "address of the SAFE" is merely the address of the SAFE holder.
     """
 
     def __init__(self, address: Address, collateral_type: CollateralType = None,
@@ -137,10 +137,10 @@ class Safe:
         assert isinstance(safe, bytes)
 
         address = Address(Web3.toHex(safe[-20:]))
-        return Safe(address)
+        return SAFE(address)
 
     def __eq__(self, other):
-        assert isinstance(other, Safe)
+        assert isinstance(other, SAFE)
 
         return (self.address == other.address) and (self.collateral_type == other.collateral_type)
 
@@ -154,7 +154,7 @@ class Safe:
             repr += f' generated_debt={self.generated_debt}'
         if repr:
             repr = f'[{repr.strip()}]'
-        return f"Safe('{self.address}'){repr}"
+        return f"SAFE('{self.address}'){repr}"
 
 
 class BasicTokenAdapter(Contract):
@@ -192,7 +192,7 @@ class BasicTokenAdapter(Contract):
 
 
 class CoinJoin(BasicTokenAdapter):
-    """A client for the `CoinJoin` contract, which allows the Safe holder to draw system coin from their Safe and repay it.
+    """A client for the `CoinJoin` contract, which allows the SAFE holder to draw system coin from their SAFE and repay it.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/BasicTokenAdapters.sol>
     """
@@ -256,7 +256,7 @@ class Collateral:
 
     def approve(self, usr: Address, **kwargs):
         """
-        Allows the user to move this collateral into and out of their Safe.
+        Allows the user to move this collateral into and out of their SAFE.
 
         Args
             usr: User making transactions with this collateral
@@ -265,14 +265,14 @@ class Collateral:
         self.adapter.approve(approve_safe_modification_directly(from_address=usr, gas_price=gas_price), self.collateral_auction_house.safe_engine())
         self.adapter.approve_token(directly(from_address=usr, gas_price=gas_price))
 
-class SafeEngine(Contract):
-    """A client for the `SafeEngine` contract, which manages accounting for all Safes (Safes).
+class SAFEEngine(Contract):
+    """A client for the `SAFEEngine` contract, which manages accounting for all SAFEs (SAFEs).
 
-    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/SafeEngine.sol>
+    Ref. <https://github.com/reflexer-labs/geb/blob/master/src/SAFEEngine.sol>
     """
 
-    # This information is read from the `LogModifySafeCollateralization` event emitted from `SafeEngine.modifySafeCollateralization`
-    class LogModifySafeCollateralization:
+    # This information is read from the `LogModifySAFECollateralization` event emitted from `SAFEEngine.modifySAFECollateralization`
+    class LogModifySAFECollateralization:
         def __init__(self, log):
             self.collateral_type = CollateralType.fromBytes(log['args']['collateralType']).name
             self.safe = Address(log['args']['safe'])
@@ -291,17 +291,17 @@ class SafeEngine(Contract):
 
             topics = event.get('topics')
             if topics and topics[0] == HexBytes('0x182725621f9c0d485fb256f86699c82616bd6e4670325087fd08f643cab7d917'):
-                log_abi = [abi for abi in SafeEngine.abi if abi.get('name') == 'ModifySafeCollateralization'][0]
+                log_abi = [abi for abi in SAFEEngine.abi if abi.get('name') == 'ModifySAFECollateralization'][0]
                 codec = ABICodec(default_registry)
                 event_data = get_event_data(codec, log_abi, event)
-                return SafeEngine.LogModifySafeCollateralization(event_data)
+                return SAFEEngine.LogModifySAFECollateralization(event_data)
 
         def __eq__(self, other):
-            assert isinstance(other, SafeEngine.LogModifySafeCollateralization)
+            assert isinstance(other, SAFEEngine.LogModifySAFECollateralization)
             return self.__dict__ == other.__dict__
 
         def __repr__(self):
-            return f"LogModifySafeCollateralization({pformat(vars(self))})"
+            return f"LogModifySAFECollateralization({pformat(vars(self))})"
 
     abi = Contract._load_abi(__name__, 'abi/SAFEEngine.abi')
     bin = Contract._load_bin(__name__, 'abi/SAFEEngine.bin')
@@ -330,7 +330,7 @@ class SafeEngine(Contract):
     def approve_safe_modification(self, address: Address):
         assert isinstance(address, Address)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'approveSafeModification', [address.address])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'approveSAFEModification', [address.address])
 
     def safe_rights(self, sender: Address, usr: Address):
         assert isinstance(sender, Address)
@@ -344,7 +344,7 @@ class SafeEngine(Contract):
         b32_collateral_type = CollateralType(name).toBytes()
         (safe_debt, rate, safety_price, d_ceiling, d_floor, liq_price) = self._contract.functions.collateralTypes(b32_collateral_type).call()
 
-        # We could get "locked_collateral" from the Safe, but caller must provide an address.
+        # We could get "locked_collateral" from the SAFE, but caller must provide an address.
 
         return CollateralType(name, accumulated_rate=Ray(rate), safe_collateral=Wad(0), safe_debt=Wad(safe_debt),
                 safety_price=Ray(safety_price), debt_ceiling=Rad(d_ceiling), debt_floor=Rad(d_floor))
@@ -365,12 +365,12 @@ class SafeEngine(Contract):
 
         return Rad(self._contract.functions.debtBalance(safe.address).call())
 
-    def safe(self, collateral_type: CollateralType, address: Address) -> Safe:
+    def safe(self, collateral_type: CollateralType, address: Address) -> SAFE:
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
 
         (locked_collateral, generated_debt) = self._contract.functions.safes(collateral_type.toBytes(), address.address).call()
-        return Safe(address, collateral_type, Wad(locked_collateral), Wad(generated_debt))
+        return SAFE(address, collateral_type, Wad(locked_collateral), Wad(generated_debt))
 
     def global_debt(self) -> Rad:
         return Rad(self._contract.functions.globalDebt().call())
@@ -383,7 +383,7 @@ class SafeEngine(Contract):
         return Rad(self._contract.functions.globalDebtCeiling().call())
 
     def transfer_collateral(self, collateral_type: CollateralType, src: Address, dst: Address, wad: Wad) -> Transact:
-        """Move CollateralType balance in SafeEngine from source address to destiny address
+        """Move CollateralType balance in SAFEEngine from source address to destiny address
 
         Args:
             collateral_type: Identifies the type of collateral.
@@ -400,7 +400,7 @@ class SafeEngine(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferCollateral', transfer_args)
 
     def transfer_internal_coins(self, src: Address, dst: Address, rad: Rad) -> Transact:
-        """Move system coin balance in SafeEngine from source address to destiny address
+        """Move system coin balance in SAFEEngine from source address to destiny address
 
         Args:
             src: Source of the system coin (address of the source).
@@ -420,8 +420,8 @@ class SafeEngine(Contract):
 
         Args:
             collateral_type: Identifies the type of collateral.
-            src: Address of the source Safe.
-            dst: Address of the destiny Safe.
+            src: Address of the source SAFE.
+            dst: Address of the destiny SAFE.
             delta_collateral: Amount of collateral to exchange.
             delta_debt: Amount of stable coin debt to exchange.
         """
@@ -432,18 +432,18 @@ class SafeEngine(Contract):
         assert isinstance(delta_debt, Wad)
 
         transfer_args = [collateral_type.toBytes(), src.address, dst.address, delta_collateral.value, delta_debt.value]
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferSafeCollateralAndDebt', transfer_args)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'transferSAFECollateralAndDebt', transfer_args)
 
     def modify_safe_collateralization(self, collateral_type: CollateralType, safe_address: Address, delta_collateral: Wad, delta_debt: Wad,
                                    collateral_owner=None, system_coin_recipient=None):
-        """Adjust amount of collateral and reserved amount of system coin for the Safe
+        """Adjust amount of collateral and reserved amount of system coin for the SAFE
 
         Args:
             collateral_type: Identifies the type of collateral.
-            safe_address: Safe holder (address of the Safe).
+            safe_address: SAFE holder (address of the SAFE).
             delta_collateral: Amount of collateral to add/remove.
-            delta_debt: Adjust Safe debt (amount of system coin available for borrowing).
-            collateral_owner: Holder of the collateral used to fund the Safe.
+            delta_debt: Adjust SAFE debt (amount of system coin available for borrowing).
+            collateral_owner: Holder of the collateral used to fund the SAFE.
             system_coin_recipient: Party receiving the system coin 
         """
         assert isinstance(collateral_type, CollateralType)
@@ -470,7 +470,7 @@ class SafeEngine(Contract):
                         f"delta_debt={delta_debt} for {w.address}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'modifySafeCollateralization',
+                        'modifySAFECollateralization',
                         [collateral_type.toBytes(), safe_address.address, v.address, w.address, delta_collateral.value, delta_debt.value])
 
     def validate_safe_modification(self, collateral_type: CollateralType, address: Address, delta_collateral: Wad, delta_debt: Wad):
@@ -504,7 +504,7 @@ class SafeEngine(Contract):
         dtab = Rad(collateral_type.accumulated_rate * Ray(delta_debt))
         tab = collateral_type.accumulated_rate * generated_debt
         debt = self.global_debt() + dtab
-        logger.debug(f"Modifying Safe collateralization debt={r(collateral_type_safe_debt)}, "
+        logger.debug(f"Modifying SAFE collateralization debt={r(collateral_type_safe_debt)}, "
                      f"locked_collateral={r(locked_collateral)}, delta_collateral={r(delta_collateral)}, "
                      f"delta_debt={r(delta_debt)}, " f"collateral_type.rate={r(collateral_type.accumulated_rate,8)}, "
                      f"rhs={r(Ray(locked_collateral) * collateral_type.safety_price)}, "
@@ -533,7 +533,7 @@ class SafeEngine(Contract):
         assert calm and safe and neat
 
     def past_safe_modifications(self, from_block: int, to_block: int = None, collateral_type: CollateralType = None,
-                               chunk_size=20000) -> List[LogModifySafeCollateralization]:
+                               chunk_size=20000) -> List[LogModifySAFECollateralization]:
         """Synchronously retrieve a list showing which collateral types and safes have been modified.
          Args:
             from_block: Oldest Ethereum block to retrieve the events from.
@@ -541,8 +541,8 @@ class SafeEngine(Contract):
             collateral_type: Optionally filter safe modification by collateral_type.name
             chunk_size: Number of blocks to fetch from chain at one time, for performance tuning
          Returns:
-            List of past `LogModifySafeCollateralization` events represented as 
-            :py:class:`pyflex.gf.SafeEngine.LogModifySafeCollateralization` class.
+            List of past `LogModifySAFECollateralization` events represented as 
+            :py:class:`pyflex.gf.SAFEEngine.LogModifySAFECollateralization` class.
         """
         current_block = self._contract.web3.eth.blockNumber
         assert isinstance(from_block, int)
@@ -577,7 +577,7 @@ class SafeEngine(Contract):
             logger.debug(f"Found {len(logs)} total logs from block {start} to {end}")
             logger.debug(logs)
 
-            log_modifications = list(map(lambda l: SafeEngine.LogModifySafeCollateralization.from_event(l), logs))
+            log_modifications = list(map(lambda l: SAFEEngine.LogModifySAFECollateralization.from_event(l), logs))
 
             log_modifications = [l for l in log_modifications if l is not None]
 
@@ -598,15 +598,15 @@ class SafeEngine(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [vice.value])
 
     def __eq__(self, other):
-        assert isinstance(other, SafeEngine)
+        assert isinstance(other, SAFEEngine)
         return self.address == other.address
 
     def __repr__(self):
-        return f"SafeEngine('{self.address}')"
+        return f"SAFEEngine('{self.address}')"
 
 
 class OracleRelayer(Contract):
-    """A client for the `OracleRelayer` contract, which interacts with SafeEngine for the purpose of managing collateral prices.
+    """A client for the `OracleRelayer` contract, which interacts with SAFEEngine for the purpose of managing collateral prices.
     Users generally have no need to interact with this contract; it is included for unit testing purposes.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/OracleRelayer.sol>
@@ -688,7 +688,7 @@ class AccountingEngine(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.safe_engine = SafeEngine(web3, Address(self._contract.functions.safeEngine().call()))
+        self.safe_engine = SAFEEngine(web3, Address(self._contract.functions.safeEngine().call()))
 
     def add_authorization(self, guy: Address) -> Transact:
         assert isinstance(guy, Address)
@@ -801,7 +801,7 @@ class TaxCollector(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.safe_engine = SafeEngine(web3, Address(self._contract.functions.safeEngine().call()))
+        self.safe_engine = SAFEEngine(web3, Address(self._contract.functions.safeEngine().call()))
         self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.primaryTaxReceiver().call()))
 
     def initialize_collateral_type(self, collateral_type: CollateralType) -> Transact:
@@ -836,17 +836,17 @@ class TaxCollector(Contract):
         return f"TaxCollector('{self.address}')"
 
 class LiquidationEngine(Contract):
-    """A client for the `LiquidationEngine` contract, used to liquidate unsafe Safes (Safes).
+    """A client for the `LiquidationEngine` contract, used to liquidate unsafe SAFEs (SAFEs).
     Specifically, this contract is useful for EnglishCollateralAuctionHouse auctions.
 
     Ref. <https://github.com/reflexer-labs/geb/blob/master/src/LiquidationEngine.sol>
     """
 
-    # This information is read from the `Liquidate` event emitted from `LiquidationEngine.liquidateSafe`
+    # This information is read from the `Liquidate` event emitted from `LiquidationEngine.liquidateSAFE`
     class LogLiquidate:
         def __init__(self, log):
             self.collateral_type = CollateralType.fromBytes(log['args']['collateralType'])
-            self.safe = Safe(Address(log['args']['safe']))
+            self.safe = SAFE(Address(log['args']['safe']))
             self.collateral_amount = Wad(log['args']['collateralAmount'])
             self.debt_amount = Wad(log['args']['debtAmount'])
             self.amount_to_raise = Rad(log['args']['amountToRaise'])
@@ -884,7 +884,7 @@ class LiquidationEngine(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
-        self.safe_engine = SafeEngine(web3, Address(self._contract.functions.safeEngine().call()))
+        self.safe_engine = SAFEEngine(web3, Address(self._contract.functions.safeEngine().call()))
         self.accounting_engine = AccountingEngine(web3, Address(self._contract.functions.accountingEngine().call()))
 
     def contract_enabled(self) -> bool:
@@ -906,16 +906,16 @@ class LiquidationEngine(Contract):
     def safe_saviours(self, collateral_type: CollateralType, safe: Address):
 
         b32_collateral_type = collateral_type.toBytes()
-        return Address(self._contract.functions.chosenSafeSaviour(b32_collateral_type,safe.address).call())
+        return Address(self._contract.functions.chosenSAFESaviour(b32_collateral_type,safe.address).call())
 
-    def can_liquidate(self, collateral_type: CollateralType, safe: Safe) -> bool:
+    def can_liquidate(self, collateral_type: CollateralType, safe: SAFE) -> bool:
         """ Determine whether a safe can be liquidated
         Args:
             collateral_type: CollateralType
             safe: Identifies the safe holder or proxy
         """
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(safe, Safe)
+        assert isinstance(safe, SAFE)
         collateral_type = self.safe_engine.collateral_type(collateral_type.name)
         safe = self.safe_engine.safe(collateral_type, safe.address)
         rate = collateral_type.accumulated_rate
@@ -942,25 +942,25 @@ class LiquidationEngine(Contract):
 
         return delta_debt > Wad(0) and delta_collateral > Wad(0)
 
-    def liquidate_safe(self, collateral_type: CollateralType, safe: Safe) -> Transact:
-        """ Initiate liquidation of a Safe, kicking off a collateral auction
+    def liquidate_safe(self, collateral_type: CollateralType, safe: SAFE) -> Transact:
+        """ Initiate liquidation of a SAFE, kicking off a collateral auction
 
         Args:
             collateral_type: Identifies the type of collateral.
-            safe: Safe
+            safe: SAFE
         """
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(safe, Safe)
+        assert isinstance(safe, SAFE)
 
         collateral_type = self.safe_engine.collateral_type(collateral_type.name)
         safe = self.safe_engine.safe(collateral_type, safe.address)
         rate = self.safe_engine.collateral_type(collateral_type.name).accumulated_rate
-        logger.info(f'Liquidating {collateral_type.name} Safe {safe.address.address} with '
+        logger.info(f'Liquidating {collateral_type.name} SAFE {safe.address.address} with '
                     f'locked_collateral={safe.locked_collateral} safety_price={collateral_type.safety_price} '
                     f'generated_debt={safe.generated_debt} accumulatedRates={rate}')
 
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'liquidateSafe', [collateral_type.toBytes(), safe.address.address])
+                        'liquidateSAFE', [collateral_type.toBytes(), safe.address.address])
 
     def collateral_auction_house(self, collateral_type: CollateralType) -> Address:
         assert isinstance(collateral_type, CollateralType)
@@ -997,7 +997,7 @@ class LiquidationEngine(Contract):
     def past_liquidations(self, number_of_past_blocks: int, event_filter: dict = None) -> List[LogLiquidate]:
         """Synchronously retrieve past LogLiquidate events.
 
-        `LogLiquidate` events are emitted every time someone liquidates a Safe.
+        `LogLiquidate` events are emitted every time someone liquidates a SAFE.
 
         Args:
             number_of_past_blocks: Number of past Ethereum blocks to retrieve the events from.
@@ -1033,7 +1033,7 @@ class CoinSavingsAccount(Contract):
         self._contract = self._get_contract(web3, self.abi, address)
 
     def approve(self, source: Address, approval_function, **kwargs):
-        """Approve the CoinSavingsAccount to access systemCoin from our Safes"""
+        """Approve the CoinSavingsAccount to access systemCoin from our SAFEs"""
         assert isinstance(source, Address)
         assert(callable(approval_function))
 

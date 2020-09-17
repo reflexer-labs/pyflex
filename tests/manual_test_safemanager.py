@@ -43,14 +43,14 @@ if dsr_client.has_proxy():
     proxy = dsr_client.get_proxy()
     print(f"{our_address} has a DS-Proxy - {proxy.address.address}, test will continue")
 
-    print(f"Urn of Safe ID {safeid} - {mcd.safe_manager.urn(safeid)}")
-    print(f"Owner of Safe ID {safeid} - {mcd.safe_manager.owns(safeid)}")
-    print(f"List of Safe IDs next to and previous to {safeid} - {mcd.safe_manager.list(safeid)}")
-    print(f"Ilk of Safe ID {safeid} - {mcd.safe_manager.ilk(safeid)}")
+    print(f"Urn of SAFE ID {safeid} - {mcd.safe_manager.urn(safeid)}")
+    print(f"Owner of SAFE ID {safeid} - {mcd.safe_manager.owns(safeid)}")
+    print(f"List of SAFE IDs next to and previous to {safeid} - {mcd.safe_manager.list(safeid)}")
+    print(f"Ilk of SAFE ID {safeid} - {mcd.safe_manager.ilk(safeid)}")
 
-    print(f"First of Safe ID for account {proxy.address.address} - {mcd.safe_manager.first(proxy.address)}")
-    print(f"Last of Safe ID for account {proxy.address.address} - {mcd.safe_manager.last(proxy.address)}")
-    print(f"Number of all Safes created via DS-Safe-Manager contract {proxy.address.address} - {mcd.safe_manager.count(proxy.address)}")
+    print(f"First of SAFE ID for account {proxy.address.address} - {mcd.safe_manager.first(proxy.address)}")
+    print(f"Last of SAFE ID for account {proxy.address.address} - {mcd.safe_manager.last(proxy.address)}")
+    print(f"Number of all SAFEs created via DS-SAFE-Manager contract {proxy.address.address} - {mcd.safe_manager.count(proxy.address)}")
 
 else:
     print(f"{our_address} does not have a DS-Proxy. Please create a safe on kovan via Oasis.app (to create a proxy) to perform this test")

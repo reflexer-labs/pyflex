@@ -28,7 +28,7 @@ from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollater
 from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
 from pyflex.auctions import DebtAuctionHouse
 from pyflex.deployment import GfDeployment
-from pyflex.gf import Collateral, Safe, OracleRelayer
+from pyflex.gf import Collateral, SAFE, OracleRelayer
 from pyflex.numeric import Wad, Ray, Rad
 from tests.test_gf import wrap_eth, mint_prot, set_collateral_price, wait, wrap_modify_safe_collateralization
 from tests.test_gf import cleanup_safe, max_delta_debt
@@ -44,11 +44,11 @@ def create_surplus(geb: GfDeployment, surplus_auction_house: Union[PreSettlement
     joy = geb.safe_engine.coin_balance(geb.accounting_engine.address)
 
     if can_skip and joy >= geb.accounting_engine.surplus_buffer() + geb.accounting_engine.surplus_auction_amount_to_sell():
-        print(f'Surplus of {joy} already exists; skipping Safe creation')
+        print(f'Surplus of {joy} already exists; skipping SAFE creation')
         return
 
-    # Create a Safe with surplus
-    print('Creating a Safe with surplus')
+    # Create a SAFE with surplus
+    print('Creating a SAFE with surplus')
     wrap_eth(geb, deployment_address, Wad.from_number(delta_collateral))
     collateral.approve(deployment_address)
 
@@ -69,7 +69,7 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     assert isinstance(our_address, Address)
     assert isinstance(deployment_address, Address)
 
-    # Create a Safe
+    # Create a SAFE
     collateral_type = collateral.collateral_type
     wrap_eth(geb, deployment_address, Wad.from_number(100))
     collateral.approve(deployment_address)
@@ -81,10 +81,10 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     wrap_modify_safe_collateralization(geb, collateral, deployment_address, delta_collateral=Wad(0),
                                       delta_debt=delta_debt)
 
-    # Ensure the Safe can't currently be liquidated
+    # Ensure the SAFE can't currently be liquidated
     assert not geb.liquidation_engine.can_liquidate(collateral_type, geb.safe_engine.safe(collateral_type, deployment_address))
 
-    # Undercollateralize and liquidation the Safe
+    # Undercollateralize and liquidation the SAFE
     to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
     set_collateral_price(geb, collateral, to_price)
     safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
@@ -199,7 +199,7 @@ class TestEnglishCollateralAuctionHouse:
             return
         prev_balance = geb.system_coin.balance_of(deployment_address)
         prev_coin_balance = geb.safe_engine.coin_balance(deployment_address)
-        # Create a Safe
+        # Create a SAFE
         collateral = geb.collaterals['ETH-A']
         auctions_started_before = english_collateral_auction_house.auctions_started()
         collateral_type = collateral.collateral_type
@@ -223,7 +223,7 @@ class TestEnglishCollateralAuctionHouse:
         assert geb.system_coin.balance_of(deployment_address) == delta_debt
         assert geb.safe_engine.coin_balance(deployment_address) == Rad(0)
 
-        # Undercollateralize the Safe
+        # Undercollateralize the SAFE
         to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
         set_collateral_price(geb, collateral, to_price)
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
@@ -237,7 +237,7 @@ class TestEnglishCollateralAuctionHouse:
 
         on_auction_before = geb.liquidation_engine.current_on_auction_system_coins()
 
-        # Liquidate the Safe, which moves debt to the accounting engine and auctions_started the english_collateral_auction_house
+        # Liquidate the SAFE, which moves debt to the accounting engine and auctions_started the english_collateral_auction_house
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
         assert safe.locked_collateral > Wad(0)
 
@@ -421,13 +421,13 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert geb.system_coin.balance_of(deployment_address) == delta_debt
         assert geb.safe_engine.coin_balance(deployment_address) == Rad(0)
 
-        # Undercollateralize the Safe
+        # Undercollateralize the SAFE
         to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
         set_collateral_price(geb, collateral, to_price)
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
         collateral_type = geb.safe_engine.collateral_type(collateral_type.name)
 
-        # Make sure the Safe is not safe
+        # Make sure the SAFE is not safe
         assert collateral_type.accumulated_rate is not None
         assert collateral_type.safety_price is not None
         safe = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rate <= \
@@ -441,7 +441,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         saviour = geb.liquidation_engine.safe_saviours(collateral.collateral_type, deployment_address)
         assert saviour == Address('0x0000000000000000000000000000000000000000')
 
-        # Liquidate the Safe, which moves debt to the accounting engine and starts auction in the fixed_collateral_auction_house
+        # Liquidate the SAFE, which moves debt to the accounting engine and starts auction in the fixed_collateral_auction_house
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
         assert safe.locked_collateral > Wad(0)
         generated_debt = min(safe.generated_debt, Wad(geb.liquidation_engine.liquidation_quantity(collateral_type)))  # Wad

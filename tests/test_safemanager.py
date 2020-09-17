@@ -17,16 +17,16 @@
 
 from pyflex import Address
 from pyflex.deployment import GfDeployment
-from pyflex.safemanager import Safe
+from pyflex.safemanager import SAFE
 
 
-class TestSafeManager:
+class TestSAFEManager:
 
     def test_existing(self, geb: GfDeployment):
         # 3 safes are opened on deployment
-        assert isinstance(geb.safe_manager.safe(1), Safe)
-        assert isinstance(geb.safe_manager.safe(2), Safe)
-        assert isinstance(geb.safe_manager.safe(3), Safe)
+        assert isinstance(geb.safe_manager.safe(1), SAFE)
+        assert isinstance(geb.safe_manager.safe(2), SAFE)
+        assert isinstance(geb.safe_manager.safe(3), SAFE)
 
     def test_none(self, our_address: Address, geb: GfDeployment):
         assert geb.safe_manager.first_safe_id(our_address) == 0
@@ -40,7 +40,7 @@ class TestSafeManager:
         assert geb.safe_manager.last_safe_id(our_address) == 1
         assert geb.safe_manager.collateral_type(1).name == collateral_type.name
         assert geb.safe_manager.owns_safe(1) == our_address
-        assert isinstance(geb.safe_manager.safe(1), Safe)
+        assert isinstance(geb.safe_manager.safe(1), SAFE)
 
     def test_one(self, our_address: Address, geb: GfDeployment):
         assert geb.safe_manager.first_safe_id(our_address) == 1

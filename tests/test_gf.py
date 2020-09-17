@@ -24,7 +24,7 @@ from web3 import Web3
 from pyflex import Address
 from pyflex.approval import approve_safe_modification_directly
 from pyflex.deployment import GfDeployment
-from pyflex.gf import Collateral, CoinJoin, BasicCollateralJoin, CollateralType, SafeEngine, AccountingEngine
+from pyflex.gf import Collateral, CoinJoin, BasicCollateralJoin, CollateralType, SAFEEngine, AccountingEngine
 from pyflex.feed import DSValue
 from pyflex.numeric import Wad, Ray, Rad
 from pyflex.oracles import OSM
@@ -95,7 +95,7 @@ def wait(geb: GfDeployment, address: Address, seconds: int):
 
 
 def wrap_modify_safe_collateralization(geb: GfDeployment, collateral: Collateral, address: Address, delta_collateral: Wad, delta_debt: Wad):
-    """Wraps SafeEngine.modify_safe_collateralization for debugging purposes"""
+    """Wraps SAFEEngine.modify_safe_collateralization for debugging purposes"""
     # given
     assert isinstance(geb, GfDeployment)
     assert isinstance(collateral, Collateral)
@@ -127,7 +127,7 @@ def max_delta_debt(geb: GfDeployment, collateral: Collateral, our_address: Addre
     safe = geb.safe_engine.safe(collateral.collateral_type, our_address)
     collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 
-    # change in generated debt = (collateral balance * collateral price with safety margin) - Safe's stablecoin debt
+    # change in generated debt = (collateral balance * collateral price with safety margin) - SAFE's stablecoin debt
     delta_debt = safe.locked_collateral * collateral_type.safety_price - Wad(Ray(safe.generated_debt) * collateral_type.accumulated_rate)
 
     # change in debt must also take the rate into account
@@ -156,7 +156,7 @@ def cleanup_safe(geb: GfDeployment, collateral: Collateral, address: Address):
     safe = geb.safe_engine.safe(collateral.collateral_type, address)
     collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 
-    # If tax_collector.tax_single has been called, we won't have sufficient system_coin to repay the Safe
+    # If tax_collector.tax_single has been called, we won't have sufficient system_coin to repay the SAFE
     #if collateral_type.accumulated_rate > Ray.from_number(1):
     #    return
 
@@ -187,13 +187,13 @@ def cleanup_safe(geb: GfDeployment, collateral: Collateral, address: Address):
         wrap_modify_safe_collateralization(geb, collateral, address, safe.locked_collateral * -1, Wad(0))
 
     assert collateral.adapter.exit(address, geb.safe_engine.token_collateral(collateral.collateral_type, address)).transact(from_address=address)
-    TestSafeEngine.ensure_clean_safe(geb, collateral, address)
+    TestSAFEEngine.ensure_clean_safe(geb, collateral, address)
 
 @pytest.fixture(scope="session")
 def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     collateral = geb.collaterals['ETH-A']
 
-    # Add collateral to our Safe
+    # Add collateral to our SAFE
     delta_collateral = Wad.from_number(1)
     wrap_eth(geb, our_address, delta_collateral)
     assert collateral.collateral.balance_of(our_address) >= delta_collateral
@@ -203,13 +203,13 @@ def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     # Define required liquidation parameters
     to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
 
-    # Manipulate price to make our Safe underwater
+    # Manipulate price to make our SAFE underwater
     # Note this will only work on a testchain deployed with fixed prices, where OSM is a DSValue
     wrap_modify_safe_collateralization(geb, collateral, our_address, Wad(0), max_delta_debt(geb, collateral, our_address))
     set_collateral_price(geb, collateral, to_price)
 
-    # Liquidate the Safe
-    assert geb.liquidation_engine.can_liquidate(collateral.collateral_type, Safe(our_address))
+    # Liquidate the SAFE
+    assert geb.liquidation_engine.can_liquidate(collateral.collateral_type, SAFE(our_address))
 
     assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, Urn(our_address)).transact()
 
@@ -276,7 +276,7 @@ class TestConfig:
         assert "post_surplus_auctions" in auctions
         assert "debt_auctions" in auctions
 
-class TestSafeEngine:
+class TestSAFEEngine:
     @staticmethod
     def ensure_clean_safe(geb: GfDeployment, collateral: Collateral, address: Address):
         assert isinstance(geb, GfDeployment)
@@ -475,9 +475,9 @@ class TestSafeEngine:
         finally:
             # teardown
             cleanup_safe(geb, collateral0, our_address)
-            TestSafeEngine.ensure_clean_safe(geb, collateral0, our_address)
+            TestSAFEEngine.ensure_clean_safe(geb, collateral0, our_address)
             cleanup_safe(geb, collateral1, other_address)
-            TestSafeEngine.ensure_clean_safe(geb, collateral1, other_address)
+            TestSAFEEngine.ensure_clean_safe(geb, collateral1, other_address)
 
     def test_settle_debt(self, geb):
         assert geb.safe_engine.settle_debt(Rad(0)).transact()
@@ -548,7 +548,7 @@ class TestSafeEngine:
 class TestLiquidationEngine:
     def test_getters(self, geb):
         assert isinstance(geb.liquidation_engine.contract_enabled(), bool)
-        assert isinstance(geb.liquidation_engine.safe_engine, SafeEngine)
+        assert isinstance(geb.liquidation_engine.safe_engine, SAFEEngine)
         assert isinstance(geb.liquidation_engine.accounting_engine, AccountingEngine)
 
         collateral = geb.collaterals['ETH-C']
@@ -577,7 +577,7 @@ class TestOracleRelayer:
 
 class TestAccountingEngine:
     def test_getters(self, geb):
-        assert isinstance(geb.accounting_engine.safe_engine, SafeEngine)
+        assert isinstance(geb.accounting_engine.safe_engine, SAFEEngine)
         assert isinstance(geb.accounting_engine.contract_enabled(), bool)
         assert isinstance(geb.accounting_engine.surplus_auction_house(), Address)
         assert isinstance(geb.accounting_engine.debt_auction_house(), Address)
@@ -603,7 +603,7 @@ class TestAccountingEngine:
 class TestTaxCollector:
     def test_getters(self, geb, our_address):
         c = geb.collaterals['ETH-A']
-        assert isinstance(geb.tax_collector.safe_engine, SafeEngine)
+        assert isinstance(geb.tax_collector.safe_engine, SAFEEngine)
         assert isinstance(geb.tax_collector.accounting_engine, AccountingEngine)
         assert isinstance(geb.tax_collector.global_stability_fee(), Ray)
         assert isinstance(geb.tax_collector.stability_fee(c.collateral_type), Ray)
@@ -635,7 +635,7 @@ class TestGeb:
     def test_healthy_safe(self, web3, geb, our_address):
         collateral = geb.collaterals['ETH-B']
         collateral_type = collateral.collateral_type
-        TestSafeEngine.ensure_clean_safe(geb, collateral, our_address)
+        TestSAFEEngine.ensure_clean_safe(geb, collateral, our_address)
         initial_system_coin = geb.safe_engine.coin_balance(our_address)
         wrap_eth(geb, our_address, Wad.from_number(90))
 

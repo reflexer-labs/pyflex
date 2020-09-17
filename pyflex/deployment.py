@@ -31,7 +31,7 @@ from pyflex import Address
 from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auth import DSGuard
 from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, BasicCollateralJoin, CollateralType
-from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, SafeEngine, AccountingEngine
+from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, SAFEEngine, AccountingEngine
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
@@ -40,7 +40,7 @@ from pyflex.numeric import Wad, Ray
 from pyflex.oracles import OSM
 from pyflex.shutdown import ESM, GlobalSettlement
 from pyflex.token import DSToken, DSEthToken
-from pyflex.safemanager import SafeManager
+from pyflex.safemanager import SAFEManager
 
 def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None) -> Address:
     """Deploys a new contract.
@@ -79,13 +79,13 @@ class GfDeployment:
     }
 
     class Config:
-        def __init__(self, pause: DSPause, safe_engine: SafeEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
+        def __init__(self, pause: DSPause, safe_engine: SAFEEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
                      liquidation_engine: LiquidationEngine, surplus_auction_house: PreSettlementSurplusAuctionHouse,
                      post_surplus_auction_house: PostSettlementSurplusAuctionHouse,
                      surplus_auctioneer: SettlementSurplusAuctioneer, debt_auction_house: DebtAuctionHouse,
                      coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
                      prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
-                     proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
+                     proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SAFEManager,
                      collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.safe_engine = safe_engine
@@ -113,7 +113,7 @@ class GfDeployment:
         def from_json(web3: Web3, conf: str):
             conf = json.loads(conf)
             pause = DSPause(web3, Address(conf['GEB_PAUSE']))
-            safe_engine = SafeEngine(web3, Address(conf['GEB_SAFE_ENGINE']))
+            safe_engine = SAFEEngine(web3, Address(conf['GEB_SAFE_ENGINE']))
             accounting_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
             tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
@@ -131,7 +131,7 @@ class GfDeployment:
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
-            safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
+            safe_manager = SAFEManager(web3, Address(conf['SAFE_MANAGER']))
             #dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
 
             collaterals = {}
@@ -278,10 +278,10 @@ class GfDeployment:
 
     def approve_system_coin(self, usr: Address, **kwargs):
         """
-        Allows the user to draw system coin from and repay system coin to their Safes.
+        Allows the user to draw system coin from and repay system coin to their SAFEs.
 
         Args
-            usr: Recipient of system coin from one or more Safes
+            usr: Recipient of system coin from one or more SAFEs
         """
         assert isinstance(usr, Address)
 

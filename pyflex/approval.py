@@ -72,7 +72,7 @@ def approve_safe_modification_directly(**kwargs):
     and possibly others in the future.
     """
 
-    move_abi = [{'constant': False, 'inputs': [{'name': 'account', 'type': 'address'}], 'name': 'approveSafeModification', 'outputs': [],
+    move_abi = [{'constant': False, 'inputs': [{'name': 'account', 'type': 'address'}], 'name': 'approveSAFEModification', 'outputs': [],
                  'payable': False, 'stateMutability': 'nonpayable', 'type': 'function'},
                 {'constant': True, 'inputs': [{'name': '', 'type': 'address'}, {'name': '', 'type': 'address'}],
                  'name': 'safeRights', 'outputs': [{'name': '', 'type': 'bool'}], 'payable': False, 'stateMutability': 'view',
@@ -88,7 +88,7 @@ def approve_safe_modification_directly(**kwargs):
             logger.info(f"Approving {spender_name} ({spender_address}) to move our {token.address} directly")
 
             approve_safe_modification = Transact(move_contract, move_contract.web3, move_contract.abi, Address(move_contract.address),
-                            move_contract, 'approveSafeModification', [spender_address.address])
+                            move_contract, 'approveSAFEModification', [spender_address.address])
 
             if not approve_safe_modification.transact(**kwargs):
                 raise RuntimeError("Approval failed!")

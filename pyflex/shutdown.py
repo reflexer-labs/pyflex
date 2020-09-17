@@ -165,11 +165,11 @@ class GlobalSettlement(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'fastTrackAuction', [collateral_type.toBytes(), collateral_auction_id])
 
     def process_safe(self, collateral_type: CollateralType, address: Address) -> Transact:
-        """Cancels undercollateralized Safe debt to determine collateral shortfall"""
+        """Cancels undercollateralized SAFE debt to determine collateral shortfall"""
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(address, Address)
         return Transact(self, self.web3, self.abi, self.address, self._contract,
-                        'processSafe', [collateral_type.toBytes(), address.address])
+                        'processSAFE', [collateral_type.toBytes(), address.address])
 
     def free_collateral(self, collateral_type: CollateralType) -> Transact:
         """Releases excess collateral after `process_safe`ing"""
