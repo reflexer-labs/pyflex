@@ -91,10 +91,10 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     collateral_type = geb.safe_engine.collateral_type(collateral_type.name)
     assert safe.locked_collateral is not None and safe.generated_debt is not None
     assert collateral_type.safety_price is not None
-    is_safe = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rate <= \
-            Ray(safe.locked_collateral) * collateral_type.safety_price
+    is_critical = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rate > \
+            Ray(safe.locked_collateral) * collateral_type.liquidation_price
 
-    assert not is_safe
+    assert is_critical
     assert geb.liquidation_engine.can_liquidate(collateral_type, safe)
     assert geb.liquidation_engine.liquidate_safe(collateral_type, safe).transact()
 
@@ -202,7 +202,6 @@ class TestEnglishCollateralAuctionHouse:
         # Create a SAFE
         collateral = geb.collaterals['ETH-A']
         auctions_started_before = english_collateral_auction_house.auctions_started()
-        collateral_type = collateral.collateral_type
 
         # Generate eth and join
         wrap_eth(geb, deployment_address, Wad.from_number(1))
@@ -213,7 +212,7 @@ class TestEnglishCollateralAuctionHouse:
         # generate the maximum debt possible
         wrap_modify_safe_collateralization(geb, collateral, deployment_address, delta_collateral=Wad.from_number(1), delta_debt=Wad(0))
         delta_debt = max_delta_debt(geb, collateral, deployment_address) - Wad(1)
-        debt_before = geb.safe_engine.safe(collateral_type, deployment_address).generated_debt
+        debt_before = geb.safe_engine.safe(collateral.collateral_type, deployment_address).generated_debt
         wrap_modify_safe_collateralization(geb, collateral, deployment_address, delta_collateral=Wad(0), delta_debt=delta_debt)
 
         # Mint and withdraw all the system coin
@@ -227,12 +226,14 @@ class TestEnglishCollateralAuctionHouse:
         to_price = Wad(Web3.toInt(collateral.osm.read())) / Wad.from_number(2)
         set_collateral_price(geb, collateral, to_price)
         safe = geb.safe_engine.safe(collateral.collateral_type, deployment_address)
-        collateral_type = geb.safe_engine.collateral_type(collateral_type.name)
+        collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
+
         assert collateral_type.accumulated_rate is not None
-        assert collateral_type.safety_price is not None
-        safe = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rate <= \
-               Ray(safe.locked_collateral) * collateral_type.safety_price
-        assert not safe
+        assert collateral_type.liquidation_price is not None
+
+        is_critical = Ray(safe.generated_debt) * geb.safe_engine.collateral_type(collateral_type.name).accumulated_rate > \
+               Ray(safe.locked_collateral) * collateral_type.liquidation_price
+        assert is_critical
         assert len(english_collateral_auction_house.active_auctions()) == 0
 
         on_auction_before = geb.liquidation_engine.current_on_auction_system_coins()
@@ -271,8 +272,7 @@ class TestEnglishCollateralAuctionHouse:
         assert current_bid.amount_to_raise > Rad(0)
         assert current_bid.bid_amount == Rad(0)
 
-        # Cat doesn't incorporate the liquidation penalty (chop), but the start_auctioner includes it.
-        # Awaiting word from @dc why this is so.
+        # LiquidationEngine doesn't incorporate the liquidation penalty, but the EnglishCollateralAuctionHouse includes it.
         #assert last_liquidation.amount_to_raise == current_bid.amount_to_raise
         log = english_collateral_auction_house.past_logs(1)[0]
         assert isinstance(log, EnglishCollateralAuctionHouse.StartAuctionLog)
