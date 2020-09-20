@@ -255,7 +255,7 @@ class EnglishCollateralAuctionHouse(AuctionContract):
         """
         return int(self._contract.functions.bidDuration().call())
 
-    def bid_to_market_price_ratio(self) -> Wad:
+    def bid_to_market_price_ratio(self) -> Ray:
         """Returns the minimum bid to market price ratio for new bids.
 
         Returns:
