@@ -255,14 +255,6 @@ class EnglishCollateralAuctionHouse(AuctionContract):
         """
         return int(self._contract.functions.bidDuration().call())
 
-    def bid_to_market_price_ratio(self) -> Ray:
-        """Returns the minimum bid to market price ratio for new bids.
-
-        Returns:
-            The minimum bid to market price ratio
-        """
-        return Ray(self._contract.functions.bidToMarketPriceRatio().call())
-
     def bid_increase(self) -> Wad:
         """Returns the percentage minimum bid increase.
 
@@ -1050,14 +1042,6 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
             The minimum
         """
         return Wad(self._contract.functions.minimumBid().call())
-
-    def bid_to_market_price_ratio(self) -> Wad:
-        """Returns the minimum bid to market price ratio for new bids.
-
-        Returns:
-            The minimum bid to market price ratio
-        """
-        return Ray(self._contract.functions.bidToMarketPriceRatio().call())
 
     def bid_increase(self) -> Wad:
         """Returns the percentage minimum bid increase.
