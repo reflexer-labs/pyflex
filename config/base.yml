@@ -1,7 +1,7 @@
 version: "3.2"
 services:
   parity:
-    image: reflexer/testchain-pyflex:testchain-value-english-governance-median-multisig
+    image: reflexer/testchain-pyflex:testchain-value-fixed-discount-governance-median-multisig-safe
     container_name: parity-pyflex-test
     ports:
       - "8545:8545"
