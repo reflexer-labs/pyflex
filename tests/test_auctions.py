@@ -156,13 +156,6 @@ class TestEnglishCollateralAuctionHouse:
         assert bid_amount > current_bid.bid_amount
         assert (bid_amount >= Rad(english_collateral_auction_house.bid_increase()) * current_bid.bid_amount) or (bid_amount == current_bid.amount_to_raise)
 
-        price_feed = Wad(Web3.toInt(collateral.osm.read()))
-        redemption_price = Wad(Ray(oracle_relayer.redemption_price()))
-        bid_to_market_price_ratio = english_collateral_auction_house.bid_to_market_price_ratio()
-
-        min_bid = Rad((price_feed / redemption_price) * amount_to_sell * bid_to_market_price_ratio)
-
-        assert bid_amount >= min_bid
         assert english_collateral_auction_house.increase_bid_size(id, amount_to_sell, bid_amount).transact(from_address=address)
 
     @staticmethod
