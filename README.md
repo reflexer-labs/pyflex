@@ -57,19 +57,19 @@ export LDFLAGS="-L$(brew --prefix openssl)/lib" CFLAGS="-I$(brew --prefix openss
 
 The current version provides APIs around:
 * `ERC20Token`,
-* `Vat`, `Cat`, `Vow`, `Jug`, `Flipper`, `Flapper`, `Flopper` (<https://github.com/reflexer-labs/geb>)
+* `SAFEEngine`, `LiquidationEngine`, `AccountingEngine`, `TaxCollector`, `CollateralAuctionHouse`, `PreSettlementSurplusAuctionHouse`, `PostSettlementSurplusAuctionHouse`, `DebtAuctionHouse` (<https://github.com/reflexer-labs/geb>)
 * `TxManager` (<https://github.com/reflexer-labs/tx-manager>),
-* `DSGuard` (<https://github.com/dapphub/ds-guard>),
-* `DSToken` (<https://github.com/dapphub/ds-token>),
+* `DSGuard` (<https://github.com/reflexer-labs/ds-guard>),
+* `DSToken` (<https://github.com/reflexer-labs/ds-token>),
 * `DSEthToken` (<https://github.com/dapphub/ds-eth-token>),
-* `DSValue` (<https://github.com/dapphub/ds-value>),
+* `DSValue` (<https://github.com/reflexer-labs/ds-value>),
 * `DSVault` (<https://github.com/dapphub/ds-vault>)
 * `ZrxExchange`, `ZrxExchangeV2`
 
 APIs around the following functionality have not been implemented:
 * Coin Savings Account
 * Global Settlement
-* Governance (`DSAuth`, `VoteQuorum`, `DSGuard`, `Proposal`, `DSRecursiveRoles`, `DSRoles`)
+* Governance (`DSAuth`, `VoteQuorum`, `DSGuard`, `Proposal`, `DSDelegateRoles`, `DSRoles`)
 
 Contributions from the community are appreciated.
 
@@ -132,7 +132,7 @@ collateral = geb.collaterals['ETH-A']
 collateral_type = collateral.collateral_type
 collateral.collateral.deposit(Wad.from_number(3)).transact()
 
-# Add collateral and allocate the desired amount of system coin
+# Add collateral and allocate the desired amount of system coins
 collateral.approve(our_address)
 collateral.adapter.join(our_address, Wad.from_number(3)).transact()
 geb.safe_engine.modify_safe_collateralization(collateralType, our_address, delta_collateral=Wad.from_number(3), delta_debt=Wad.from_number(153)).transact()
@@ -143,7 +143,7 @@ geb.approve_system_coin(our_address)
 geb.system_coin_adapter.exit(our_address, Wad.from_number(153)).transact()
 print(f"SAFE system coin balance after withdrawal:  {geb.safe_engine.coin_balance(our_address)}")
 
-# Repay (and burn) our system coin
+# Repay (and burn) our system coins
 assert geb.system_coin_adapter.join(our_address, Wad.from_number(153)).transact()
 print(f"SAFE system balance after repayment:   {geb.safe_engine.coin_balance(our_address)}")
 
