@@ -142,8 +142,8 @@ class GfDeployment:
                 else:
                     collateral = DSToken(web3, Address(conf[name[1]]))
 
-                # osm_address contract may be a DSValue, OSM, or bogus address.
-                osm_address = Address(conf[f'ORACLE_SECURITY_MODULE_{name[1]}'])
+                # osm_address contract may be a DSValue, OSM, DSM, or bogus address.
+                osm_address = Address(conf[f'FEED_SECURITY_MODULE_{name[1]}'])
                 network = GfDeployment.NETWORKS.get(web3.net.version, "testnet")
 
                 osm = DSValue(web3, osm_address) if network == "testnet" else OSM(web3, osm_address)
