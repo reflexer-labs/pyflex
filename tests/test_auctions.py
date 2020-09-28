@@ -553,13 +553,13 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert after_second_bid.raised_amount == Rad(0)
         assert after_second_bid.sold_amount == Wad(0)
 
-        log = fixed_collateral_auction_house.past_logs(1)[1]
+        log = fixed_collateral_auction_house.past_logs(1)[0]
         assert isinstance(log, FixedDiscountCollateralAuctionHouse.BuyCollateralLog)
         assert log.id == auction_id
         assert log.wad == second_bid_amount
         assert log.bought_collateral > Wad(0)
 
-        log = fixed_collateral_auction_house.past_logs(1)[0]
+        log = fixed_collateral_auction_house.past_logs(1)[1]
         assert isinstance(log, FixedDiscountCollateralAuctionHouse.SettleAuctionLog)
         assert log.id == auction_id
         assert log.leftover_collateral == Wad(0)
