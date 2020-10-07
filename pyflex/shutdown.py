@@ -159,9 +159,9 @@ class GlobalSettlement(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'freezeCollateralType(bytes32)', [collateral_type.toBytes()])
 
     def fast_track_auction(self, collateral_type: CollateralType, collateral_auction_id: int) -> Transact:
-        """Cancel a flip auction and seize it's collateral"""
+        """Cancel a collateral auction and seize it's collateral"""
         assert isinstance(collateral_type, CollateralType)
-        assert isinstance(flip_id, int)
+        assert isinstance(collateral_auction_id, int)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'fastTrackAuction', [collateral_type.toBytes(), collateral_auction_id])
 
     def process_safe(self, collateral_type: CollateralType, address: Address) -> Transact:
