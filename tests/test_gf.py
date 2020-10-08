@@ -273,7 +273,6 @@ class TestConfig:
         auctions = geb.active_auctions()
         assert "collateral_auctions" in auctions
         assert "surplus_auctions" in auctions
-        assert "post_surplus_auctions" in auctions
         assert "debt_auctions" in auctions
 
 class TestSAFEEngine:

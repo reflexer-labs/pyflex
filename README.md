@@ -57,7 +57,7 @@ export LDFLAGS="-L$(brew --prefix openssl)/lib" CFLAGS="-I$(brew --prefix openss
 
 The current version provides APIs around:
 * `ERC20Token`,
-* `SAFEEngine`, `LiquidationEngine`, `AccountingEngine`, `TaxCollector`, `CollateralAuctionHouse`, `PreSettlementSurplusAuctionHouse`, `PostSettlementSurplusAuctionHouse`, `DebtAuctionHouse` (<https://github.com/reflexer-labs/geb>)
+* `SAFEEngine`, `LiquidationEngine`, `AccountingEngine`, `TaxCollector`, `CollateralAuctionHouse`, `PreSettlementSurplusAuctionHouse`, `DebtAuctionHouse` (<https://github.com/reflexer-labs/geb>)
 * `TxManager` (<https://github.com/reflexer-labs/tx-manager>),
 * `DSGuard` (<https://github.com/reflexer-labs/ds-guard>),
 * `DSToken` (<https://github.com/reflexer-labs/ds-token>),
