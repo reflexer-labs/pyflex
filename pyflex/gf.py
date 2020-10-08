@@ -31,7 +31,7 @@ from eth_abi.registry import registry as default_registry
 
 from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_safe_modification_directly
-from pyflex.auctions import PreSettlementSurplusAuctionHouse, PostSettlementSurplusAuctionHouse
+from pyflex.auctions import PreSettlementSurplusAuctionHouse
 from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
 from pyflex.auctions import DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
