@@ -30,6 +30,6 @@ py.test -s --cov=pyflex --cov-report=term --cov-append tests/${TEST_FILE}
 TEST_RESULT=$?
 
 # Cleanup
-docker-compose -f config/${CONFIG}.yml down
+#docker-compose -f config/${CONFIG}.yml down
 
 exit $TEST_RESULT
