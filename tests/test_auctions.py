@@ -102,13 +102,13 @@ def create_debt(web3: Web3, geb: GfDeployment, our_address: Address, deployment_
     # Raise debt from the queue (note that accounting_engine.pop_debt_delay is 0 on our testchain)
     liquidations = geb.liquidation_engine.past_liquidations(100)
     for liquidation in liquidations:
-        era_liquidation = liquidation.era(web3)
-        liquidation_age = int(datetime.now().timestamp()) - era_liquidation
-        assert era_liquidation > int(datetime.now().timestamp()) - 120
+        block_time_liquidation = liquidation.block_time(web3)
+        liquidation_age = int(datetime.now().timestamp()) - block_time_liquidation
+        assert block_time_liquidation > int(datetime.now().timestamp()) - 120
 
-        assert geb.accounting_engine.debt_queue_of(era_liquidation) > Rad(0)
-        assert geb.accounting_engine.pop_debt_from_queue(era_liquidation).transact()
-        assert geb.accounting_engine.debt_queue_of(era_liquidation) == Rad(0)
+        assert geb.accounting_engine.debt_queue_of(block_time_liquidation) > Rad(0)
+        assert geb.accounting_engine.pop_debt_from_queue(block_time_liquidation).transact()
+        assert geb.accounting_engine.debt_queue_of(block_time_liquidation) == Rad(0)
 
     # Cancel out surplus and debt
     acct_engine_coin_balance = geb.safe_engine.coin_balance(geb.accounting_engine.address)
