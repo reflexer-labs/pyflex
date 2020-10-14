@@ -796,14 +796,6 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         """
         return Wad(self._contract.functions.minimumBid().call())
 
-    def bid_increase(self) -> Wad:
-        """Returns the percentage minimum bid increase.
-
-        Returns:
-            The percentage minimum bid increase.
-        """
-        return Wad(self._contract.functions.bidIncrease().call())
-
     def bids(self, id: int) -> Bid:
         """Returns the auction details.
 
