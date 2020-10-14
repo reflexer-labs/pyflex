@@ -869,7 +869,7 @@ class LiquidationEngine(Contract):
                 event_data = get_event_data(codec, log_liquidate_abi, event)
                 return LiquidationEngine.LogLiquidate(event_data)
 
-        def era(self, web3: Web3):
+        def block_time(self, web3: Web3):
             return web3.eth.getBlock(self.raw['blockNumber'])['timestamp']
 
         def __eq__(self, other):
