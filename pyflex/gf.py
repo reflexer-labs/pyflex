@@ -728,8 +728,8 @@ class AccountingEngine(Contract):
     def debt_queue(self) -> Rad:
         return Rad(self._contract.functions.totalQueuedDebt().call())
 
-    def debt_queue_of(self, era: int) -> Rad:
-        return Rad(self._contract.functions.debtQueue(era).call())
+    def debt_queue_of(self, block_time: int) -> Rad:
+        return Rad(self._contract.functions.debtQueue(block_time).call())
 
     def total_on_auction_debt(self) -> Rad:
         return Rad(self._contract.functions.totalOnAuctionDebt().call())
@@ -758,10 +758,10 @@ class AccountingEngine(Contract):
     def surplus_buffer(self) -> Rad:
         return Rad(self._contract.functions.surplusBuffer().call())
 
-    def pop_debt_from_queue(self, era: int) -> Transact:
-        assert isinstance(era, int)
+    def pop_debt_from_queue(self, block_time: int) -> Transact:
+        assert isinstance(block_time, int)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'popDebtFromQueue', [era])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'popDebtFromQueue', [block_time])
 
     def settle_debt(self, rad: Rad) -> Transact:
         assert isinstance(rad, Rad)
