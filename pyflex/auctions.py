@@ -17,7 +17,7 @@
 
 from datetime import datetime
 from pprint import pformat
-from typing import List
+from typing import List, Tuple
 from web3 import Web3
 
 from web3._utils.events import get_event_data
@@ -843,6 +843,14 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         assert(isinstance(wad, Wad))
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'getCollateralBought', [id, wad.value])
+
+    def get_approximate_collateral_bought(self, id: int, wad: Wad) -> Tuple[Wad, Wad]:
+        assert(isinstance(id, int))
+        assert(isinstance(wad, Wad))
+
+        collateral, bid = self._contract.functions.getApproximateCollateralBought(id, wad.value).call()
+
+        return Wad(collateral), Wad(bid)
 
     def parse_event(self, event):
         signature = Web3.toHex(event['topics'][0])
