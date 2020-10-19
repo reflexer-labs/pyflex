@@ -381,6 +381,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert wad > Wad(0)
 
         assert fixed_collateral_auction_house.get_collateral_bought(id, wad).transact(from_address=address)
+        assert fixed_collateral_auction_house.get_approximate_collateral_bought(id, wad)
         assert fixed_collateral_auction_house.buy_collateral(id, wad).transact(from_address=address)
 
     def test_getters(self, geb, fixed_collateral_auction_house):
