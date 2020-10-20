@@ -118,15 +118,21 @@ class GfDeployment:
             surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
-            prot = DSToken(web3, Address(conf['GEB_PROT']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
-            #vote_quorum = DSVoteQuorum(web3, Address(conf['GEB_VOTE_QUORUM']))
-            esm = ESM(web3, Address(conf['GEB_ESM']))
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
             safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
-            #dsr_manager = DsrManager(web3, Address(conf['DSR_MANAGER']))#
+
+            # Kovan deployment current doesn't have PROT or ESM
+            try:
+                prot = DSToken(web3, Address(conf['GEB_PROT']))
+            except:
+                prot = None
+            try:
+                esm = ESM(web3, Address(conf['GEB_ESM']))
+            except:
+                esm = None
 
             collaterals = {}
             for name in GfDeployment.Config._infer_collaterals_from_addresses(conf.keys()):
@@ -189,9 +195,9 @@ class GfDeployment:
                 'GEB_DEBT_AUCTION_HOUSE': self.debt_auction_house.address.address,
                 'GEB_COIN': self.system_coin.address.address,
                 'GEB_COIN_JOIN': self.coin_join.address.address,
-                'GEB_PROT': self.prot.address.address,
+                'GEB_PROT': self.prot.address.address if self.prot else None,
                 'GEB_ORACLE_RELAYER': self.oracle_relayer.address.address,
-                'GEB_ESM': self.esm.address.address,
+                'GEB_ESM': self.esm.address.address if self.esm else None,
                 'GEB_GLOBAL_SETTLEMENT': self.global_settlement.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
                 'PROXY_ACTIONS': self.proxy_actions.address.address,
