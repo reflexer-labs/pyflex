@@ -29,9 +29,7 @@ This project uses *Python 3.6.6*.
 
 In order to clone the project and install required third-party packages please execute:
 ```
-git clone https://github.com/reflexer-labs/pyflex.git
-cd pyflex
-pip3 install -r requirements.txt
+pip install git+https://github.com/reflexer-labs/pyflex
 ```
 
 ### Known Ubuntu issues
@@ -76,69 +74,40 @@ APIs around the following functionality have not been implemented:
 
 Contributions from the community are appreciated.
 
-## Code samples
-
-Below you can find some code snippets demonstrating how the API can be used both for developing
-your own keepers and for creating some other utilities interacting with the _GEB_
-ecosystem contracts.
-
-### Updating a DSValue
-
-This snippet demonstrates how to update a `DSValue` with the ETH/USD rate pulled from _CryptoCompare_:
-
-```python
-import json
-import urllib.request
-
-from web3 import HTTPProvider, Web3
-
-from pyflex import Address
-from pyflex.feed import DSValue
-from pyflex.numeric import Wad
-
-
-def cryptocompare_rate() -> Wad:
-    with urllib.request.urlopen("https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD") as url:
-        data = json.loads(url.read().decode())
-        return Wad.from_number(data['USD'])
-
-
-web3 = Web3(HTTPProvider(endpoint_uri="http://localhost:8545"))
-
-dsvalue = DSValue(web3=web3, address=Address('0x038b3d8288df582d57db9be2106a27be796b0daf'))
-dsvalue.update_result(cryptocompare_rate().value).transact()
-```
 ### System Coin
 
 This snippet demonstrates how to create a SAFE and draw system coins
 
 ```python
 import sys
+import logging
 from web3 import Web3, HTTPProvider
+
+logger = logging.getLogger()
 
 from pyflex import Address
 from pyflex.deployment import GfDeployment
 from pyflex.keys import register_keys
 from pyflex.numeric import Wad
 
-
-web3 = Web3(HTTPProvider(endpoint_uri="https://localhost:8545",
+ETH_RPC_URL="https://localhost:8545"
+web3 = Web3(HTTPProvider(endpoint_uri=ETH_RPC_URL,
                          request_kwargs={"timeout": 10}))
 web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000aBcdef123
 register_keys(web3, [sys.argv[2]])      # ex: key_file=~keys/default-account.json,pass_file=~keys/default-account.pass
 
-geb = GfDeployment.from_json(web3=web3, conf=open("tests/config/kovan-addresses.json", "r").read())
+geb = GfDeployment.from_node(web3=web3)
 our_address = Address(web3.eth.defaultAccount)
 
 # Choose the desired collateral; in this case we'll wrap some Eth
 collateral = geb.collaterals['ETH-A']
-collateral_type = collateral.collateral_type
+collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 collateral.collateral.deposit(Wad.from_number(3)).transact()
 
 # Add collateral and allocate the desired amount of system coins
 collateral.approve(our_address)
 collateral.adapter.join(our_address, Wad.from_number(3)).transact()
-geb.safe_engine.modify_safe_collateralization(collateralType, our_address, delta_collateral=Wad.from_number(3), delta_debt=Wad.from_number(153)).transact()
+geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad.from_number(3), delta_debt=Wad.from_number(153)).transact()
 print(f"SAFE system coin balance before withdrawal: {geb.safe_engine.coin_balance(our_address)}")
 
 # Mint and withdraw our system coin
@@ -151,8 +120,8 @@ assert geb.system_coin_adapter.join(our_address, Wad.from_number(153)).transact(
 print(f"SAFE system balance after repayment:   {geb.safe_engine.coin_balance(our_address)}")
 
 # Withdraw our collateral
-geb.safe_engine.modify_safe_collateralization(collateralType, our_address, delta_collateral=Wad(0), delta_debt=Wad.from_number(-153)).transact()
-geb.safe_engine.modify_safe_collateralization(collateralType, our_address, delta_collateral=Wad.from_number(-3), delta_debt=Wad(0)).transact()
+geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad(0), delta_debt=Wad.from_number(-153)).transact()
+geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad.from_number(-3), delta_debt=Wad(0)).transact()
 collateral.adapter.exit(our_address, Wad.from_number(3)).transact()
 print(f"SAFE system coin balance w/o collateral:    {geb.safe_engine.coin_balance(our_address)}")
 ```
