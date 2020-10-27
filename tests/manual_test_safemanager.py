@@ -24,7 +24,7 @@ from pyflex import Address
 from pyflex.deployment import GfDeployment
 from pyflex.keys import register_keys
 from pyflex.numeric import Wad
-#from pyflex.dsr import Dsr
+from pyflex.proxy import DSProxy
 
 endpoint_uri = f"{os.environ['SERVER_ETH_RPC_HOST']}:{os.environ['SERVER_ETH_RPC_PORT']}"
 web3 = Web3(HTTPProvider(endpoint_uri=endpoint_uri,
@@ -35,24 +35,21 @@ safeid = int(sys.argv[3])
 
 geb = GfDeployment.from_network(web3, "kovan")
 our_address = Address(web3.eth.defaultAccount)
-#dsr_client = Dsr(mcd, our_address)
-print(our_address)
+
+proxy = geb.proxy_registry.proxies(our_address)
+if proxy == Address("0x0000000000000000000000000000000000000000"):
+    print(f"No proxy exists for our address. Building one first")
+    geb.proxy_registry.build(our_address).transact()
+
+proxy = DSProxy(web3, Address(geb.proxy_registry.proxies(our_address)))
 
 print(f"Default account: {our_address.address}")
-if dsr_client.has_proxy():
-    proxy = dsr_client.get_proxy()
-    print(f"{our_address} has a DS-Proxy - {proxy.address.address}, test will continue")
+print(f"{our_address} has a DS-Proxy - {proxy.address.address}, test will continue")
 
-    print(f"Urn of Safe ID {safeid} - {mcd.safe_manager.urn(safeid)}")
-    print(f"Owner of SAFE ID {safeid} - {mcd.safe_manager.owns(safeid)}")
-    print(f"List of SAFE IDs next to and previous to {safeid} - {mcd.safe_manager.list(safeid)}")
-    print(f"Ilk of SAFE ID {safeid} - {mcd.safe_manager.ilk(safeid)}")
+print(f"SAFE of Safe ID {safeid} - {geb.safe_manager.safe(safeid)}")
+print(f"Owner of SAFE ID {safeid} - {geb.safe_manager.owns_safe(safeid)}")
+print(f"CollateralType of SAFE ID {safeid} - {geb.safe_manager.collateral_type(safeid)}")
 
-    print(f"First of Safe ID for account {proxy.address.address} - {mcd.safe_manager.first(proxy.address)}")
-    print(f"Last of Safe ID for account {proxy.address.address} - {mcd.safe_manager.last(proxy.address)}")
-    print(f"Number of all SAFEs created via DS-Safe-Manager contract {proxy.address.address} - {mcd.safe_manager.count(proxy.address)}")
-
-else:
-    print(f"{our_address} does not have a DS-Proxy. Please create a safe on kovan via Oasis.app (to create a proxy) to perform this test")
-
-
+print(f"First of Safe ID for account {proxy.address.address} - {geb.safe_manager.first_safe_id(proxy.address)}")
+print(f"Last of Safe ID for account {proxy.address.address} - {geb.safe_manager.last_safe_id(proxy.address)}")
+print(f"Number of all SAFEs created via DSProxy contract {proxy.address.address} - {geb.safe_manager.safe_count(proxy.address)}")

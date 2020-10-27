@@ -113,8 +113,8 @@ class GfDeployment:
             accounting_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
             tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
-            system_coin = DSToken(web3, Address(conf['GEB_COIN']))#
-            system_coin_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))#
+            system_coin = DSToken(web3, Address(conf['GEB_COIN']))
+            system_coin_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))
             surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
