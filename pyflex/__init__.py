@@ -616,7 +616,7 @@ class Transact:
             if self.nonce is not None and self.web3.eth.getTransactionCount(from_account) > self.nonce:
                 # Check if any transaction sent so far has been mined (has a receipt).
                 # If it has, we return either the receipt (if if was successful) or `None`.
-                for attempt in range(1, 31):
+                for attempt in range(1, 11):
                     if self.replaced:
                         self.logger.debug(f"Transaction with nonce={self.nonce} was replaced with a newer transaction")
                         return None
