@@ -74,23 +74,18 @@ APIs around the following functionality have not been implemented:
 
 Contributions from the community are appreciated.
 
-### System Coin
-
-This snippet demonstrates how to create a SAFE and draw system coins
+### Example: Create SAFE and draw system coins
 
 ```python
 import sys
-import logging
 from web3 import Web3, HTTPProvider
-
-logger = logging.getLogger()
 
 from pyflex import Address
 from pyflex.deployment import GfDeployment
 from pyflex.keys import register_keys
 from pyflex.numeric import Wad
 
-ETH_RPC_URL="https://localhost:8545"
+ETH_RPC_URL = <ETH RPC URL>
 web3 = Web3(HTTPProvider(endpoint_uri=ETH_RPC_URL,
                          request_kwargs={"timeout": 10}))
 web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000aBcdef123
@@ -104,7 +99,7 @@ collateral = geb.collaterals['ETH-A']
 collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 collateral.collateral.deposit(Wad.from_number(3)).transact()
 
-# Add collateral and allocate the desired amount of system coins
+# Add collateral and allocate the desired amount of system coin
 collateral.approve(our_address)
 collateral.adapter.join(our_address, Wad.from_number(3)).transact()
 geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad.from_number(3), delta_debt=Wad.from_number(153)).transact()
@@ -115,15 +110,31 @@ geb.approve_system_coin(our_address)
 geb.system_coin_adapter.exit(our_address, Wad.from_number(153)).transact()
 print(f"SAFE system coin balance after withdrawal:  {geb.safe_engine.coin_balance(our_address)}")
 
-# Repay (and burn) our system coins
+# Rejoin our system coin
 assert geb.system_coin_adapter.join(our_address, Wad.from_number(153)).transact()
 print(f"SAFE system balance after repayment:   {geb.safe_engine.coin_balance(our_address)}")
 
-# Withdraw our collateral
+# Repay system coins
 geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad(0), delta_debt=Wad.from_number(-153)).transact()
+
+# Withdraw our collateral
 geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delta_collateral=Wad.from_number(-3), delta_debt=Wad(0)).transact()
 collateral.adapter.exit(our_address, Wad.from_number(3)).transact()
+
 print(f"SAFE system coin balance w/o collateral:    {geb.safe_engine.coin_balance(our_address)}")
+```
+### Example: Show active collateral auctions
+
+```
+from web3 import Web3, HTTPProvider
+from pyflex.deployment import GfDeployment
+
+ETH_RPC_URL = <ETH RPC URL>
+
+web3 = Web3(HTTPProvider(endpoint_uri=ETH_RPC_URL, request_kwargs={"timeout": 60}))
+geb = GfDeployment.from_node(web3=web3)
+collateral_auction_house = geb.collaterals['ETH-A'].collateral_auction_house
+print(collateral_auction_house.active_auctions())
 ```
 
 ## Testing
