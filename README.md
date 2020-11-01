@@ -125,7 +125,7 @@ print(f"SAFE system coin balance w/o collateral:    {geb.safe_engine.coin_balanc
 ```
 ### Example: Show active collateral auctions
 
-```
+```python
 from web3 import Web3, HTTPProvider
 from pyflex.deployment import GfDeployment
 
