@@ -77,9 +77,11 @@ class Lifecycle:
     """
     logger = logging.getLogger()
 
-    def __init__(self, web3: Web3 = None):
+    def __init__(self, web3: Web3 = None, block_check_interval=1):
         self.web3 = web3
+        assert isinstance(block_check_interval, int)
 
+        self.block_check_interval = block_check_interval
         self.do_wait_for_sync = True
         self.delay = 0
         self.wait_for_functions = []
@@ -365,7 +367,7 @@ class Lifecycle:
                     self.logger.warning("Node dropped event emitter; recreating latest block filter")
                     event_filter = self.web3.eth.filter('latest')
                 finally:
-                    time.sleep(1)
+                    time.sleep(self.block_check_interval)
 
         if self.block_function:
             self._on_block_callback = AsyncCallback(self.block_function)
