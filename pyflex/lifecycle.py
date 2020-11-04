@@ -24,6 +24,7 @@ import time
 import pytz
 from pyflex.sign import eth_sign
 from web3 import Web3
+from web3.exceptions import BlockNotFound
 
 from pyflex import register_filter_thread, any_filter_thread_present, stop_all_filter_threads, all_filter_threads_alive
 from pyflex.util import AsyncCallback
@@ -355,10 +356,11 @@ class Lifecycle:
                         for attempt in range(NUM_GETBLOCK_ATTEMPTS - 1):
                             try:
                                 new_block_callback(event)
-                            except web3.exceptions.BlockNotFound as ex:
+                            except BlockNotFound as ex:
                                 if attempt == NUM_GETBLOCK_ATTEMPTS - 1:
                                     raise ex
                                 self.logger.warning("BlockNotFound from web3.eth.getBlock(). Retrying...")
+                                time.sleep(0.2)
                 except ValueError:
                     self.logger.warning("Node dropped event emitter; recreating latest block filter")
                     event_filter = self.web3.eth.filter('latest')
