@@ -7,4 +7,3 @@ pytest-cov == 2.5.1
 pytest-mock == 1.6.3
 pytest-timeout == 1.2.1
 asynctest == 0.13.0
-Sphinx == 1.6.2
