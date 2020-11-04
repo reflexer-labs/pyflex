@@ -79,7 +79,7 @@ class Lifecycle:
 
     def __init__(self, web3: Web3 = None, block_check_interval=1):
         self.web3 = web3
-        assert isinstance(block_check_interval, int)
+        assert isinstance(block_check_interval, int) or isinstance(block_check_interval, float)
 
         self.block_check_interval = block_check_interval
         self.do_wait_for_sync = True
