@@ -796,6 +796,14 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         """
         return Wad(self._contract.functions.minimumBid().call())
 
+    def discount(self) -> Wad:
+        """Returns the auction discount 
+
+        Returns:
+            The auction discount
+        """
+        return Wad(self._contract.functions.discount().call())
+
     def last_read_redemption_price(self) -> Wad:
         """Returns the last read redemption price
 
