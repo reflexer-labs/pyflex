@@ -133,6 +133,16 @@ class GfDeployment:
                 esm = ESM(web3, Address(conf['GEB_ESM']))
             except:
                 esm = None
+           
+            try:
+                uniswap_factory = Address(conf['UNISWAP_FACTORY'])
+            except:
+                uniswap_factory = None
+
+            try:
+                uniswap_router = Address(conf['UNISWAP_ROUTER'])
+            except:
+                uniswap_router = None
 
             collaterals = {}
             for name in GfDeployment.Config._infer_collaterals_from_addresses(conf.keys()):
