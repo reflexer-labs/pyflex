@@ -213,7 +213,9 @@ class GfDeployment:
                 'GEB_GLOBAL_SETTLEMENT': self.global_settlement.address.address,
                 'PROXY_REGISTRY': self.proxy_registry.address.address,
                 'PROXY_ACTIONS': self.proxy_actions.address.address,
-                'SAFE_MANAGER': self.safe_manager.address.address
+                'SAFE_MANAGER': self.safe_manager.address.address,
+                'UNISWAP_FACTORY': self.uniswap_factory.address,
+                'UNISWAP_ROUTER': self.uniswap_router.address
             }
 
             for collateral in self.collaterals.values():
@@ -255,6 +257,9 @@ class GfDeployment:
         self.proxy_registry = config.proxy_registry
         self.proxy_actions = config.proxy_actions
         self.safe_manager = config.safe_manager
+        self.uniswap_factory = config.uniswap_factory
+        self.uniswap_router = config.uniswap_router
+
         #self.dsr_manager = config.dsr_manager
 
     @staticmethod
