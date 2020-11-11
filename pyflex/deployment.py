@@ -84,7 +84,7 @@ class GfDeployment:
                      coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
                      prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
-                     collaterals: Optional[Dict[str, Collateral]] = None):
+                     uniswap_factory: Address, uniswap_router: Address, collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.safe_engine = safe_engine
             self.accounting_engine = accounting_engine
@@ -103,6 +103,8 @@ class GfDeployment:
             self.proxy_registry = proxy_registry
             self.proxy_actions = proxy_actions
             self.safe_manager = safe_manager
+            self.uniswap_factory = uniswap_factory
+            self.uniswap_router = uniswap_router
             self.collaterals = collaterals or {}
 
         @staticmethod
@@ -178,7 +180,7 @@ class GfDeployment:
                                         surplus_auction_house,
                                         debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
                                         prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
-                                        safe_manager, collaterals)
+                                        safe_manager, uniswap_factory, uniswap_router, collaterals)
 
         @staticmethod
         def _infer_collaterals_from_addresses(keys: []) -> List:
