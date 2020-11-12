@@ -385,6 +385,10 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert fixed_collateral_auction_house.get_approximate_collateral_bought(id, wad)
         assert fixed_collateral_auction_house.buy_collateral(id, wad).transact(from_address=address)
 
+    def test_discount(self, geb, fixed_collateral_auction_house):
+        assert fixed_collateral_auction_house.discount() == Wad.from_number(0.95)
+        assert fixed_collateral_auction_house.discount().value == 0.95 * 10**18
+
     def test_getters(self, geb, fixed_collateral_auction_house):
         if not isinstance(fixed_collateral_auction_house, FixedDiscountCollateralAuctionHouse):
             return

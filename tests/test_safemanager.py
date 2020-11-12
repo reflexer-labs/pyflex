@@ -37,12 +37,12 @@ class TestSafeManager:
         collateral_type = geb.collaterals['ETH-A'].collateral_type
         assert geb.safe_manager.open_safe(collateral_type, our_address).transact()
 
-        assert geb.safe_manager.last_safe_id(our_address) == 1
+        assert geb.safe_manager.last_safe_id(our_address) == 2
         assert geb.safe_manager.collateral_type(1).name == collateral_type.name
-        assert geb.safe_manager.owns_safe(1) == our_address
+        assert geb.safe_manager.owns_safe(2) == our_address
         assert isinstance(geb.safe_manager.safe(1), SAFE)
 
     def test_one(self, our_address: Address, geb: GfDeployment):
-        assert geb.safe_manager.first_safe_id(our_address) == 1
-        assert geb.safe_manager.last_safe_id(our_address) == 1
+        assert geb.safe_manager.first_safe_id(our_address) == 2
+        assert geb.safe_manager.last_safe_id(our_address) == 2
         assert geb.safe_manager.safe_count(our_address) == 1
