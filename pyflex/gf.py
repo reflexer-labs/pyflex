@@ -705,11 +705,6 @@ class AccountingEngine(Contract):
 
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
-    def authorized_accounts(self, address: Address):
-        assert isinstance(address, Address)
-
-        return bool(self._contract.functions.authorizedAccounts(address.address).call())
-
     def contract_enabled(self) -> bool:
         return self._contract.functions.contractEnabled().call() > 0
 
@@ -725,7 +720,7 @@ class AccountingEngine(Contract):
     def debt_auction_house(self) -> Address:
         return Address(self._contract.functions.debtAuctionHouse().call())
 
-    def debt_queue(self) -> Rad:
+    def total_queued_debt(self) -> Rad:
         return Rad(self._contract.functions.totalQueuedDebt().call())
 
     def debt_queue_of(self, block_time: int) -> Rad:
@@ -735,7 +730,7 @@ class AccountingEngine(Contract):
         return Rad(self._contract.functions.totalOnAuctionDebt().call())
 
     def unqueued_unauctioned_debt(self) -> Rad:
-        return (self.safe_engine.debt_balance(self.address) - self.debt_queue()) - self.total_on_auction_debt()
+        return (self.safe_engine.debt_balance(self.address) - self.total_queued_debt()) - self.total_on_auction_debt()
 
     def pop_debt_delay(self) -> int:
         return int(self._contract.functions.popDebtDelay().call())

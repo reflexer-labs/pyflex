@@ -580,7 +580,7 @@ class TestAccountingEngine:
         assert isinstance(geb.accounting_engine.contract_enabled(), bool)
         assert isinstance(geb.accounting_engine.surplus_auction_house(), Address)
         assert isinstance(geb.accounting_engine.debt_auction_house(), Address)
-        assert isinstance(geb.accounting_engine.debt_queue(), Rad)
+        assert isinstance(geb.accounting_engine.total_queued_debt(), Rad)
         assert isinstance(geb.accounting_engine.debt_queue_of(0), Rad)
         assert isinstance(geb.accounting_engine.total_on_auction_debt(), Rad)
         assert isinstance(geb.accounting_engine.unqueued_unauctioned_debt(), Rad)

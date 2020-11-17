@@ -53,7 +53,7 @@ def create_surplus_auction(geb: GfDeployment, deployment_address: Address, our_a
     create_surplus(geb, surplus_auction_house, deployment_address, collateral)
     coin_balance = geb.safe_engine.coin_balance(geb.accounting_engine.address)
     assert coin_balance > geb.safe_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
-    assert (geb.safe_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - geb.accounting_engine.total_on_auction_debt() == Rad(0)
+    assert (geb.safe_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.total_queued_debt()) - geb.accounting_engine.total_on_auction_debt() == Rad(0)
     assert geb.accounting_engine.auction_surplus().transact()
 
     mint_prot(geb.prot, our_address, Wad.from_number(10))
