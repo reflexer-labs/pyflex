@@ -249,7 +249,7 @@ class TestEnglishCollateralAuctionHouse:
         assert safe.locked_collateral == Wad(0)
         assert safe.generated_debt == delta_debt - generated_debt
         assert geb.safe_engine.global_unbacked_debt() > Rad(0)
-        assert geb.accounting_engine.debt_queue() == Rad(amount_to_raise)
+        assert geb.accounting_engine.total_queued_debt() == Rad(amount_to_raise)
         liquidations = geb.liquidation_engine.past_liquidations(1)
         assert len(liquidations) == 1
         last_liquidation = liquidations[0]
@@ -464,7 +464,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert safe.locked_collateral == Wad(0)
         assert safe.generated_debt == delta_debt - generated_debt
         assert geb.safe_engine.global_unbacked_debt() > Rad(0)
-        assert geb.accounting_engine.debt_queue() == Rad(amount_to_raise)
+        assert geb.accounting_engine.total_queued_debt() == Rad(amount_to_raise)
         liquidations = geb.liquidation_engine.past_liquidations(1)
         assert len(liquidations) == 1
         last_liquidation = liquidations[0]
@@ -626,7 +626,7 @@ class TestPreSettlementSurplusAuctionHouse:
         # total surplus > total debt + surplus auction amount_to_sell size + surplus buffer
 
         assert joy_before > geb.safe_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
-        assert (geb.safe_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - \
+        assert (geb.safe_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.total_queued_debt()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
         assert geb.accounting_engine.auction_surplus().transact()
         start_auction = surplus_auction_house.auctions_started()
@@ -670,7 +670,7 @@ class TestPreSettlementSurplusAuctionHouse:
         geb.approve_system_coin(our_address)
         assert geb.system_coin_adapter.exit(our_address, Wad(current_bid.amount_to_sell)).transact(from_address=our_address)
         assert geb.system_coin.balance_of(our_address) >= Wad(current_bid.amount_to_sell)
-        assert (geb.safe_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.debt_queue()) - \
+        assert (geb.safe_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.total_queued_debt()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
 
         cleanup_safe(geb, geb.collaterals['ETH-A'], deployment_address)
