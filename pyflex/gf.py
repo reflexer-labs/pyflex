@@ -580,7 +580,6 @@ class SAFEEngine(Contract):
 
             logs = self.web3.eth.getLogs(filter_params)
             logger.debug(f"Found {len(logs)} total logs from block {start} to {end}")
-            logger.debug(logs)
 
             log_modifications = list(map(lambda l: SAFEEngine.LogModifySAFECollateralization.from_event(l), logs))
 
