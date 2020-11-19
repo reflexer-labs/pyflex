@@ -354,7 +354,9 @@ class Lifecycle:
             event_filter = self.web3.eth.filter('latest')
             while True:
                 try:
-                    for event in event_filter.get_new_entries():
+                    # old blocks are ignored in new_block_callback,
+                    # so process only the last filter entry
+                    for event in event_filter.get_new_entries()[-1::]:
                         for attempt in range(NUM_GETBLOCK_ATTEMPTS - 1):
                             try:
                                 new_block_callback(event)
