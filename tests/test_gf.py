@@ -590,9 +590,6 @@ class TestAccountingEngine:
         assert isinstance(geb.accounting_engine.surplus_auction_amount_to_sell(), Rad)
         assert isinstance(geb.accounting_engine.surplus_buffer(), Rad)
 
-    def test_empty_flog(self, geb):
-        assert geb.accounting_engine.pop_debt_from_queue(0).transact()
-
     def test_settle_debt(self, geb):
         assert geb.accounting_engine.settle_debt(Rad(0)).transact()
 

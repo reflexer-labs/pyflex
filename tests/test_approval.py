@@ -49,7 +49,7 @@ def setup_module():
 
 def setup_function():
     global token
-    token = DSToken.deploy(web3, 'ABC')
+    token = DSToken.deploy(web3, 'ABC', 'ABC')
 
 
 def test_direct_approval():

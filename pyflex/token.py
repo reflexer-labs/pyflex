@@ -183,18 +183,20 @@ class DSToken(ERC20Token):
     bin = Contract._load_bin(__name__, 'abi/DSToken.bin')
 
     @staticmethod
-    def deploy(web3: Web3, symbol: str):
+    def deploy(web3: Web3, name:str, symbol: str):
         """Deploy a new instance of the `DSToken` contract.
 
         Args:
             web3: An instance of `Web` from `web3.py`.
+            name: Name of the new token.
             symbol: Symbol of the new token.
 
         Returns:
             A `DSToken` class instance.
         """
+        assert(isinstance(name, str))
         assert(isinstance(symbol, str))
-        return DSToken(web3=web3, address=Contract._deploy(web3, DSToken.abi, DSToken.bin, [bytes(symbol, "utf-8")]))
+        return DSToken(web3=web3, address=Contract._deploy(web3, DSToken.abi, DSToken.bin, [bytes(name, "utf-8"), bytes(symbol, "utf-8")]))
 
     def owner(self) -> Address:
         """Return the current `authority` of a `DSAuth`-ed contract.

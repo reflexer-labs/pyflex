@@ -32,7 +32,7 @@ class TestERC20Token:
         self.our_address = Address(self.web3.eth.defaultAccount)
         self.second_address = Address(self.web3.eth.accounts[1])
         self.third_address = Address(self.web3.eth.accounts[2])
-        self.token = DSToken.deploy(self.web3, 'ABC')
+        self.token = DSToken.deploy(self.web3, 'ABC', 'ABC')
         self.token.mint(Wad(1000000)).transact()
 
     def test_fail_when_no_token_with_that_address(self):
@@ -136,8 +136,8 @@ class TestERC20Token:
 
     def test_equals(self):
         # given
-        token1 = DSToken.deploy(self.web3, 'ABC')
-        token2 = DSToken.deploy(self.web3, 'DEF')
+        token1 = DSToken.deploy(self.web3, 'ABC', 'ABC')
+        token2 = DSToken.deploy(self.web3, 'DEF', 'DEF')
         token2b = ERC20Token(web3=self.web3, address=token2.address)
 
         # expect
@@ -157,7 +157,7 @@ class TestDSToken:
         self.web3.eth.defaultAccount = self.web3.eth.accounts[0]
         self.our_address = Address(self.web3.eth.defaultAccount)
         self.second_address = Address(self.web3.eth.accounts[1])
-        self.dstoken = DSToken.deploy(self.web3, 'ABC')
+        self.dstoken = DSToken.deploy(self.web3, 'ABC', 'ABC')
 
     def test_fail_when_no_contract_under_that_address(self):
         # expect

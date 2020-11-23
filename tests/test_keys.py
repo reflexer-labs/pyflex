@@ -40,7 +40,7 @@ def test_local_accounts():
 
     # when
     # [we deploy some test contract and mint some tokens]
-    token = DSToken.deploy(web3, 'XYZ')
+    token = DSToken.deploy(web3, 'XYZ', 'XYZ')
     token.mint(Wad.from_number(150000)).transact()
 
     # then
@@ -65,7 +65,7 @@ def test_local_accounts_register_key():
 
     # when
     # [we deploy some test contract and mint some tokens]
-    token = DSToken.deploy(web3, 'XYZ')
+    token = DSToken.deploy(web3, 'XYZ', 'XYZ')
     token.mint(Wad.from_number(150000)).transact()
 
     # then
@@ -99,7 +99,7 @@ def test_multiple_local_accounts():
 
     # when
     # [we execute some test scenario involving two addresses]
-    token = DSToken.deploy(web3, 'XYZ')
+    token = DSToken.deploy(web3, 'XYZ', 'XYZ')
     token.mint(Wad.from_number(150000)).transact()
     token.transfer(local_account_2, Wad.from_number(60000)).transact()
     token.transfer(local_account_1, Wad.from_number(10000)).transact(from_address=local_account_2)
