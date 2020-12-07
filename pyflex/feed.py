@@ -79,31 +79,6 @@ class DSValue(DSAuth):
         """
         return self._contract.functions.read().call()
 
-    '''
-    def read_as_hex(self) -> str:
-        """Reads the current value from this instance and converts it to a hex string.
-
-        If this instance does not contain a value, throws an exception.
-
-        Returns:
-            A string with a hexadecimal representation of the current value of this instance.
-        """
-        return ''.join(hex(x)[2:].zfill(2) for x in self.read())
-
-    def read_as_int(self) -> int:
-        """Reads the current value from this instance and converts it to an int.
-
-        If the value is actually a `Ray` or a `Wad`, you can convert it to one using `Ray(...)`
-        or `Wad(...)`. Please see `Ray` or `Wad` for more details.
-
-        If this instance does not contain a value, throws an exception.
-
-        Returns:
-            An integer representation of the current value of this instance.
-        """
-        return int(self.read_as_hex(), 16)
-    '''
-
     def update_result(self, new_value: int) -> Transact:
         """Populates this instance with a new value.
 
@@ -116,26 +91,6 @@ class DSValue(DSAuth):
         assert(isinstance(new_value, int))
         #assert(len(new_value) == 32)
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateResult', [new_value])
-
-    '''
-    def update_result_with_int(self, new_value: int) -> Transact:
-        """Populates this instance with a new value. """
-
-        Handles the conversion of a Python `int` into the Solidity `bytes32` type automatically.
-
-        If the value you want to set is actually a `Ray` or a `Wad`, you can get the integer value from them
-        by accessing their `value` property. Please see `Ray` or `Wad` for more details.
-
-        Args:
-            new_value: A non-negative integer with the new value to be set.
-
-        Returns:
-            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
-        """
-        assert(isinstance(new_value, int))
-        assert(new_value >= 0)
-        return self.update_result(new_value.to_bytes(32, byteorder='big'))
-    '''
 
     def restart_value(self) -> Transact:
         """Removes the current value from this instance.

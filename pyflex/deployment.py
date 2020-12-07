@@ -24,6 +24,7 @@ import pkg_resources
 from pyflex.auctions import PreSettlementSurplusAuctionHouse
 from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
 from pyflex.auctions import DebtAuctionHouse
+from pyflex.flash_proxy import GebKeeperFlashProxy
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
@@ -68,7 +69,7 @@ def deploy_contract(web3: Web3, contract_name: str, args: Optional[list] = None)
 class GfDeployment:
     """Represents a GEB Framework deployment.
 
-    Static method `from_json()` should be used to instantiate all the objet of
+    Static method `from_json()` should be used to instantiate all the objects of
     a deployment from a json description of all the system addresses.
     """
 
@@ -171,16 +172,23 @@ class GfDeployment:
                     except:
                         raise ValueError(f"Unknown auction house: GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}")
 
+                try:
+                    coll_flash_proxy = GebKeeperFlashProxy(web3, Address(conf[f'GEB_KEEPER_FLASH_PROXY_{name[0]}']))
+                except:
+                    coll_flash_proxy = None
+
+
                 collateral = Collateral(collateral_type=collateral_type, collateral=collateral, adapter=adapter,
-                                        collateral_auction_house=coll_auction_house, osm=osm)
+                                        collateral_auction_house=coll_auction_house, collateral_flash_proxy=coll_flash_proxy,
+                                        osm=osm)
 
                 collaterals[collateral_type.name] = collateral
 
             return GfDeployment.Config(pause, safe_engine, accounting_engine, tax_collector, liquidation_engine,
-                                        surplus_auction_house,
-                                        debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
-                                        prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
-                                        safe_manager, uniswap_factory, uniswap_router, collaterals)
+                                       surplus_auction_house,
+                                       debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
+                                       prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
+                                       safe_manager, uniswap_factory, uniswap_router, collaterals)
 
         @staticmethod
         def _infer_collaterals_from_addresses(keys: []) -> List:
@@ -188,7 +196,7 @@ class GfDeployment:
             for key in keys:
                 match = re.search(r'GEB_COLLATERAL_AUCTION_HOUSE_((\w+)_\w+)', key)
                 if match:
-                    collaterals.append((match.group(1), match.group(2)))
+                    collaterals.append((match.group(1), match.group(2))) # ('ETH_A', 'ETH')
                     continue
                 match = re.search(r'GEB_COLLATERAL_AUCTION_HOUSE_(\w+)', key)
                 if match:
@@ -263,29 +271,35 @@ class GfDeployment:
         #self.dsr_manager = config.dsr_manager
 
     @staticmethod
-    def from_json(web3: Web3, conf: str):
-        return GfDeployment(web3, GfDeployment.Config.from_json(web3, conf))
+    def from_file(web3: Web3, addresses_path: str):
+        return GfDeployment(web3, GfDeployment.Config.from_json(web3, open(addresses_path, "r").read()))
 
     def to_json(self) -> str:
         return self.config.to_json()
 
     @staticmethod
-    def from_node(web3: Web3):
+    def from_node(web3: Web3, system_coin: str):
         assert isinstance(web3, Web3)
 
         network = GfDeployment.NETWORKS.get(web3.net.version, "testnet")
+        
+        if network == 'testnet':
+            testchain = os.environ['TESTCHAIN'] # eg. rai-testchain-value-fixed-discount-uniswap-vote-quorum
+            if testchain.split('-')[0] != system_coin:
+                raise RuntimeError(f"system coin '{system_coin}' does not match testchain {testchain}")
+            network = '-'.join(testchain.split('-')[1:]) # eg. testchain-value-fixed-discount-uniswap-vote-quorum
 
-        return GfDeployment.from_network(web3=web3, network=network)
+        return GfDeployment.from_network(web3=web3, network=network, system_coin=system_coin)
 
     @staticmethod
-    def from_network(web3: Web3, network: str):
+    def from_network(web3: Web3, network: str, system_coin: str):
         assert isinstance(web3, Web3)
         assert isinstance(network, str)
 
         cwd = os.path.dirname(os.path.realpath(__file__))
-        addresses_path = os.path.join(cwd, "../config", f"{network}-addresses.json")
+        addresses_path = os.path.join(cwd, "../config", f"{system_coin}-{network}-addresses.json")
 
-        return GfDeployment.from_json(web3=web3, conf=open(addresses_path, "r").read())
+        return GfDeployment.from_file(web3, addresses_path)
 
     def approve_system_coin(self, usr: Address, **kwargs):
         """

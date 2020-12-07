@@ -77,7 +77,7 @@ def deployment_address(web3) -> Address:
 @pytest.fixture(scope="session")
 def geb(web3) -> GfDeployment:
     # for local dockerized parity testchain
-    deployment = GfDeployment.from_node(web3=web3)
+    deployment = GfDeployment.from_node(web3=web3, system_coin='rai')
     validate_contracts_loaded(deployment)
     return deployment
 

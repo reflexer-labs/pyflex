@@ -34,6 +34,7 @@ from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auctions import PreSettlementSurplusAuctionHouse
 from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
 from pyflex.auctions import DebtAuctionHouse
+from pyflex.flash_proxy import GebKeeperFlashProxy
 from pyflex.gas import DefaultGasPrice
 from pyflex.token import DSToken, ERC20Token
 from pyflex.numeric import Wad, Ray, Rad
@@ -244,17 +245,19 @@ class Collateral:
     """
 
     def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: BasicCollateralJoin,
-                 collateral_auction_house: EnglishCollateralAuctionHouse, osm):
+            collateral_auction_house: EnglishCollateralAuctionHouse, collateral_flash_proxy: GebKeeperFlashProxy, osm):
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, BasicCollateralJoin)
         assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse) or \
                isinstance(collateral_auction_house, FixedDiscountCollateralAuctionHouse)
+        assert isinstance(collateral_flash_proxy, GebKeeperFlashProxy) or collateral_flash_proxy is None
 
         self.collateral_type = collateral_type
         self.collateral = collateral
         self.adapter = adapter
         self.collateral_auction_house = collateral_auction_house
+        self.collateral_flash_proxy = collateral_flash_proxy
         # Points to `median` for official deployments, `DSValue` for testing purposes.
         # Users generally have no need to interact with the osm.
         self.osm = osm
