@@ -15,19 +15,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
 from pprint import pformat
-from typing import List, Tuple, Union
+from typing import Union
 from web3 import Web3
 
-from web3._utils.events import get_event_data
-
-from eth_abi.codec import ABICodec
-from eth_abi.registry import registry as default_registry
-
 from pyflex import Contract, Address, Transact
-from pyflex.numeric import Wad, Rad, Ray
-from pyflex.token import ERC20Token
 
 class GebKeeperFlashProxy(Contract):
     """A client for the `GebKeeperFlashProxy` contract, used to interact with collateral auctions.
@@ -42,7 +34,7 @@ class GebKeeperFlashProxy(Contract):
     """
 
     abi = Contract._load_abi(__name__, 'abi/GebKeeperFlashProxy.abi')
-    #bin = Contract._load_bin(__name__, 'abi/EnglishCollateralAuctionHouse.bin')
+    #bin = Contract._load_bin(__name__, 'abi/GebKeeperFlashProxy.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -62,20 +54,6 @@ class GebKeeperFlashProxy(Contract):
             return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction(uint256)', [auction_id])
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction(uint256[])', [auction_id])
-
-    def decrease_sold_amount(self, id: int, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
-        assert(isinstance(id, int))
-        assert(isinstance(amount_to_sell, Wad))
-        assert(isinstance(bid_amount, Rad))
-
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'decreaseSoldAmount',
-                        [id, amount_to_sell.value, bid_amount.value])
-
-    def restart_auction(self, id: int) -> Transact:
-        """Resurrect an auction which expired without any bids."""
-        assert (isinstance(id, int))
-
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
 
     def __repr__(self):
         return f"GebKeeperFlashProxy('{self.address}')"
