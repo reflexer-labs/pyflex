@@ -15,11 +15,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
 import logging
 from collections import defaultdict
 from datetime import datetime
 from pprint import pformat
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from hexbytes import HexBytes
 from web3 import Web3
@@ -34,7 +35,6 @@ from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auctions import PreSettlementSurplusAuctionHouse
 from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
 from pyflex.auctions import DebtAuctionHouse
-from pyflex.flash_proxy import GebKeeperFlashProxy
 from pyflex.gas import DefaultGasPrice
 from pyflex.token import DSToken, ERC20Token
 from pyflex.numeric import Wad, Ray, Rad
@@ -237,6 +237,43 @@ class BasicCollateralJoin(BasicTokenAdapter):
 
     def decimals(self) -> int:
         return 18
+
+class GebKeeperFlashProxy(Contract):
+    """A client for the `GebKeeperFlashProxy` contract, used to interact with collateral auctions.
+
+    You can find the source code of the `GebKeeperFlashProxy` contract here:
+    <https://github.com/reflexer-labs/geb-keeper-flash-proxy/blob/master/src/GebKeeperFlashProxy.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `GebKeeperFlashProxy` contract.
+
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/GebKeeperFlashProxy.abi')
+    #bin = Contract._load_bin(__name__, 'abi/GebKeeperFlashProxy.bin')
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        self.web3 = web3
+        self.address = address
+        self._contract = self._get_contract(web3, self.abi, address)
+
+    def liquidate_and_settle_safe(self, safe: SAFE) -> Transact:
+        assert isinstance(safe, SAFE)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'liquidateAndSettleSAFE', [safe.address.address])
+
+    def settle_auction(self, auction_id: Union[int, list]):
+        assert isinstance(auction_id, int) or isinstance(auction_id, list)
+        if isinstance(auction_id, int):
+            return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction(uint256)', [auction_id])
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction(uint256[])', [auction_id])
+
+    def __repr__(self):
+        return f"GebKeeperFlashProxy('{self.address}')"
 
 class Collateral:
     """The `Collateral` object wraps accounting information in the CollateralType with token-wide artifacts shared across
@@ -1069,3 +1106,5 @@ class CoinSavingsAccount(Contract):
 
     def __repr__(self):
         return f"CoinSavingsAccount('{self.address}')"
+
+

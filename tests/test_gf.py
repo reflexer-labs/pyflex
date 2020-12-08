@@ -211,7 +211,7 @@ def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     # Liquidate the SAFE
     assert geb.liquidation_engine.can_liquidate(collateral.collateral_type, SAFE(our_address))
 
-    assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, Urn(our_address)).transact()
+    assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, SAFE(our_address)).transact()
 
 
 @pytest.fixture(scope="session")

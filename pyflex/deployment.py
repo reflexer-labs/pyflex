@@ -24,7 +24,6 @@ import pkg_resources
 from pyflex.auctions import PreSettlementSurplusAuctionHouse
 from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
 from pyflex.auctions import DebtAuctionHouse
-from pyflex.flash_proxy import GebKeeperFlashProxy
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
@@ -32,6 +31,7 @@ from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auth import DSGuard
 from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, BasicCollateralJoin, CollateralType
 from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, SAFEEngine, AccountingEngine
+from pyflex.gf import GebKeeperFlashProxy
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
