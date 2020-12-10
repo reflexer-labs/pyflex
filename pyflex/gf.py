@@ -238,20 +238,20 @@ class BasicCollateralJoin(BasicTokenAdapter):
     def decimals(self) -> int:
         return 18
 
-class GebKeeperFlashProxy(Contract):
-    """A client for the `GebKeeperFlashProxy` contract, used to interact with collateral auctions.
+class GebETHKeeperFlashProxy(Contract):
+    """A client for the `GebUniswapV2KeeperFlashProxyETH` contract, used to perform flash swaps for collateral auctions.
 
-    You can find the source code of the `GebKeeperFlashProxy` contract here:
-    <https://github.com/reflexer-labs/geb-keeper-flash-proxy/blob/master/src/GebKeeperFlashProxy.sol>.
+    You can find the source code of the `GebUniswapV2KeeperFlashProxyETH` contract here:
+    <https://github.com/reflexer-labs/geb-keeper-flash-proxy/blob/master/src/GebUniswapV2KeeperFlashProxyETH.sol>.
 
     Attributes:
         web3: An instance of `Web` from `web3.py`.
-        address: Ethereum address of the `GebKeeperFlashProxy` contract.
+        address: Ethereum address of the `GebUniswapV2KeeperFlashProxyETH` contract.
 
     """
 
-    abi = Contract._load_abi(__name__, 'abi/GebKeeperFlashProxy.abi')
-    #bin = Contract._load_bin(__name__, 'abi/GebKeeperFlashProxy.bin')
+    abi = Contract._load_abi(__name__, 'abi/GebUniswapV2KeeperFlashProxyETH.abi')
+    bin = Contract._load_bin(__name__, 'abi/GebUniswapV2KeeperFlashProxyETH.bin')
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -260,6 +260,15 @@ class GebKeeperFlashProxy(Contract):
         self.web3 = web3
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
+
+    def auction_house(self) -> Address:
+        return Address(self._contract.functions.auctionHouse().call())
+
+    def liquidation_engine(self) -> Address:
+        return Address(self._contract.functions.liquidationEngine().call())
+
+    def collateral_type(self):
+        return CollateralType.fromBytes(self._contract.functions.collateralType().call())
 
     def liquidate_and_settle_safe(self, safe: SAFE) -> Transact:
         assert isinstance(safe, SAFE)
@@ -273,7 +282,47 @@ class GebKeeperFlashProxy(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction(uint256[])', [auction_id])
 
     def __repr__(self):
-        return f"GebKeeperFlashProxy('{self.address}')"
+        return f"GebETHKeeperFlashProxy('{self.address}')"
+
+class GebMCKeeperFlashProxy(Contract):
+    """A client for the `GebUniswapV2MultiCollateralKeeperFlashProxy` contract, used to perform flash swaps for collateral auctions.
+
+    You can find the source code of the `GebUniswapV2MultiCollateralKeeperFlashProxy` contract here:
+    <https://github.com/reflexer-labs/geb-keeper-flash-proxy/blob/master/src/GebUniswapV2MultiCollateralKeeperFlashProxy.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `GebUniswapV2MultiCollateralKeeperFlashProxy` contract.
+
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/GebUniswapV2MultiCollateralKeeperFlashProxy.abi')
+    bin = Contract._load_bin(__name__, 'abi/GebUniswapV2MultiCollateralKeeperFlashProxy.bin')
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        self.web3 = web3
+        self.address = address
+        self._contract = self._get_contract(web3, self.abi, address)
+
+    def liquidation_engine(self) -> Address:
+        return Address(self._contract.functions.liquidationEngine().call())
+
+    def liquidate_and_settle_safe(self, collateral_join: Address, safe: SAFE) -> Transact:
+        assert isinstance(collateral_join, Address)
+        assert isinstance(safe, SAFE)
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'liquidateAndSettleSAFE', [collateral_join.address, safe.address.address])
+
+    def settle_auction(self, collateral_join: Address, auction_id: int):
+        assert isinstance(collateral_join, Address)
+        assert isinstance(auction_id, int)
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleAuction', [collateral_join.address, auction_id])
+
+    def __repr__(self):
+        return f"GebMCKeeperFlashProxy('{self.address}')"
 
 class Collateral:
     """The `Collateral` object wraps accounting information in the CollateralType with token-wide artifacts shared across
@@ -282,19 +331,19 @@ class Collateral:
     """
 
     def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: BasicCollateralJoin,
-            collateral_auction_house: EnglishCollateralAuctionHouse, collateral_flash_proxy: GebKeeperFlashProxy, osm):
+            collateral_auction_house: EnglishCollateralAuctionHouse, keeper_flash_proxy: GebETHKeeperFlashProxy, osm):
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, BasicCollateralJoin)
         assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse) or \
                isinstance(collateral_auction_house, FixedDiscountCollateralAuctionHouse)
-        assert isinstance(collateral_flash_proxy, GebKeeperFlashProxy) or collateral_flash_proxy is None
+        assert isinstance(keeper_flash_proxy, GebETHKeeperFlashProxy) or keeper_flash_proxy is None
 
         self.collateral_type = collateral_type
         self.collateral = collateral
         self.adapter = adapter
         self.collateral_auction_house = collateral_auction_house
-        self.collateral_flash_proxy = collateral_flash_proxy
+        self.keeper_flash_proxy = keeper_flash_proxy
         # Points to `median` for official deployments, `DSValue` for testing purposes.
         # Users generally have no need to interact with the osm.
         self.osm = osm

@@ -90,8 +90,8 @@ def validate_contracts_loaded(deployment: GfDeployment):
     assert deployment.liquidation_engine.address is not None
     assert isinstance(deployment.tax_collector, TaxCollector)
     assert deployment.tax_collector.address is not None
-    assert isinstance(deployment.surplus_auction_house, PreSettlementSurplusAuctionHouse)
-    assert deployment.surplus_auction_house.address is not None
+    #assert isinstance(deployment.surplus_auction_house, PreSettlementSurplusAuctionHouse)
+    #assert deployment.surplus_auction_house.address is not None
     assert isinstance(deployment.debt_auction_house, DebtAuctionHouse)
     assert deployment.debt_auction_house.address is not None
     assert isinstance(deployment.coin_savings_acct, CoinSavingsAccount)

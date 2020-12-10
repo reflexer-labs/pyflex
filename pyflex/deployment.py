@@ -31,7 +31,7 @@ from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auth import DSGuard
 from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, BasicCollateralJoin, CollateralType
 from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, SAFEEngine, AccountingEngine
-from pyflex.gf import GebKeeperFlashProxy
+from pyflex.gf import GebETHKeeperFlashProxy, GebMCKeeperFlashProxy
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
@@ -85,7 +85,8 @@ class GfDeployment:
                      coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
                      prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
-                     uniswap_factory: Address, uniswap_router: Address, collaterals: Optional[Dict[str, Collateral]] = None):
+                     uniswap_factory: Address, uniswap_router: Address, mc_keeper_flash_proxy: GebMCKeeperFlashProxy,
+                     collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.safe_engine = safe_engine
             self.accounting_engine = accounting_engine
@@ -106,6 +107,7 @@ class GfDeployment:
             self.safe_manager = safe_manager
             self.uniswap_factory = uniswap_factory
             self.uniswap_router = uniswap_router
+            self.mc_keeper_flash_proxy = mc_keeper_flash_proxy
             self.collaterals = collaterals or {}
 
         @staticmethod
@@ -118,7 +120,7 @@ class GfDeployment:
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
             system_coin = DSToken(web3, Address(conf['GEB_COIN']))
             system_coin_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))
-            surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE']))
+            surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_SURPLUS_AUCTION_HOUSE']))
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
@@ -126,6 +128,7 @@ class GfDeployment:
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
             safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
+            mc_keeper_flash_proxy = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_MULTI_COLLATERAL_KEEPER_FLASH_PROXY']))
 
             # Kovan deployment current doesn't have PROT or ESM
             try:
@@ -173,13 +176,14 @@ class GfDeployment:
                         raise ValueError(f"Unknown auction house: GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}")
 
                 try:
-                    coll_flash_proxy = GebKeeperFlashProxy(web3, Address(conf[f'GEB_KEEPER_FLASH_PROXY_{name[0]}']))
-                except:
-                    coll_flash_proxy = None
+                    flash_proxy = GebETHKeeperFlashProxy(web3, Address(conf[f'GEB_UNISWAP_SINGLE_KEEPER_FLASH_PROXY_{name[0]}']))
+                except Exception as e:
+                    print(e)
+                    flash_proxy = None
 
 
                 collateral = Collateral(collateral_type=collateral_type, collateral=collateral, adapter=adapter,
-                                        collateral_auction_house=coll_auction_house, collateral_flash_proxy=coll_flash_proxy,
+                                        collateral_auction_house=coll_auction_house, keeper_flash_proxy=flash_proxy,
                                         osm=osm)
 
                 collaterals[collateral_type.name] = collateral
@@ -188,7 +192,7 @@ class GfDeployment:
                                        surplus_auction_house,
                                        debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
                                        prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
-                                       safe_manager, uniswap_factory, uniswap_router, collaterals)
+                                       safe_manager, uniswap_factory, uniswap_router, mc_keeper_flash_proxy, collaterals)
 
         @staticmethod
         def _infer_collaterals_from_addresses(keys: []) -> List:
@@ -211,7 +215,7 @@ class GfDeployment:
                 'GEB_ACCOUNTING_ENGINE': self.accounting_engine.address.address,
                 'GEB_TAX_COLLECTOR': self.tax_collector.address.address,
                 'GEB_LIQUIDATION_ENGINE': self.liquidation_engine.address.address,
-                'GEB_PRE_SETTLEMENT_SURPLUS_AUCTION_HOUSE': self.surplus_auction_house.address.address,
+                'GEB_SURPLUS_AUCTION_HOUSE': self.surplus_auction_house.address.address,
                 'GEB_DEBT_AUCTION_HOUSE': self.debt_auction_house.address.address,
                 'GEB_COIN': self.system_coin.address.address,
                 'GEB_COIN_JOIN': self.coin_join.address.address,
@@ -223,7 +227,8 @@ class GfDeployment:
                 'PROXY_ACTIONS': self.proxy_actions.address.address,
                 'SAFE_MANAGER': self.safe_manager.address.address,
                 'UNISWAP_FACTORY': self.uniswap_factory.address,
-                'UNISWAP_ROUTER': self.uniswap_router.address
+                'UNISWAP_ROUTER': self.uniswap_router.address,
+                'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address
             }
 
             for collateral in self.collaterals.values():
@@ -267,6 +272,7 @@ class GfDeployment:
         self.safe_manager = config.safe_manager
         self.uniswap_factory = config.uniswap_factory
         self.uniswap_router = config.uniswap_router
+        self.mc_keeper_flash_proxy = config.mc_keeper_flash_proxy
 
         #self.dsr_manager = config.dsr_manager
 
