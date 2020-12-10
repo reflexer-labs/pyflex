@@ -794,6 +794,9 @@ class AccountingEngine(Contract):
 
         return bool(self._contract.functions.authorizedAccounts(address.address).call())
 
+    def extra_surplus_is_transferred(self):
+        return bool(self._contract.functions.extraSurplusIsTransferred().call())
+
     def contract_enabled(self) -> bool:
         return self._contract.functions.contractEnabled().call() > 0
 

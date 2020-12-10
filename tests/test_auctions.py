@@ -628,7 +628,17 @@ class TestPreSettlementSurplusAuctionHouse:
         assert joy_before > geb.safe_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
         assert (geb.safe_engine.debt_balance(geb.accounting_engine.address) - geb.accounting_engine.total_queued_debt()) - \
                 geb.accounting_engine.total_on_auction_debt() == Rad(0)
+        assert not geb.accounting_engine.extra_surplus_is_transferred()
+        assert geb.accounting_engine.surplus_auction_amount_to_sell() > Rad(0)
+        assert web3.eth.getBlock('latest')['timestamp'] > geb.accounting_engine.last_surplus_auction_time() + geb.accounting_engine.surplus_auction_delay()
+
+        assert geb.accounting_engine.unqueued_unauctioned_debt() == Rad(0)
+        assert geb.safe_engine.coin_balance(geb.accounting_engine.address) >=  geb.safe_engine.debt_balance(geb.accounting_engine.address) + geb.accounting_engine.surplus_auction_amount_to_sell() + geb.accounting_engine.surplus_buffer()
+
+        assert geb.accounting_engine.surplus_auction_house() == geb.surplus_auction_house.address
+        assert geb.surplus_auction_house.protocol_token() != Address('0x0000000000000000000000000000000000000000')
         assert geb.accounting_engine.auction_surplus().transact()
+
         start_auction = surplus_auction_house.auctions_started()
         assert start_auction == 1
         assert len(surplus_auction_house.active_auctions()) == 1

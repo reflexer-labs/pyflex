@@ -228,7 +228,7 @@ class GfDeployment:
                 'SAFE_MANAGER': self.safe_manager.address.address,
                 'UNISWAP_FACTORY': self.uniswap_factory.address,
                 'UNISWAP_ROUTER': self.uniswap_router.address,
-                'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address
+                'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address.address
             }
 
             for collateral in self.collaterals.values():

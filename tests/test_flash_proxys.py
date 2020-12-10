@@ -30,7 +30,7 @@ from tests.test_gf import wrap_eth, set_collateral_price, wait, wrap_modify_safe
 from tests.test_gf import cleanup_safe, max_delta_debt
 
 #Transact.gas_estimate_for_bad_txs = 800000
-#@pytest.mark.skip("tmp")
+@pytest.mark.skip("tmp")
 class TestETHKeeperFlashProxy:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
@@ -257,7 +257,7 @@ class TestETHKeeperFlashProxy:
         set_collateral_price(geb, collateral, Wad.from_number(230))
         cleanup_safe(geb, collateral, other_address)
 
-#@pytest.mark.skip("tmp")
+@pytest.mark.skip("tmp")
 class TestMCKeeperFlashProxy:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
