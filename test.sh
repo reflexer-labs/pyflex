@@ -25,7 +25,7 @@ run_test () {
   TEST_RESULT=$?
 
   # Cleanup
-  #docker-compose -f config/${TESTCHAIN}.yml down
+  docker-compose -f config/${TESTCHAIN}.yml down
   return $TEST_RESULT
 }
 
