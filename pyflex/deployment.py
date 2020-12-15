@@ -86,7 +86,7 @@ class GfDeployment:
                      prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
                      uniswap_factory: Address, uniswap_router: Address, mc_keeper_flash_proxy: GebMCKeeperFlashProxy,
-                     collaterals: Optional[Dict[str, Collateral]] = None):
+                     starting_block_number: int, collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.safe_engine = safe_engine
             self.accounting_engine = accounting_engine
@@ -108,6 +108,7 @@ class GfDeployment:
             self.uniswap_factory = uniswap_factory
             self.uniswap_router = uniswap_router
             self.mc_keeper_flash_proxy = mc_keeper_flash_proxy
+            self.starting_block_number = starting_block_number
             self.collaterals = collaterals or {}
 
         @staticmethod
@@ -129,6 +130,7 @@ class GfDeployment:
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
             safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
             mc_keeper_flash_proxy = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_MULTI_COLLATERAL_KEEPER_FLASH_PROXY']))
+            starting_block_number = int(conf['STARTING_BLOCK_NUMBER'])
 
             # Kovan deployment current doesn't have PROT or ESM
             try:
@@ -192,7 +194,8 @@ class GfDeployment:
                                        surplus_auction_house,
                                        debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
                                        prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
-                                       safe_manager, uniswap_factory, uniswap_router, mc_keeper_flash_proxy, collaterals)
+                                       safe_manager, uniswap_factory, uniswap_router, mc_keeper_flash_proxy, 
+                                       starting_block_number, collaterals)
 
         @staticmethod
         def _infer_collaterals_from_addresses(keys: []) -> List:
@@ -228,7 +231,8 @@ class GfDeployment:
                 'SAFE_MANAGER': self.safe_manager.address.address,
                 'UNISWAP_FACTORY': self.uniswap_factory.address,
                 'UNISWAP_ROUTER': self.uniswap_router.address,
-                'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address.address
+                'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address.address,
+                'STARTING_BLOCK_NUMBER': self.starting_block_number
             }
 
             for collateral in self.collaterals.values():
@@ -273,6 +277,7 @@ class GfDeployment:
         self.uniswap_factory = config.uniswap_factory
         self.uniswap_router = config.uniswap_router
         self.mc_keeper_flash_proxy = config.mc_keeper_flash_proxy
+        self.starting_block_number = config.starting_block_number
 
         #self.dsr_manager = config.dsr_manager
 

@@ -1,0 +1,1 @@
+[{"inputs":[{"internalType":"address","name":"_masterCopy","type":"address"},{"internalType":"bytes","name":"initializer","type":"bytes"}],"stateMutability":"nonpayable","type":"constructor"},{"stateMutability":"payable","type":"fallback"}]
