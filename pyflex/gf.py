@@ -381,7 +381,6 @@ class SAFEEngine(Contract):
 
         @classmethod
         def from_event(cls, event: dict):
-            assert isinstance(event, dict)
 
             topics = event.get('topics')
             if topics and topics[0] == HexBytes('0x182725621f9c0d485fb256f86699c82616bd6e4670325087fd08f643cab7d917'):
