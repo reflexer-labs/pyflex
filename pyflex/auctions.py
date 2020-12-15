@@ -443,6 +443,9 @@ class PreSettlementSurplusAuctionHouse(AuctionContract):
     def contract_enabled(self) -> bool:
         return self._contract.functions.contractEnabled().call() > 0
 
+    def protocol_token(self) -> Address:
+        return Address(self._contract.functions.protocolToken().call())
+
     def bids(self, id: int) -> Bid:
         """Returns the auction details.
 
@@ -787,6 +790,18 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         super(FixedDiscountCollateralAuctionHouse, self).__init__(web3, address, FixedDiscountCollateralAuctionHouse.abi, self.bids)
 
         assert self._contract.functions.AUCTION_TYPE().call() == toBytes('FIXED_DISCOUNT')
+   
+    def get_collateral_median_price(self) -> Ray:
+        """Returns the market price from system coin oracle.
+       
+
+        Returns:
+            System coin market price
+        """
+        return Ray(self._contract.functions.getCollateralMedianPrice().call())
+
+    def get_final_token_prices(self) -> (int, int):
+        return self._contract.functions.getFinalTokenPrices(self._contract.functions.lastReadRedemptionPrice().call()).call()
 
     def minimum_bid(self) -> Wad:
         """Returns the minimum bid.

@@ -35,7 +35,7 @@ class TestTransact:
         self.our_address = Address(self.web3.eth.defaultAccount)
         self.second_address = Address(self.web3.eth.accounts[1])
         self.third_address = Address(self.web3.eth.accounts[2])
-        self.token = DSToken.deploy(self.web3, 'ABC')
+        self.token = DSToken.deploy(self.web3, 'ABC', 'ABC')
         self.token.mint(Wad(1000000)).transact()
 
     def test_can_only_execute_once(self):
@@ -218,7 +218,7 @@ class TestTransactReplace:
         self.our_address = Address(self.web3.eth.defaultAccount)
         self.second_address = Address(self.web3.eth.accounts[1])
         self.third_address = Address(self.web3.eth.accounts[2])
-        self.token = DSToken.deploy(self.web3, 'ABC')
+        self.token = DSToken.deploy(self.web3, 'ABC', 'ABC')
         self.token.mint(Wad(1000000)).transact()
 
     @pytest.mark.asyncio

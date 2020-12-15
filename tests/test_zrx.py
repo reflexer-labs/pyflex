@@ -45,9 +45,9 @@ class TestZrx:
         self.web3.eth.contract(abi=token_proxy_abi)\
             (address=self.token_transfer_proxy_address.address).functions.addAuthorizedAddress(
             self.exchange.address.address).transact()
-        self.token1 = DSToken.deploy(self.web3, 'AAA')
+        self.token1 = DSToken.deploy(self.web3, 'AAA', 'AAA')
         self.token1.mint(Wad.from_number(100)).transact()
-        self.token2 = DSToken.deploy(self.web3, 'BBB')
+        self.token2 = DSToken.deploy(self.web3, 'BBB', 'BBB')
         self.token2.mint(Wad.from_number(100)).transact()
 
     def test_fail_when_no_contract_under_that_address(self):

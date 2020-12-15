@@ -211,7 +211,7 @@ def liquidate(web3: Web3, geb: GfDeployment, our_address: Address):
     # Liquidate the SAFE
     assert geb.liquidation_engine.can_liquidate(collateral.collateral_type, SAFE(our_address))
 
-    assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, Urn(our_address)).transact()
+    assert geb.liquidation_engine.liquidate_safe(collateral.collateral_type, SAFE(our_address)).transact()
 
 
 @pytest.fixture(scope="session")
@@ -237,7 +237,7 @@ class TestConfig:
         assert len(dict) > 20
 
     def test_from_node(self, web3: Web3):
-        geb_testnet = GfDeployment.from_node(web3)
+        geb_testnet = GfDeployment.from_node(web3, 'rai')
         validate_contracts_loaded(geb_testnet)
 
     def test_collaterals(self, geb):
@@ -590,9 +590,6 @@ class TestAccountingEngine:
         assert isinstance(geb.accounting_engine.surplus_auction_amount_to_sell(), Rad)
         assert isinstance(geb.accounting_engine.surplus_buffer(), Rad)
 
-    def test_empty_flog(self, geb):
-        assert geb.accounting_engine.pop_debt_from_queue(0).transact()
-
     def test_settle_debt(self, geb):
         assert geb.accounting_engine.settle_debt(Rad(0)).transact()
 
@@ -626,7 +623,7 @@ class TestOsm:
         set_collateral_price(geb, collateral, Wad.from_number(200))
         # Note this isn't actually an OSM, but we can still read storage slots
         osm = OSM(web3, collateral.osm.address)
-        raw_price = osm._extract_price(2)
+        raw_price = osm.read()
         assert isinstance(raw_price, int)
         assert Wad.from_number(200) == Wad(raw_price)
 

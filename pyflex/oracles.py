@@ -44,18 +44,55 @@ class OSM(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
-    def poke(self) -> Transact:
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'poke', [])
+    def has_value(self) -> bool:
+        """Checks whether this instance contains a value.
 
-    def peek(self) -> Wad:
-        return Wad(self._extract_price(3))
+        Returns:
+            `True` if this instance contains a value, which can be read. `False` otherwise.
+        """
+        return self._contract.functions.getResultWithValidity().call()[1]
 
-    def peep(self) -> Wad:
-        return Wad(self._extract_price(4))
+    def last_update_time(self) -> int:
+        """ Returns last update time in secs
 
-    def _extract_price(self, storage_slot: int) -> int:
-        assert isinstance(storage_slot, int)
-        return Web3.toInt(self.web3.eth.getStorageAt(self.address.address, storage_slot)[16:])
+        Returns:
+            Epoch time in seconds
+        """
+        return self._contract.functions.lastUpdateTime().call()
+
+    def update_delay(self) -> int:
+        """ Returns number of seconds that must pass between updates
+
+        Returns:
+            Number of seconds
+        """
+        return self._contract.functions.updateDelay().call()
+
+    def passed_delay(self) -> bool:
+        """ Check if update delay has passed
+
+        Returns:
+            `True` if time since last update is greater than required delay. `False` otherwise.
+        """
+        return self._contract.functions.lastUpdateTime().call()
+
+    def read(self) -> int:
+        """Reads the current value from this instance
+
+        If this instance does not contain a value, throws an exception.
+
+        Returns:
+            An integer with the current value of this instance.
+        """
+        return self._contract.functions.read().call()
+
+    def update_result(self) -> Transact:
+        """Populates this instance with a new value.
+
+            A :py:class:`pyflex.Transact` instance, which can be used to trigger the transaction.
+        """
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateResult', [])
 
     def __repr__(self):
         return f"OSM('{self.address}')"

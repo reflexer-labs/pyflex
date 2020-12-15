@@ -38,6 +38,7 @@ from web3.exceptions import TransactionNotFound
 
 from eth_abi.codec import ABICodec
 from eth_abi.registry import registry as default_registry
+from eth_abi import decode_single
 
 from pyflex.gas import DefaultGasPrice, GasPrice
 from pyflex.numeric import Wad
@@ -509,13 +510,34 @@ class Transact:
 
         if self.contract is not None:
             if self.function_name is None:
-                return self.web3.eth.estimateGas({**self._as_dict(self.extra), **{'from': from_address.address,
-                                                                                  'to': self.address.address,
-                                                                                  'data': self.parameters[0]}})
+                try:
+                    return self.web3.eth.estimateGas({**self._as_dict(self.extra), **{'from': from_address.address,
+                                                                                      'to': self.address.address,
+                                                                                      'data': self.parameters[0]}})
+                except Exception as e:
+                    try:
+                        return self.web3.eth.call({**self._as_dict(self.extra), **{'from': from_address.address,
+                                                                                          'to': self.address.address,
+                                                                                          'data': self.parameters[0]}})
+                    except Exception as call_e:
+                        raise RuntimeError(call_e) from e
+
+                    raise(e)
+
+
 
             else:
-                estimate = self._contract_function() \
-                        .estimateGas({**self._as_dict(self.extra), **{'from': from_address.address}})
+                try:
+                    estimate = self._contract_function() \
+                            .estimateGas({**self._as_dict(self.extra), **{'from': from_address.address}})
+                except Exception as e:
+                    try:
+                        estimate = self._contract_function() \
+                                .call({**self._as_dict(self.extra), **{'from': from_address.address}})
+                    except Exception as call_e:
+                        raise RuntimeError(call_e) from e
+
+                    raise(e)
 
         else:
             estimate = 21000
