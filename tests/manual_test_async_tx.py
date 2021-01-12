@@ -22,9 +22,7 @@ import sys
 import threading
 import time
 
-from web3 import Web3, HTTPProvider
-
-from pyflex import Address
+from pyflex import Address, web3_via_http
 from pyflex.deployment import GfDeployment
 from pyflex.gas import FixedGasPrice
 from pyflex.keys import register_keys
@@ -35,62 +33,56 @@ logging.basicConfig(format='%(asctime)-15s %(levelname)-8s %(message)s', level=l
 logging.getLogger('urllib3').setLevel(logging.INFO)
 logging.getLogger("web3").setLevel(logging.INFO)
 logging.getLogger("asyncio").setLevel(logging.INFO)
-logging.getLogger("requests").setLevel(logging.INFO)
 
-web3 = Web3(HTTPProvider(endpoint_uri=os.environ['ETH_RPC_URL'], request_kwargs={"timeout": 60}))
+pool_size = int(sys.argv[3]) if len(sys.argv) > 3 else 10
+
+#web3 = Web3(HTTPProvider(endpoint_uri=os.environ['ETH_RPC_URL'], request_kwargs={"timeout": 60}))
+web3 = web3_via_http(endpoint_uri=os.environ['ETH_RPC_URL'], http_pool_size=pool_size)
 web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000aBcdef123
 register_keys(web3, [sys.argv[2]])      # ex: key_file=~keys/default-account.json,pass_file=~keys/default-account.pass
 
 geb = GfDeployment.from_node(web3)
 our_address = Address(web3.eth.defaultAccount)
 
-collateral = geb.collaterals['ETH-A']
-collateral_type = collateral.collateral_type
-collateral.approve(our_address)
+weth = GfDeployment.from_node(web3).collaterals['ETH-A'].collateral
 
 GWEI = 1000000000
+slow_gas = GeometricGasPrice(initial_price=int(0.8 * GWEI), every_secs=30, max_price=2000 * GWEI)
+fast_gas = GeometricGasPrice(initial_price=int(1.1 * GWEI), every_secs=30, max_price=2000 * GWEI)
 
 
 class TestApp:
-    def __init__(self):
-        self.wrap_amount = Wad(10)
 
     def main(self):
-        self.startup()
         self.test_replacement()
         self.test_simultaneous()
         self.shutdown()
 
-    def startup(self):
-        logging.info(f"Wrapping {self.wrap_amount} ETH")
-        assert collateral.collateral.deposit(self.wrap_amount).transact()
-
     def test_replacement(self):
-        first_tx = collateral.adapter.join(our_address, Wad(4))
+        first_tx = weth.deposit(Wad(4))
         logging.info(f"Submitting first TX with gas price deliberately too low")
-        self._run_future(first_tx.transact_async(gas_price=FixedGasPrice(1000)))
-        time.sleep(2)
+        self._run_future(first_tx.transact_async(gas_price=slow_gas))
+        time.sleep(0.5)
 
-        second_tx = collateral.adapter.join(our_address, Wad(6))
+        second_tx = weth.deposit(Wad(6))
         logging.info(f"Replacing first TX with legitimate gas price")
-        second_tx.transact(replace=first_tx, gas_price=FixedGasPrice(2*GWEI))
+        second_tx.transact(replace=first_tx)
 
         assert first_tx.replaced
 
     def test_simultaneous(self):
-        gas = FixedGasPrice(3*GWEI)
-        self._run_future(collateral.adapter.join(our_address, Wad(1)).transact_async(gas_price=gas))
-        self._run_future(collateral.adapter.join(our_address, Wad(5)).transact_async(gas_price=gas))
+        self._run_future(weth.deposit(Wad(1)).transact_async(gas_price=fast_gas))
+        self._run_future(weth.deposit(Wad(5)).transact_async(gas_price=fast_gas))
         asyncio.sleep(6)
 
     def shutdown(self):
-        logging.info(f"Exiting {collateral_type.name} from our safe")
-        # balance = geb.safe_engine.collateral(collateral_type our_address)
-        # assert collateral.adapter.exit(our_address, balance).transact()
-        assert collateral.adapter.exit(our_address, Wad(6)).transact()
-        logging.info(f"Balance is {geb.safe_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
-        logging.info(f"Unwrapping {self.wrap_amount} ETH")
-        assert collateral.collateral.withdraw(self.wrap_amount).transact()
+        balance = weth.balance_of(our_address)
+        if Wad(0) < balance < Wad(100):  # this account's tiny WETH balance came from this test
+            logging.info(f"Unwrapping {balance} WETH")
+            assert weth.withdraw(balance).transact(gas_price=fast_gas)
+        elif balance >= Wad(12):  # user already had a balance, so unwrap what a successful test would have consumed
+            logging.info(f"Unwrapping 12 WETH")
+            assert weth.withdraw(Wad(12)).transact(gas_price=fast_gas)
 
     @staticmethod
     def _run_future(future):
