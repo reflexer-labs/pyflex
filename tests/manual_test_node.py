@@ -40,8 +40,11 @@ if len(sys.argv) > 3:
     register_keys(web3, [sys.argv[3]])      # ex: key_file=~keys/default-account.json,pass_file=~keys/default-account.pass
     our_address = Address(web3.eth.defaultAccount)
     run_transactions = True
-else:
+elif len(sys.argv) > 2:
     our_address = Address(sys.argv[2])
+    run_transactions = False
+else:
+    our_address = None
     run_transactions = False
 
 geb = GfDeployment.from_node(web3)
@@ -69,9 +72,10 @@ class TestApp:
             assert collateral.adapter.join(our_address, self.amount).transact()
             self.joined += self.amount
         else:
-            logging.info(f"Found block {web3.eth.blockNumber}")
-        logging.info(f"SAFE balance is {geb.safe_engine.collateral(collateral_type, our_address)} {collateral_type.name}")
-        self.request_history()
+            logging.info(f"Found block; web3.eth.blockNumber={web3.eth.blockNumber}")
+        if our_address:
+            logging.info(f"Urn balance is {mcd.vat.gem(ilk, our_address)} {ilk.name}")
+        # self.request_history()
 
     def request_history(self):
         logs = geb.safe_engine.past_safe_modifications(web3.eth.blockNumber - past_blocks)

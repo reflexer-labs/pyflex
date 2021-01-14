@@ -24,7 +24,7 @@ import time
 import pytz
 from pyflex.sign import eth_sign
 from web3 import Web3
-from web3.exceptions import BlockNotFound
+from web3.exceptions import BlockNotFound, BlockNumberOutofRange
 
 from pyflex import register_filter_thread, any_filter_thread_present, stop_all_filter_threads, all_filter_threads_alive
 from pyflex.util import AsyncCallback
@@ -331,7 +331,7 @@ class Lifecycle:
             block_number = block['number']
             if not self.web3.eth.syncing:
                 max_block_number = self.web3.eth.blockNumber
-                if block_number == max_block_number:
+                if block_number >= max_block_number:
                     def on_start():
                         self.logger.debug(f"Processing block #{block_number} ({block_hash.hex()})")
 
@@ -352,24 +352,30 @@ class Lifecycle:
 
         def new_block_watch():
             event_filter = self.web3.eth.filter('latest')
+            logging.debug(f"Created event filter: {event_filter}")
             while True:
                 try:
                     # old blocks are ignored in new_block_callback,
                     # so process only the last filter entry
-                    for event in event_filter.get_new_entries()[-1::]:
-                        for attempt in range(NUM_GETBLOCK_ATTEMPTS - 1):
-                            try:
-                                new_block_callback(event)
-                            except BlockNotFound as ex:
-                                if attempt == NUM_GETBLOCK_ATTEMPTS - 1:
-                                    raise ex
-                                self.logger.warning("BlockNotFound from web3.eth.getBlock(). Retrying...")
-                                time.sleep(0.2)
+                    new_block_callback(event_filter.get_new_entries()[-1])
                 except ValueError:
                     self.logger.warning("Node dropped event emitter; recreating latest block filter")
                     event_filter = self.web3.eth.filter('latest')
                 finally:
                     time.sleep(self.block_check_interval)
+
+        def new_block_watch():
+            event_filter = self.web3.eth.filter('latest')
+            logging.debug(f"Created event filter: {event_filter}")
+            while True:
+                try:
+                    for event in event_filter.get_new_entries():
+                        new_block_callback(event)
+                except (BlockNotFound, BlockNumberOutofRange, ValueError) as ex:
+                    self.logger.warning(f"Node dropped event emitter; recreating latest block filter: {ex}")
+                    event_filter = self.web3.eth.filter('latest')
+                finally:
+                    time.sleep(1)
 
         if self.block_function:
             self._on_block_callback = AsyncCallback(self.block_function)

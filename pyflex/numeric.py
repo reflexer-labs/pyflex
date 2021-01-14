@@ -84,6 +84,12 @@ class Wad:
         else:
             raise ArithmeticError
 
+    def __mod__(self, other):
+        if isinstance(other, Wad):
+            return Wad(self.value % other.value)
+        else:
+            raise ArithmeticError
+
     # z = cast((uint256(x) * y + WAD / 2) / WAD);
     def __mul__(self, other):
         if isinstance(other, Wad):
@@ -205,6 +211,12 @@ class Ray:
         else:
             raise ArithmeticError
 
+    def __mod__(self, other):
+        if isinstance(other, Ray):
+            return Ray(self.value % other.value)
+        else:
+            raise ArithmeticError
+
     def __mul__(self, other):
         if isinstance(other, Ray):
             result = Decimal(self.value) * Decimal(other.value) / (Decimal(10) ** Decimal(27))
@@ -322,6 +334,12 @@ class Rad:
     def __sub__(self, other):
         if isinstance(other, Rad):
             return Rad(self.value - other.value)
+        else:
+            raise ArithmeticError
+
+    def __mod__(self, other):
+        if isinstance(other, Rad):
+            return Rad(self.value % other.value)
         else:
             raise ArithmeticError
 
