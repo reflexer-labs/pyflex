@@ -24,7 +24,7 @@ import time
 
 from pyflex import Address, web3_via_http
 from pyflex.deployment import GfDeployment
-from pyflex.gas import FixedGasPrice
+from pyflex.gas import FixedGasPrice, GeometricGasPrice
 from pyflex.keys import register_keys
 from pyflex.numeric import Wad
 
@@ -41,14 +41,14 @@ web3 = web3_via_http(endpoint_uri=os.environ['ETH_RPC_URL'], http_pool_size=pool
 web3.eth.defaultAccount = sys.argv[1]   # ex: 0x0000000000000000000000000000000aBcdef123
 register_keys(web3, [sys.argv[2]])      # ex: key_file=~keys/default-account.json,pass_file=~keys/default-account.pass
 
-geb = GfDeployment.from_node(web3)
+geb = GfDeployment.from_node(web3, 'rai')
 our_address = Address(web3.eth.defaultAccount)
 
-weth = GfDeployment.from_node(web3).collaterals['ETH-A'].collateral
+weth = geb.collaterals['ETH-A'].collateral
 
 GWEI = 1000000000
-slow_gas = GeometricGasPrice(initial_price=int(0.8 * GWEI), every_secs=30, max_price=2000 * GWEI)
-fast_gas = GeometricGasPrice(initial_price=int(1.1 * GWEI), every_secs=30, max_price=2000 * GWEI)
+slow_gas = GeometricGasPrice(initial_price=int(15 * GWEI), every_secs=42, max_price=200 * GWEI)
+fast_gas = GeometricGasPrice(initial_price=int(30 * GWEI), every_secs=42, max_price=200 * GWEI)
 
 
 class TestApp:
@@ -62,27 +62,29 @@ class TestApp:
         first_tx = weth.deposit(Wad(4))
         logging.info(f"Submitting first TX with gas price deliberately too low")
         self._run_future(first_tx.transact_async(gas_price=slow_gas))
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         second_tx = weth.deposit(Wad(6))
         logging.info(f"Replacing first TX with legitimate gas price")
-        second_tx.transact(replace=first_tx)
+        second_tx.transact(replace=first_tx, gas_price=fast_gas)
 
         assert first_tx.replaced
 
     def test_simultaneous(self):
         self._run_future(weth.deposit(Wad(1)).transact_async(gas_price=fast_gas))
+        self._run_future(weth.deposit(Wad(3)).transact_async(gas_price=fast_gas))
         self._run_future(weth.deposit(Wad(5)).transact_async(gas_price=fast_gas))
-        asyncio.sleep(6)
+        self._run_future(weth.deposit(Wad(7)).transact_async(gas_price=fast_gas))
+        time.sleep(33)
 
     def shutdown(self):
         balance = weth.balance_of(our_address)
         if Wad(0) < balance < Wad(100):  # this account's tiny WETH balance came from this test
             logging.info(f"Unwrapping {balance} WETH")
             assert weth.withdraw(balance).transact(gas_price=fast_gas)
-        elif balance >= Wad(12):  # user already had a balance, so unwrap what a successful test would have consumed
-            logging.info(f"Unwrapping 12 WETH")
-            assert weth.withdraw(Wad(12)).transact(gas_price=fast_gas)
+        elif balance >= Wad(22):  # user already had a balance, so unwrap what a successful test would have consumed
+            logging.info(f"Unwrapping 22 WETH")
+            assert weth.withdraw(Wad(22)).transact(gas_price=fast_gas)
 
     @staticmethod
     def _run_future(future):
