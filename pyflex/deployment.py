@@ -312,19 +312,19 @@ class GfDeployment:
 
         return GfDeployment.from_file(web3, addresses_path)
 
-    def approve_system_coin(self, usr: Address, **kwargs):
+    def approve_system_coin(self, address: Address, **kwargs):
         """
         Allows the user to draw system coin from and repay system coin to their SAFEs.
 
         Args
-            usr: Recipient of system coin from one or more SAFEs
+            address: Recipient of system coin from one or more SAFEs
         """
-        assert isinstance(usr, Address)
+        assert isinstance(address, Address)
 
         gas_price = kwargs['gas_price'] if 'gas_price' in kwargs else DefaultGasPrice()
-        self.system_coin_adapter.approve(approval_function=approve_safe_modification_directly(from_address=usr, gas_price=gas_price),
+        self.system_coin_adapter.approve(approval_function=approve_safe_modification_directly(from_address=address, gas_price=gas_price),
                                  source=self.safe_engine.address)
-        self.system_coin.approve(self.system_coin_adapter.address).transact(from_address=usr, gas_price=gas_price)
+        self.system_coin.approve(self.system_coin_adapter.address).transact(from_address=address, gas_price=gas_price)
 
     def active_auctions(self) -> dict:
         collateral_auctions = {}

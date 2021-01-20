@@ -567,7 +567,7 @@ class SAFEEngine(Contract):
                         [collateral_type.toBytes(), safe_address.address, v.address, w.address, delta_collateral.value, delta_debt.value])
 
     def validate_safe_modification(self, collateral_type: CollateralType, address: Address, delta_collateral: Wad, delta_debt: Wad):
-        """Helps diagnose `frob` transaction failures by asserting on `require` conditions in the contract"""
+        """Helps diagnose `modify_safe_collateralization` transaction failures by asserting on `require` conditions in the contract"""
 
         def r(value, decimals=1):  # rounding function
             return round(float(value), decimals)
@@ -612,7 +612,7 @@ class SAFEEngine(Contract):
         is_safe = (delta_debt <= Wad(0) and delta_collateral >= Wad(0)) or \
                 tab <= Ray(locked_collateral) * collateral_type.safety_price
 
-        # safe has no debt, or a non-dusty amount
+        # safe has no debt, or debt greater than debt floor
         neat = generated_debt == Wad(0) or Rad(tab) >= collateral_type.debt_floor
 
         if not under_collateral_debt_ceiling:
@@ -685,10 +685,10 @@ class SAFEEngine(Contract):
         logger.debug(f"Found {len(retval)} safe modifications in {chunks_queried} requests")
         return retval
 
-    def settle_debt(self, vice: Rad) -> Transact:
-        assert isinstance(vice, Rad)
+    def settle_debt(self, amount: Rad) -> Transact:
+        assert isinstance(amount, Rad)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [vice.value])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [amount.value])
 
     def __eq__(self, other):
         assert isinstance(other, SAFEEngine)
@@ -783,10 +783,10 @@ class AccountingEngine(Contract):
         self._contract = self._get_contract(web3, self.abi, address)
         self.safe_engine = SAFEEngine(web3, Address(self._contract.functions.safeEngine().call()))
 
-    def add_authorization(self, guy: Address) -> Transact:
-        assert isinstance(guy, Address)
+    def add_authorization(self, address: Address) -> Transact:
+        assert isinstance(address, Address)
 
-        return Transact(self, self.web3, self.abi, self.address, self._contract, 'addAuthorization', [guy.address])
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'addAuthorization', [address.address])
 
     def authorized_accounts(self, address: Address):
         assert isinstance(address, Address)
@@ -851,7 +851,7 @@ class AccountingEngine(Contract):
 
     def settle_debt(self, rad: Rad) -> Transact:
         assert isinstance(rad, Rad)
-        logger.info(f"Settling debt joy={self.safe_engine.coin_balance(self.address)} unqueued_enauctioned_debt={self.unqueued_unauctioned_debt()}")
+        logger.info(f"Settling debt. coin_balance={self.safe_engine.coin_balance(self.address)} unqueued_enauctioned_debt={self.unqueued_unauctioned_debt()}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'settleDebt', [rad.value])
 
@@ -868,7 +868,7 @@ class AccountingEngine(Contract):
 
     def auction_surplus(self) -> Transact:
         """Initiate a surplus auction"""
-        logger.info(f"Initiating a surplus auction with joy={self.safe_engine.coin_balance(self.address)}")
+        logger.info(f"Initiating a surplus auction with coin balance={self.safe_engine.coin_balance(self.address)}")
 
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionSurplus', [])
 
@@ -1034,7 +1034,7 @@ class LiquidationEngine(Contract):
         return delta_debt > Wad(0) and delta_collateral > Wad(0)
 
     def liquidate_safe(self, collateral_type: CollateralType, safe: SAFE) -> Transact:
-        """ Initiate liquidation of a SAFE, kicking off a collateral auction
+        """ Initiate liquidation of a SAFE, starting a collateral auction
 
         Args:
             collateral_type: Identifies the type of collateral.
