@@ -2,7 +2,7 @@
 
 #TESTCHAIN="testchain-value-fixed-discount-governance-median-multisig-basic"
 #TESTCHAIN="rai-testchain-value-fixed-discount-uniswap-multisig-basic"
-declare -a TESTCHAINS=("rai-testchain-value-fixed-discount-uniswap-multisig-basic" "rai-testchain-value-fixed-discount-uniswap-multisig-safe")
+declare -a TESTCHAINS=("rai-testchain-value-fixed-discount-uniswap-multisig-safe")
 
 run_test () {
   export TESTCHAIN=$1

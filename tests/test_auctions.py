@@ -509,8 +509,9 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert geb.safe_engine.coin_balance(other_address) == Rad(0)
 
         # Add Wad(1) to counter precision error converting amount_to_raise from Rad to Wad
+        # Add another Wad(1) because the auction house adds Wad(1)
         wrap_modify_safe_collateralization(geb, collateral, other_address, delta_collateral=eth_required,
-                                          delta_debt=Wad(current_bid.amount_to_raise) + Wad(1))
+                                          delta_debt=Wad(current_bid.amount_to_raise) + Wad(2))
 
         assert geb.safe_engine.coin_balance(other_address) > current_bid.amount_to_raise
 
@@ -541,7 +542,7 @@ class TestFixedDiscountCollateralAuctionHouse:
         assert after_first_bid.sold_amount == log.bought_collateral
 
         # Second bid to buy the remaining collateral
-        second_bid_amount = Wad(after_first_bid.amount_to_raise) - first_bid_amount
+        second_bid_amount = Wad(after_first_bid.amount_to_raise) - first_bid_amount + Wad(1)
         assert second_bid_amount > fixed_collateral_auction_house.minimum_bid()
         assert geb.safe_engine.coin_balance(other_address) > Rad(second_bid_amount)
         TestFixedDiscountCollateralAuctionHouse.buy_collateral(fixed_collateral_auction_house, auction_id,
