@@ -464,8 +464,9 @@ class Transact:
                 receipt = Receipt(raw_receipt)
                 receipt.result = self.result_function(receipt) if self.result_function is not None else None
                 return receipt
-        except (TransactionNotFound, ValueError):
-            self.logger.debug(f"Transaction {transaction_hash} not found (may have been dropped/replaced)")
+        except (TransactionNotFound, ValueError, KeyError):
+            tx_str = transaction_hash.hex() if isinstance(transaction_hash, bytes) else str(transaction_hash)
+            self.logger.debug(f"Transaction {tx_str} not found (may have been dropped/replaced)")
         return None
 
     def _as_dict(self, dict_or_none) -> dict:
@@ -846,6 +847,9 @@ class RecoveredTransact(Transact):
                     return
 
             await asyncio.sleep(0.75)
+
+    def __str__(self):
+        return f"RecoveredTransact(address: {self.address}, nonce: {self.nonce}, current_gas: {self.current_gas})"
 
 class Transfer:
     """Represents an ERC20 token transfer.
