@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import pytest
 import asyncio
 import logging
 import os
@@ -27,6 +28,7 @@ from pyflex.deployment import GfDeployment
 from pyflex.gas import FixedGasPrice, GeometricGasPrice
 from pyflex.keys import register_keys
 from pyflex.numeric import Wad
+from pyflex import get_pending_transactions
 
 logging.basicConfig(format='%(asctime)-15s %(levelname)-8s %(message)s', level=logging.DEBUG)
 # reduce logspew
@@ -47,17 +49,20 @@ our_address = Address(web3.eth.defaultAccount)
 weth = geb.collaterals['ETH-A'].collateral
 
 GWEI = 1000000000
-slow_gas = GeometricGasPrice(initial_price=int(15 * GWEI), every_secs=42, max_price=200 * GWEI)
-fast_gas = GeometricGasPrice(initial_price=int(30 * GWEI), every_secs=42, max_price=200 * GWEI)
+slow_gas = GeometricGasPrice(initial_price=int(15 * GWEI), every_secs=42, max_price=300 * GWEI)
+fast_gas = GeometricGasPrice(initial_price=int(90 * GWEI), every_secs=42, max_price=300 * GWEI)
 
 from mock import MagicMock
 
 class TestApp:
 
     def main(self):
-        self.test_replacement()
-        self.test_simultaneous()
-        self.shutdown()
+        # Cancel any pending txs
+        pending = get_pending_transactions(web3, our_address)
+        for tx in pending:
+            print(f"canceling pending tx {tx}")
+            tx.cancel(gas_price=fast_gas)
+        self.test_mainnet_async_sync_replacement()
 
     def start_ignoring_transactions(self):
         """ Allows an async tx to be created and leaves it trapped in Transact's event loop """
@@ -97,13 +102,22 @@ class TestApp:
 
         logging.debug("Finished ignoring async transactions")
 
-    def _test_replacement(self):
+    def test_mainnet_async_async_replacement(self):
         first_tx = weth.deposit(Wad(4))
         logging.info(f"Submitting first TX with gas price deliberately too low")
-        self.start_ignoring_transactions()
         self._run_future(first_tx.transact_async(gas_price=slow_gas))
-        time.sleep(0.1)
-        self.end_ignoring_transactions()
+        time.sleep(0.5)
+
+        second_tx = weth.deposit(Wad(6))
+        logging.info(f"Replacing first TX with legitimate gas price")
+        self._run_future(second_tx.transact_async(replace=first_tx, gas_price=fast_gas), join=True)
+
+        assert first_tx.replaced
+
+    def test_mainnet_async_sync_replacement(self):
+        first_tx = weth.deposit(Wad(4))
+        logging.info(f"Submitting first TX with gas price deliberately too low")
+        self._run_future(first_tx.transact_async(gas_price=slow_gas))
 
         second_tx = weth.deposit(Wad(6))
         logging.info(f"Replacing first TX with legitimate gas price")
@@ -111,7 +125,10 @@ class TestApp:
 
         assert first_tx.replaced
 
-    def test_replacement(self):
+    @pytest.mark.skip("kovan")
+    def test_kovan_async_sync_replacement(self):
+        # This version uses start_ignoring_transactions() for kovan since txs get mined
+        # very quickly on kovan
         first_tx = weth.deposit(Wad(4))
         logging.info(f"Submitting first TX with gas price deliberately too low")
         self.start_ignoring_transactions()
@@ -125,29 +142,33 @@ class TestApp:
 
         second_tx = weth.deposit(Wad(6))
         logging.info(f"Replacing first TX with legitimate gas price")
-        self._run_future(second_tx.transact_async(gas_price=fast_gas))
-        time.sleep(30)
-        #second_tx.transact(replace=first_tx, gas_price=fast_gas)
+        second_tx.transact(replace=first_tx, gas_price=fast_gas)
 
         assert first_tx.replaced
-    def _test_simultaneous(self):
-        self._run_future(weth.deposit(Wad(1)).transact_async(gas_price=fast_gas))
-        self._run_future(weth.deposit(Wad(3)).transact_async(gas_price=fast_gas))
-        self._run_future(weth.deposit(Wad(5)).transact_async(gas_price=fast_gas))
-        self._run_future(weth.deposit(Wad(7)).transact_async(gas_price=fast_gas))
-        time.sleep(33)
 
-    def _shutdown(self):
-        balance = weth.balance_of(our_address)
-        if Wad(0) < balance < Wad(100):  # this account's tiny WETH balance came from this test
-            logging.info(f"Unwrapping {balance} WETH")
-            assert weth.withdraw(balance).transact(gas_price=fast_gas)
-        elif balance >= Wad(22):  # user already had a balance, so unwrap what a successful test would have consumed
-            logging.info(f"Unwrapping 22 WETH")
-            assert weth.withdraw(Wad(22)).transact(gas_price=fast_gas)
+    @pytest.mark.skip("kovan")
+    def test_kovan_async_async_replacement(self):
+        # This version uses start_ignoring_transactions() for kovan since txs get mined
+        # very quickly on kovan
+        first_tx = weth.deposit(Wad(4))
+        logging.info(f"Submitting first TX with gas price deliberately too low")
+        self.start_ignoring_transactions()
+        self._run_future(first_tx.transact_async(gas_price=slow_gas))
+        time.sleep(0.1)
+        self.end_ignoring_transactions()
+        while threading.active_count() > 1:
+            print("> 1 thread")
+            #asyncio.sleep(0.4)
+            time.sleep(0.4)
+
+        second_tx = weth.deposit(Wad(6))
+        logging.info(f"Replacing first TX with legitimate gas price")
+        self._run_future(second_tx.transact_async(replace=first_tx, gas_price=fast_gas), join=True)
+
+        assert first_tx.replaced
 
     @staticmethod
-    def _run_future(future):
+    def _run_future(future, join=False):
         def worker():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -158,7 +179,8 @@ class TestApp:
 
         thread = threading.Thread(target=worker, daemon=True)
         thread.start()
-
+        if join:
+            thread.join()
 
 if __name__ == '__main__':
     TestApp().main()
