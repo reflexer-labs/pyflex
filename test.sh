@@ -21,7 +21,7 @@ run_test () {
   sleep 2
 
   #Run the tests
-  py.test -s --cov=pyflex --cov-report=term --cov-append tests/${TEST_FILE}
+  pytest -s --cov=pyflex --cov-report=term --cov-append tests/${TEST_FILE}
   TEST_RESULT=$?
 
   # Cleanup
