@@ -784,7 +784,7 @@ class TestDebtAuctionHouse:
         cleanup_safe(geb, collateral, our_address)
         cleanup_safe(geb, collateral, deployment_address)
 
-@pytest.mark.skip("don't have testchain support for this")
+@pytest.mark.skip("don't have testchain support for this.")
 class TestIncreasingDiscountCollateralAuctionHouse:
     @pytest.fixture(scope="session")
     def collateral(self, geb: GfDeployment) -> Collateral:
