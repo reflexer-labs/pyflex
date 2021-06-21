@@ -269,6 +269,7 @@ class TestConfig:
         assert token.transfer_from(other_address, our_address, amount).transact(from_address=other_address)
         assert token.balance_of(our_address) == before
 
+    @pytest.mark.skip("broken on testchain as there is no Increasing Discount Auction house.")
     def test_get_active_auctions(self, geb):
         auctions = geb.active_auctions()
         assert "collateral_auctions" in auctions
