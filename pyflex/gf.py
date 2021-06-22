@@ -34,7 +34,7 @@ from pyflex import Address, Contract, Transact
 from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auctions import PreSettlementSurplusAuctionHouse
 from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
-from pyflex.auctions import DebtAuctionHouse
+from pyflex.auctions import IncreasingDiscountCollateralAuctionHouse, DebtAuctionHouse
 from pyflex.gas import DefaultGasPrice
 from pyflex.token import DSToken, ERC20Token
 from pyflex.numeric import Wad, Ray, Rad
@@ -336,7 +336,8 @@ class Collateral:
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, BasicCollateralJoin)
         assert isinstance(collateral_auction_house, EnglishCollateralAuctionHouse) or \
-               isinstance(collateral_auction_house, FixedDiscountCollateralAuctionHouse)
+               isinstance(collateral_auction_house, FixedDiscountCollateralAuctionHouse) or \
+               isinstance(collateral_auction_house, IncreasingDiscountCollateralAuctionHouse)
         assert isinstance(keeper_flash_proxy, GebETHKeeperFlashProxy) or keeper_flash_proxy is None
 
         self.collateral_type = collateral_type

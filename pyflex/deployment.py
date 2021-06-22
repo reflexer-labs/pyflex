@@ -22,8 +22,8 @@ from typing import Dict, List, Optional
 
 import pkg_resources
 from pyflex.auctions import PreSettlementSurplusAuctionHouse
-from pyflex.auctions import FixedDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
-from pyflex.auctions import DebtAuctionHouse
+from pyflex.auctions import IncreasingDiscountCollateralAuctionHouse, EnglishCollateralAuctionHouse
+from pyflex.auctions import FixedDiscountCollateralAuctionHouse, DebtAuctionHouse
 from web3 import Web3, HTTPProvider
 
 from pyflex import Address
@@ -170,7 +170,7 @@ class GfDeployment:
 
                 # Detect which auction house is used
                 try:
-                    coll_auction_house = FixedDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))
+                    coll_auction_house = IncreasingDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))
                 except:
                     try:
                         coll_auction_house = EnglishCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))

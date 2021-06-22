@@ -38,7 +38,8 @@ class AuctionContract(Contract):
 
     def __init__(self, web3: Web3, address: Address, abi: list, bids: callable):
         if self.__class__ == AuctionContract:
-            raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, FixedDiscountAuctionHouse, \
+            raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, \
+                                 FixedDiscountCollateralAuctionHouse, IncreasingDiscountCollateralAuctionHouse, \
                                  PreSettlementSurplusAuctionHouse, or DebtAuctionHouse')
 
         assert isinstance(web3, Web3)
@@ -767,15 +768,6 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         def __repr__(self):
             return f"FixedDiscountCollateralAuctionHouse.SettleAuctionLog({pformat(vars(self))})"
 
-    def active_auctions(self) -> list:
-        active_auctions = []
-        auction_count = self.auctions_started()
-        for index in range(1, auction_count + 1):
-            bid = self._bids(index)
-            if bid.amount_to_sell > Wad(0) and bid.amount_to_raise > Rad(0):
-                active_auctions.append(bid)
-
-        return active_auctions
 
     def __init__(self, web3: Web3, address: Address):
         assert isinstance(web3, Web3)
@@ -790,6 +782,16 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
         super(FixedDiscountCollateralAuctionHouse, self).__init__(web3, address, FixedDiscountCollateralAuctionHouse.abi, self.bids)
 
         assert self._contract.functions.AUCTION_TYPE().call() == toBytes('FIXED_DISCOUNT')
+
+    def active_auctions(self) -> list:
+        active_auctions = []
+        auction_count = self.auctions_started()
+        for index in range(1, auction_count + 1):
+            bid = self._bids(index)
+            if bid.amount_to_sell > Wad(0) and bid.amount_to_raise > Rad(0):
+                active_auctions.append(bid)
+
+        return active_auctions
    
     def get_collateral_median_price(self) -> Ray:
         """Returns the market price from system coin oracle.
@@ -899,3 +901,250 @@ class FixedDiscountCollateralAuctionHouse(AuctionContract):
     def __repr__(self):
         return f"FixedDiscountCollateralAuctionHouse('{self.address}')"
 
+class IncreasingDiscountCollateralAuctionHouse(AuctionContract):
+    """A client for the `IncreasingDiscountCollateralAuctionHouse` contract, used to interact with collateral auctions.
+
+    You can find the source code of the `FixedDiscountCollateralAuctionHouse` contract here:
+    <https://github.com/reflexer-labs/geb/blob/8ff6f9499df94486063a27b82e1b2126728ffa18/src/CollateralAuctionHouse.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `IncreasingDiscountCollateralAuctionHouse` contract.
+
+    Event signatures:
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/IncreasingDiscountAuctionHouse.abi')
+    #abi = Contract._load_abi(__name__, 'abi/IncreasingDiscountCollateralAuctionHouse.abi')
+    #bin = Contract._load_bin(__name__, 'abi/FixedDiscountCollateralAuctionHouse.bin')
+
+    class Bid:
+        def __init__(self, id: int, amount_to_sell: Wad, amount_to_raise: Rad, current_discount: Wad,
+                max_discount: Wad, per_second_discount_update_rate: Ray, latest_discount_update_time: int,
+                discount_increase_deadline: int, forgone_collateral_receiver: Address,
+                auction_income_recipient: Address):
+            assert(isinstance(id, int))
+            assert(isinstance(amount_to_sell, Wad))
+            assert(isinstance(amount_to_raise, Rad))
+            assert(isinstance(current_discount, Wad))
+            assert(isinstance(max_discount, Wad))
+            assert(isinstance(per_second_discount_update_rate, Ray))
+            assert(isinstance(latest_discount_update_time, int))
+            assert(isinstance(discount_increase_deadline, int))
+            assert(isinstance(forgone_collateral_receiver, Address))
+            assert(isinstance(auction_income_recipient, Address))
+
+            self.id = id
+            self.amount_to_sell = amount_to_sell
+            self.amount_to_raise = amount_to_raise
+            self.current_discount = current_discount
+            self.max_discount = max_discount
+            self.per_second_discount_update_rate = per_second_discount_update_rate
+            self.latest_discount_update_time = latest_discount_update_time
+            self.discount_increase_deadline = discount_increase_deadline
+            self.forgone_collateral_receiver = forgone_collateral_receiver
+            self.auction_income_recipient = auction_income_recipient
+
+        def __repr__(self):
+            return f"IncreasingDiscountCollateralAuctionHouse.Bid({pformat(vars(self))})"
+
+    class StartAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.auctions_started = int(args['auctionsStarted'])
+            self.amount_to_sell = Wad(args['amountToSell'])
+            self.initial_bid = Rad(args['initialBid'])
+            self.amount_to_raise = Rad(args['amountToRaise'])
+            self.forgone_collateral_receiver = Address(args['forgoneCollateralReceiver'])
+            self.auction_income_recipient = Address(args['auctionIncomeRecipient'])
+            self.auction_deadline = int(args['auctionDeadline'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"IncreasingDiscountCollateralAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+
+    class BuyCollateralLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.wad = Wad(args['wad'])
+            self.bought_collateral = Wad(args['boughtCollateral'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+            self.raw = log
+
+        def __repr__(self):
+            return f"IncreasingDiscountCollateralAuctionHouse.BuyCollateralLog({pformat(vars(self))})"
+
+    class SettleAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.leftover_collateral = Wad(args['leftoverCollateral'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+            self.raw = log
+
+        def __repr__(self):
+            return f"IncreasingDiscountCollateralAuctionHouse.SettleAuctionLog({pformat(vars(self))})"
+
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        # Set ABIs for event names that are not in AuctionContract
+        self.buy_collateral_abi = None
+        for member in IncreasingDiscountCollateralAuctionHouse.abi:
+            if not self.buy_collateral_abi and member.get('name') == 'BuyCollateral':
+                self.buy_collateral_abi = member
+
+        super(IncreasingDiscountCollateralAuctionHouse, self).__init__(web3, address, IncreasingDiscountCollateralAuctionHouse.abi, self.bids)
+
+        #assert self._contract.functions.AUCTION_TYPE().call() == toBytes('INCREASING_DISCOUNT')
+        #assert self._contract.functions.AUCTION_TYPE().call() == toBytes('FIXED_DISCOUNT')
+   
+    def active_auctions(self) -> list:
+        active_auctions = []
+        auction_count = self.auctions_started()
+        for index in range(1, auction_count + 1):
+            bid = self._bids(index)
+            if bid.amount_to_sell > Wad(0) and bid.amount_to_raise > Rad(0):
+                active_auctions.append(bid)
+
+        return active_auctions
+
+    def get_collateral_median_price(self) -> Ray:
+        """Returns the market price from system coin oracle.
+       
+        Returns:
+            System coin market price
+        """
+        return Ray(self._contract.functions.getCollateralMedianPrice().call())
+
+    def get_final_token_prices(self) -> (int, int):
+        return self._contract.functions.getFinalTokenPrices(self._contract.functions.lastReadRedemptionPrice().call()).call()
+
+    def minimum_bid(self) -> Wad:
+        """Returns the minimum bid.
+
+        Returns:
+            The minimum
+        """
+        return Wad(self._contract.functions.minimumBid().call())
+
+    def min_discount(self) -> Wad:
+        """Returns the min auction discount 
+
+        Returns:
+            The auction discount
+        """
+        return Wad(self._contract.functions.minDiscount().call())
+
+    def max_discount(self) -> Wad:
+        """Returns the max auction discount 
+
+        Returns:
+            The auction discount
+        """
+        return Wad(self._contract.functions.maxDiscount().call())
+
+    def per_second_discount_update_rate(self) -> Ray:
+        """Returns the perSecondDiscountUpdateRate
+
+        Returns:
+            The per second discount update rate
+        """
+        return Ray(self._contract.functions.perSecondDiscountUpdateRate().call())
+
+    def max_discount_update_rate_timeline(self) -> int:
+        """Returns the Max time over which the discount can be updated
+
+        Returns:
+            The maxDiscountUpdateRateTimeline
+        """
+        return int(self._contract.functions.maxDiscountUpdateRateTimeline().call())
+
+    def last_read_redemption_price(self) -> Wad:
+        """Returns the last read redemption price
+
+        Returns:
+            the last read redemption price
+        """
+        return Wad(self._contract.functions.lastReadRedemptionPrice().call())
+
+    def bids(self, id: int) -> Bid:
+        """Returns the auction details.
+
+        Args:
+            id: Auction identifier.
+
+        Returns:
+            The auction details.
+        """
+        assert(isinstance(id, int))
+
+        array = self._contract.functions.bids(id).call()
+
+        return IncreasingDiscountCollateralAuctionHouse.Bid(id=id,
+                           amount_to_sell=Wad(array[0]),
+                           amount_to_raise=Rad(array[1]),
+                           current_discount=Wad(array[2]),
+                           max_discount=Wad(array[3]),
+                           per_second_discount_update_rate=Ray(array[4]),
+                           latest_discount_update_time=int(array[5]),
+                           discount_increase_deadline=int(array[6]),
+                           forgone_collateral_receiver=Address(array[7]),
+                           auction_income_recipient=Address(array[8]))
+
+    def start_auction(self, forgone_collateral_receiver: Address, auction_income_recipient: Address,
+                      amount_to_raise: Rad, amount_to_sell: Wad, bid_amount: Rad) -> Transact:
+        assert(isinstance(forgoneCollateralReceiver, Address))
+        assert(isinstance(auction_income_recipient, Address))
+        assert(isinstance(amount_to_raise, Rad))
+        assert(isinstance(amount_to_sell, Wad))
+        assert(isinstance(bid_amount, Rad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'startAuction', [forgone_collateral_receiver.address,
+                                                                                          auction_income_recipient.address,
+                                                                                          amount_to_raise.value,
+                                                                                          amount_to_sell.value,
+                                                                                          bid_amount.value])
+
+    def buy_collateral(self, id: int, wad: Wad) -> Transact:
+        assert(isinstance(id, int))
+        assert(isinstance(wad, Wad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'buyCollateral', [id, wad.value])
+
+    def get_collateral_bought(self, id: int, wad: Wad) -> Transact:
+        assert(isinstance(id, int))
+        assert(isinstance(wad, Wad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'getCollateralBought', [id, wad.value])
+
+    def get_approximate_collateral_bought(self, id: int, wad: Wad) -> Tuple[Wad, Wad]:
+        assert(isinstance(id, int))
+        assert(isinstance(wad, Wad))
+
+        collateral, bid = self._contract.functions.getApproximateCollateralBought(id, wad.value).call()
+
+        return Wad(collateral), Wad(bid)
+
+    def parse_event(self, event):
+        signature = Web3.toHex(event['topics'][0])
+        codec = ABICodec(default_registry)
+        if signature == "0xdf7b5cd0ee6547c7389d2ac00ee0c1cd3439542399d6c8c520cc69c7409c0990":
+            event_data = get_event_data(codec, self.start_auction_abi, event)
+            return FixedDiscountCollateralAuctionHouse.StartAuctionLog(event_data)
+        elif signature == "0xa4a1133e32fac37643a1fe1db4631daadb462c8662ae16004e67f0b8bb608383":
+            event_data = get_event_data(codec, self.buy_collateral_abi, event)
+            return FixedDiscountCollateralAuctionHouse.BuyCollateralLog(event_data)
+        elif signature == "0xef063949eb6ef5abef19139d9c75a558424ffa759302cfe445f8d2d327376fe4":
+            event_data = get_event_data(codec, self.settle_auction_abi, event)
+            return FixedDiscountCollateralAuctionHouse.SettleAuctionLog(event_data)
+
+    def __repr__(self):
+        return f"IncreasingDiscountCollateralAuctionHouse('{self.address}')"
