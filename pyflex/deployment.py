@@ -243,8 +243,10 @@ class GfDeployment:
                 'UNISWAP_FACTORY': self.uniswap_factory.address,
                 'UNISWAP_ROUTER': self.uniswap_router.address,
                 'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address.address,
-                'GEB_MC_KEEPER_FLASH_PROXY_V3': self.mc_keeper_flash_proxy_v3.address.address,
-                'GEB_MC_KEEPER_FLASH_PROXYi_DAI_V3': self.mc_keeper_flash_proxy_dai_v3.address.address,
+                'GEB_MC_KEEPER_FLASH_PROXY_V3': self.mc_keeper_flash_proxy_v3.address.address \
+                        if self.mc_keeper_flash_proxy_v3 else None,
+                'GEB_MC_KEEPER_FLASH_PROXY_DAI_V3': self.mc_keeper_flash_proxy_dai_v3.address.address \
+                        if self.mc_keeper_flash_proxy_dai_v3 else None,
                 'STARTING_BLOCK_NUMBER': self.starting_block_number
             }
 
