@@ -86,6 +86,7 @@ class GfDeployment:
                      prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
                      uniswap_factory: Address, uniswap_router: Address, mc_keeper_flash_proxy: GebMCKeeperFlashProxy,
+                     mc_keeper_flash_proxy_v3: GebMCKeeperFlashProxy, mc_keeper_flash_proxy_dai_v3: GebMCKeeperFlashProxy,
                      starting_block_number: int, collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.safe_engine = safe_engine
@@ -108,6 +109,8 @@ class GfDeployment:
             self.uniswap_factory = uniswap_factory
             self.uniswap_router = uniswap_router
             self.mc_keeper_flash_proxy = mc_keeper_flash_proxy
+            self.mc_keeper_flash_proxy_v3 = mc_keeper_flash_proxy_v3
+            self.mc_keeper_flash_proxy_dai_v3 = mc_keeper_flash_proxy_dai_v3
             self.starting_block_number = starting_block_number
             self.collaterals = collaterals or {}
 
@@ -130,6 +133,13 @@ class GfDeployment:
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
             safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
             mc_keeper_flash_proxy = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_MULTI_COLLATERAL_KEEPER_FLASH_PROXY']))
+            try:
+                mc_keeper_flash_proxy_v3 = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_V3_MULTI_COLLATERAL_KEEPER_FLASH_PROXY']))
+                mc_keeper_flash_proxy_dai_v3 = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_V3_MULTI_HOP_KEEPER_FLASH_PROXY']))
+            except:
+                mc_keeper_flash_proxy_v3 = None
+                mc_keeper_flash_proxy_dai_v3 = None
+
             starting_block_number = int(conf['STARTING_BLOCK_NUMBER'])
 
             # Kovan deployment current doesn't have PROT or ESM
@@ -195,6 +205,7 @@ class GfDeployment:
                                        debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
                                        prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
                                        safe_manager, uniswap_factory, uniswap_router, mc_keeper_flash_proxy, 
+                                       mc_keeper_flash_proxy_v3, mc_keeper_flash_proxy_dai_v3, 
                                        starting_block_number, collaterals)
 
         @staticmethod
@@ -232,6 +243,10 @@ class GfDeployment:
                 'UNISWAP_FACTORY': self.uniswap_factory.address,
                 'UNISWAP_ROUTER': self.uniswap_router.address,
                 'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address.address,
+                'GEB_MC_KEEPER_FLASH_PROXY_V3': self.mc_keeper_flash_proxy_v3.address.address \
+                        if self.mc_keeper_flash_proxy_v3 else None,
+                'GEB_MC_KEEPER_FLASH_PROXY_DAI_V3': self.mc_keeper_flash_proxy_dai_v3.address.address \
+                        if self.mc_keeper_flash_proxy_dai_v3 else None,
                 'STARTING_BLOCK_NUMBER': self.starting_block_number
             }
 
@@ -277,6 +292,8 @@ class GfDeployment:
         self.uniswap_factory = config.uniswap_factory
         self.uniswap_router = config.uniswap_router
         self.mc_keeper_flash_proxy = config.mc_keeper_flash_proxy
+        self.mc_keeper_flash_proxy_v3 = config.mc_keeper_flash_proxy_v3
+        self.mc_keeper_flash_proxy_dai_v3 = config.mc_keeper_flash_proxy_dai_v3
         self.starting_block_number = config.starting_block_number
 
         #self.dsr_manager = config.dsr_manager
