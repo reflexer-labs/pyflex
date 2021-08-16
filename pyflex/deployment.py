@@ -130,6 +130,8 @@ class GfDeployment:
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
             safe_manager = SafeManager(web3, Address(conf['SAFE_MANAGER']))
             mc_keeper_flash_proxy = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_MULTI_COLLATERAL_KEEPER_FLASH_PROXY']))
+            mc_keeper_flash_proxy_v3 = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_V3_MULTI_COLLATERAL_KEEPER_FLASH_PROXY']))
+            mc_keeper_flash_proxy_dai_v3 = GebMCKeeperFlashProxy(web3, Address(conf['GEB_UNISWAP_V3_MULTI_HOP_KEEPER_FLASH_PROXY']))
             starting_block_number = int(conf['STARTING_BLOCK_NUMBER'])
 
             # Kovan deployment current doesn't have PROT or ESM
