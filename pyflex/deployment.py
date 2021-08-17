@@ -249,8 +249,6 @@ class GfDeployment:
                 'GEB_MC_KEEPER_FLASH_PROXY': self.mc_keeper_flash_proxy.address.address,
                 'GEB_MC_KEEPER_FLASH_PROXY_V3': self.mc_keeper_flash_proxy_v3.address.address \
                         if self.mc_keeper_flash_proxy_v3 else None,
-                'GEB_MC_KEEPER_FLASH_PROXY_DAI_V3': self.mc_keeper_flash_proxy_dai_v3.address.address \
-                        if self.mc_keeper_flash_proxy_dai_v3 else None,
                 'STARTING_BLOCK_NUMBER': self.starting_block_number
             }
 
@@ -297,7 +295,6 @@ class GfDeployment:
         self.uniswap_router = config.uniswap_router
         self.mc_keeper_flash_proxy = config.mc_keeper_flash_proxy
         self.mc_keeper_flash_proxy_v3 = config.mc_keeper_flash_proxy_v3
-        self.mc_keeper_flash_proxy_dai_v3 = config.mc_keeper_flash_proxy_dai_v3
         self.starting_block_number = config.starting_block_number
 
         #self.dsr_manager = config.dsr_manager
