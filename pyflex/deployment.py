@@ -87,6 +87,7 @@ class GfDeployment:
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
                      uniswap_factory: Address, uniswap_router: Address, mc_keeper_flash_proxy: GebMCKeeperFlashProxy,
                      mc_keeper_flash_proxy_v3: GebMCKeeperFlashProxy,
+
                      starting_block_number: int, collaterals: Optional[Dict[str, Collateral]] = None):
             self.pause = pause
             self.safe_engine = safe_engine
@@ -209,7 +210,7 @@ class GfDeployment:
                                        debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
                                        prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
                                        safe_manager, uniswap_factory, uniswap_router, mc_keeper_flash_proxy, 
-                                       mc_keeper_flash_proxy_v3, 
+                                       mc_keeper_flash_proxy_v3,
                                        starting_block_number, collaterals)
 
         @staticmethod
