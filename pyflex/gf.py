@@ -332,7 +332,7 @@ class Collateral:
 
     def __init__(self, collateral_type: CollateralType, collateral: ERC20Token, adapter: BasicCollateralJoin,
             collateral_auction_house: EnglishCollateralAuctionHouse, keeper_flash_proxy: GebETHKeeperFlashProxy,
-            keeper_flash_proxy_dai: GebETHKeeperFlashProxy, osm):
+            keeper_flash_proxy_dai_v3: GebETHKeeperFlashProxy, keeper_flash_proxy_v3: GebETHKeeperFlashProxy, osm):
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(collateral, ERC20Token)
         assert isinstance(adapter, BasicCollateralJoin)
@@ -340,14 +340,16 @@ class Collateral:
                isinstance(collateral_auction_house, FixedDiscountCollateralAuctionHouse) or \
                isinstance(collateral_auction_house, IncreasingDiscountCollateralAuctionHouse)
         assert isinstance(keeper_flash_proxy, GebETHKeeperFlashProxy) or keeper_flash_proxy is None
-        assert isinstance(keeper_flash_proxy_dai, GebETHKeeperFlashProxy) or keeper_flash_proxy_dai is None
+        assert isinstance(keeper_flash_proxy_dai_v3, GebETHKeeperFlashProxy) or keeper_flash_proxy_dai_v3 is None
+        assert isinstance(keeper_flash_proxy_v3, GebETHKeeperFlashProxy) or keeper_flash_proxy_v3 is None
 
         self.collateral_type = collateral_type
         self.collateral = collateral
         self.adapter = adapter
         self.collateral_auction_house = collateral_auction_house
         self.keeper_flash_proxy = keeper_flash_proxy
-        self.keeper_flash_proxy_dai = keeper_flash_proxy_dai
+        self.keeper_flash_proxy_dai_v3 = keeper_flash_proxy_dai_v3
+        self.keeper_flash_proxy_v3 = keeper_flash_proxy_v3
         # Points to `median` for official deployments, `DSValue` for testing purposes.
         # Users generally have no need to interact with the osm.
         self.osm = osm
