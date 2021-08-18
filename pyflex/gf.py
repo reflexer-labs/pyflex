@@ -1005,7 +1005,7 @@ class LiquidationEngine(Contract):
         b32_collateral_type = collateral_type.toBytes()
         return Address(self._contract.functions.chosenSAFESaviour(b32_collateral_type,safe.address).call())
 
-    def can_liquidate(self, collateral_type: CollateralType, safe: SAFE) -> bool:
+    def can_liquidate(self, collateral_type: CollateralType, safe: SAFE, refresh_safe_status: bool = True) -> bool:
         """ Determine whether a safe can be liquidated
         Args:
             collateral_type: CollateralType
@@ -1013,8 +1013,11 @@ class LiquidationEngine(Contract):
         """
         assert isinstance(collateral_type, CollateralType)
         assert isinstance(safe, SAFE)
-        collateral_type = self.safe_engine.collateral_type(collateral_type.name)
-        safe = self.safe_engine.safe(collateral_type, safe.address)
+
+        if refresh_safe_status == True:
+            collateral_type = self.safe_engine.collateral_type(collateral_type.name)
+            safe = self.safe_engine.safe(collateral_type, safe.address)
+
         rate = collateral_type.accumulated_rate
 
         # Collateral value should be less than the product of our stablecoin debt and the debt multiplier

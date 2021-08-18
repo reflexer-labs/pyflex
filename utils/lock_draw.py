@@ -18,18 +18,6 @@ if len(sys.argv) != 3:
     print("usage: python lock_draw.py <ether amount to lock> <rai amount to draw>")
     sys.exit()
 
-def confirm():
-    warning = (f'----------------------------------WARNING-----------------------------------------------\n'
-              'It is highly recommended to use the Reflexer App or Geb-js to perform SAFE modifications\n'
-              'Pyflex uses unmanaged SAFEs, which are not supported by the App or geb-js.\n'
-              'If you use pyflex to open or modify a SAFE, it will be unaccessible in the App or geb-js!\n')
-
-    answer = ""
-    while answer not in ["y", "n"]:
-        print(warning)
-        answer = input("OK to continue [Y/N]? ").lower()
-    return answer == "y"
-
 pyflex_warning()
 
 new_collateral_amount = Wad.from_number(sys.argv[1])
@@ -51,7 +39,6 @@ our_address = Address(web3.eth.defaultAccount)
 
 collateral = geb.collaterals['ETH-A']
 collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
-
 
 
 # Get SAFE status before modification
@@ -88,6 +75,7 @@ geb.safe_engine.modify_safe_collateralization(collateral_type, our_address, delt
 # Get SAFE status after modification
 safe = geb.safe_engine.safe(collateral_type, our_address)
 coll_ratio = (safe.locked_collateral * collateral_type.liquidation_price * geb.oracle_relayer.liquidation_c_ratio(collateral_type)) / (safe.generated_debt * collateral_type.accumulated_rate) * 100
+
 print("")
 print("Safe after modification")
 print("------------------------")
