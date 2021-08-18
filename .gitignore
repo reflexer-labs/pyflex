@@ -16,3 +16,4 @@ _virtualenv
 *.swp
 *.bin-runtime
 pyflex.egg-info
+env.sh

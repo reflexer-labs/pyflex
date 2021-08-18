@@ -23,9 +23,6 @@ while web3.eth.syncing:
 
 print(f"Current block number: {web3.eth.blockNumber}")
 
-web3.eth.defaultAccount = os.environ['ETH_ACCOUNT']
-register_keys(web3, [os.environ['ETH_KEYPASS']])
-
 geb = GfDeployment.from_node(web3, 'rai')
 
 collateral = geb.collaterals['ETH-A']
@@ -43,3 +40,4 @@ if safe.generated_debt != Wad(0):
     is_critical = (Ray(safe.locked_collateral) * collateral_type.liquidation_price) < Ray(safe.generated_debt) * collateral_type.accumulated_rate
     coll_ratio = (safe.locked_collateral * collateral_type.liquidation_price * geb.oracle_relayer.liquidation_c_ratio(collateral_type)) / (safe.generated_debt * collateral_type.accumulated_rate) * 100
     print(f"coll_ratio                                   {coll_ratio}")
+    print(f"is_critical {is_critical}")

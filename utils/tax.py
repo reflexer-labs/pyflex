@@ -1,16 +1,9 @@
-""" script to liquidate a SAFE, starting a collateral auction """
-import sys
+""" Call tax_single() """
 import os
 import time
 from web3 import Web3, HTTPProvider
-from pyflex import Address
-from pyflex.gf import SAFE
 from pyflex.deployment import GfDeployment
 from pyflex.keys import register_keys
-
-if len(sys.argv) != 2:
-    print("usage: python liq_safe.py <safe addr>")
-    sys.exit()
 
 ETH_RPC_URL = os.environ['ETH_RPC_URL']
 
@@ -20,6 +13,7 @@ while web3.eth.syncing:
     time.sleep(5)
 
 print(f"Current block number: {web3.eth.blockNumber}")
+
 web3.eth.defaultAccount = os.environ['ETH_ACCOUNT']
 register_keys(web3, [os.environ['ETH_KEYPASS']])
 
@@ -27,12 +21,4 @@ geb = GfDeployment.from_node(web3, 'rai')
 
 collateral = geb.collaterals['ETH-A']
 collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
-rate = collateral_type.accumulated_rate
-
-safe = geb.safe_engine.safe(collateral_type, Address(sys.argv[1]))
-
-if not geb.liquidation_engine.can_liquidate(collateral_type, safe):
-    print("SAFE can't be liquidated. Exiting.")
-    sys.exit()
-
-assert geb.liquidation_engine.liquidate_safe(collateral_type, SAFE(Address(sys.argv[1]))).transact()
+geb.tax_collector.tax_single(collateral_type).transact()

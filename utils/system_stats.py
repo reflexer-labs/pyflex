@@ -17,11 +17,8 @@ while web3.eth.syncing:
     time.sleep(5)
 
 print(f"Current block number: {web3.eth.blockNumber}")
-web3.eth.defaultAccount = os.environ['ETH_ACCOUNT']
-register_keys(web3, [os.environ['ETH_KEYPASS']])
 
 geb = GfDeployment.from_node(web3, 'rai')
-our_address = Address(web3.eth.defaultAccount)
 collateral = geb.collaterals['ETH-A']
 collateral_type = geb.safe_engine.collateral_type(collateral.collateral_type.name)
 
