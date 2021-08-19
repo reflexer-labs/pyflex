@@ -190,6 +190,12 @@ class GfDeployment:
                     flash_proxy_dai_v3 = None
 
                 try:
+                    flash_proxy_usdc_v3 = GebETHKeeperFlashProxy(web3, Address(conf[f'GEB_UNISWAP_V3_MULTI_HOP_KEEPER_FLASH_PROXY_USDC_{name[0]}']))
+                except Exception as e:
+                    print(e)
+                    flash_proxy_usdc_v3 = None
+
+                try:
                     flash_proxy_v3 = GebETHKeeperFlashProxy(web3, Address(conf[f'GEB_UNISWAP_V3_SINGLE_KEEPER_FLASH_PROXY_{name[0]}']))
                 except Exception as e:
                     print(e)
@@ -199,6 +205,7 @@ class GfDeployment:
                 collateral = Collateral(collateral_type=collateral_type, collateral=collateral, adapter=adapter,
                                         collateral_auction_house=coll_auction_house, keeper_flash_proxy=flash_proxy,
                                         keeper_flash_proxy_dai_v3=flash_proxy_dai_v3,
+                                        keeper_flash_proxy_usdc_v3=flash_proxy_usdc_v3,
                                         keeper_flash_proxy_v3=flash_proxy_v3,
                                         osm=osm)
 
