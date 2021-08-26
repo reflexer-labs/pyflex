@@ -21,8 +21,6 @@ while web3.eth.syncing:
     print("Node is syncing")
     time.sleep(5)
 
-print(f"Current block number: {web3.eth.blockNumber}")
-
 geb = GfDeployment.from_node(web3, 'rai')
 
 collateral = geb.collaterals['ETH-A']
