@@ -171,6 +171,7 @@ class GfDeployment:
                 # Detect which auction house is used
                 try:
                     coll_auction_house = IncreasingDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))
+                    #coll_auction_house = FixedDiscountCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))
                 except:
                     try:
                         coll_auction_house = EnglishCollateralAuctionHouse(web3, Address(conf[f'GEB_COLLATERAL_AUCTION_HOUSE_{name[0]}']))
