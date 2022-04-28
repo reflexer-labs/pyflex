@@ -30,7 +30,7 @@ from pyflex import Address
 from pyflex.approval import directly, approve_safe_modification_directly
 from pyflex.auth import DSGuard
 from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, BasicCollateralJoin, CollateralType
-from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, SAFEEngine, AccountingEngine
+from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, RedemptionPriceSnap, SAFEEngine, AccountingEngine
 from pyflex.gf import GebETHKeeperFlashProxy, GebMCKeeperFlashProxy
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
@@ -83,7 +83,8 @@ class GfDeployment:
                      liquidation_engine: LiquidationEngine, surplus_auction_house: PreSettlementSurplusAuctionHouse,
                      debt_auction_house: DebtAuctionHouse,
                      coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
-                     prot: DSToken, oracle_relayer: OracleRelayer, esm: ESM, global_settlement: GlobalSettlement,
+                     prot: DSToken, oracle_relayer: OracleRelayer, redemption_price_snap: RedemptionPriceSnap, esm: ESM,
+                     global_settlement: GlobalSettlement,
                      proxy_registry: ProxyRegistry, proxy_actions: GebProxyActions, safe_manager: SafeManager,
                      uniswap_factory: Address, uniswap_router: Address, mc_keeper_flash_proxy: GebMCKeeperFlashProxy,
                      starting_block_number: int, collaterals: Optional[Dict[str, Collateral]] = None):
@@ -99,6 +100,7 @@ class GfDeployment:
             self.coin_join = coin_join
             self.prot = prot
             self.oracle_relayer = oracle_relayer
+            self.redemption_price_snap = redemption_price_snap
             #self.vote_quorum = vote_quorum
             self.esm = esm
             self.global_settlement = global_settlement
@@ -125,6 +127,10 @@ class GfDeployment:
             debt_auction_house = DebtAuctionHouse(web3, Address(conf['GEB_DEBT_AUCTION_HOUSE']))
             coin_savings_acct = CoinSavingsAccount(web3, Address(conf['GEB_COIN']))
             oracle_relayer = OracleRelayer(web3, Address(conf['GEB_ORACLE_RELAYER']))
+            try:
+                redemption_price_snap = RedemptionPriceSnap(web3, Address(conf['GEB_REDEMPTION_PRICE_SNAP']))
+            except:
+                redemption_price_snap = None
             global_settlement = GlobalSettlement(web3, Address(conf['GEB_GLOBAL_SETTLEMENT']))
             proxy_registry = ProxyRegistry(web3, Address(conf['PROXY_REGISTRY']))
             proxy_actions = GebProxyActions(web3, Address(conf['PROXY_ACTIONS']))
@@ -215,7 +221,7 @@ class GfDeployment:
             return GfDeployment.Config(pause, safe_engine, accounting_engine, tax_collector, liquidation_engine,
                                        surplus_auction_house,
                                        debt_auction_house, coin_savings_acct, system_coin, system_coin_adapter,
-                                       prot, oracle_relayer, esm, global_settlement, proxy_registry, proxy_actions,
+                                       prot, oracle_relayer, redemption_price_snap, esm, global_settlement, proxy_registry, proxy_actions,
                                        safe_manager, uniswap_factory, uniswap_router, mc_keeper_flash_proxy, 
                                        starting_block_number, collaterals)
 
@@ -290,6 +296,7 @@ class GfDeployment:
         self.prot = config.prot
         self.collaterals = config.collaterals
         self.oracle_relayer = config.oracle_relayer
+        self.redemption_price_snap = config.redemption_price_snap
         self.esm = config.esm
         self.global_settlement = config.global_settlement
         self.proxy_registry = config.proxy_registry
