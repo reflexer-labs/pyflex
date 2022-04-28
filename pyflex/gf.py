@@ -798,7 +798,7 @@ class RedemptionPriceSnap(Contract):
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateSnappedPrice', [])
 
     def snapped_price(self) -> Rad:
-        return Rad(self._contract.functions.snappedRedemptionPrice().call())
+        return Ray(self._contract.functions.snappedRedemptionPrice().call())
 
 class AccountingEngine(Contract):
     """A client for the `AccountingEngine` contract, which manages liquidation of surplus systemc coin and settlement of collateral debt.
