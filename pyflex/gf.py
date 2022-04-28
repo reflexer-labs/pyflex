@@ -773,6 +773,33 @@ class OracleRelayer(Contract):
     def __repr__(self):
         return f"OracleRelayer('{self.address}')"
 
+class RedemptionPriceSnap(Contract):
+    """A client for the `RedemptionPriceSnap` contract, which stores a snapshot of the redempion price
+
+    Ref. <https://github.com/reflexer-labs/geb-redemption-price-snap/blob/master/src/RedemptionPriceSnap.sol>
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/RedemptionPriceSnap.abi')
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        self.web3 = web3
+        self.address = address
+        self._contract = self._get_contract(web3, self.abi, address)
+
+    def authorized_accounts(self, address: Address):
+        assert isinstance(address, Address)
+
+        return bool(self._contract.functions.authorizedAccounts(address.address).call())
+
+    def update_snapped_price(self) -> Transact:
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'updateSnappedPrice', [])
+
+    def snapped_price(self) -> Rad:
+        return Rad(self._contract.functions.snappedRedemptionPrice().call())
+
 class AccountingEngine(Contract):
     """A client for the `AccountingEngine` contract, which manages liquidation of surplus systemc coin and settlement of collateral debt.
     Specifically, this contract is useful for PreSettlementSurplusAuctionHouse and DebtAuctionHouse auctions.
