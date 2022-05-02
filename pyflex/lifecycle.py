@@ -357,25 +357,13 @@ class Lifecycle:
                 try:
                     # old blocks are ignored in new_block_callback,
                     # so process only the last filter entry
-                    new_block_callback(event_filter.get_new_entries()[-1])
-                except ValueError:
+                    for event in event_filter.get_new_entries()[-1:]:
+                        new_block_callback(event)
+                except (BlockNotFound, BlockNumberOutofRange, ValueError) as ex: 
                     self.logger.warning("Node dropped event emitter; recreating latest block filter")
                     event_filter = self.web3.eth.filter('latest')
                 finally:
                     time.sleep(self.block_check_interval)
-
-        def new_block_watch():
-            event_filter = self.web3.eth.filter('latest')
-            logging.debug(f"Created event filter: {event_filter}")
-            while True:
-                try:
-                    for event in event_filter.get_new_entries():
-                        new_block_callback(event)
-                except (BlockNotFound, BlockNumberOutofRange, ValueError) as ex:
-                    self.logger.warning(f"Node dropped event emitter; recreating latest block filter: {ex}")
-                    event_filter = self.web3.eth.filter('latest')
-                finally:
-                    time.sleep(1)
 
         if self.block_function:
             self._on_block_callback = AsyncCallback(self.block_function)
