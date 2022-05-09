@@ -196,11 +196,15 @@ class Lifecycle:
         if 'TestRPC' in self.web3.clientVersion:
             return
 
-        # wait for the client to have at least one peer
-        if self.web3.net.peer_count == 0:
-            self.logger.info(f"Waiting for the node to have at least one peer...")
-            while self.web3.net.peer_count == 0:
-                time.sleep(0.25)
+        # Need try/catch since alchemy doesn't support net_peerCount
+        try:
+            # wait for the client to have at least one peer
+            if self.web3.net.peer_count == 0:
+                self.logger.info(f"Waiting for the node to have at least one peer...")
+                while self.web3.net.peer_count == 0:
+                    time.sleep(0.25)
+        except:
+            pass
 
         # wait for the client to sync completely,
         # as we do not want to apply keeper logic to stale blocks
