@@ -74,7 +74,7 @@ def _get_nonce_calc(web3: Web3) -> NonceCalculation:
     assert isinstance(web3, Web3)
     global nonce_calc
     if web3 not in nonce_calc:
-        providers_without_nonce_calculation = ['infura', 'quiknode']
+        providers_without_nonce_calculation = ['infura', 'quiknode', 'alchemy']
         requires_serial_nonce = any(provider in web3.manager.provider.endpoint_uri for provider in
                                     providers_without_nonce_calculation)
         is_parity = "parity" in web3.clientVersion.lower() or "openethereum" in web3.clientVersion.lower()
