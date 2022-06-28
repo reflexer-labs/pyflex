@@ -1220,6 +1220,10 @@ class GebStaking(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
+    def can_auction_tokens(self) -> bool:
+        can_auction = self._contract.functions.canAuctionTokens().call()
+        return bool(can_auction)
+
     def system_coins_to_request(self) -> Wad:
         syscoins = self._contract.functions.systemCoinsToRequest().call()
         return Wad(syscoins)
