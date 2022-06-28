@@ -251,7 +251,7 @@ class GfDeployment:
                 'GEB_LIQUIDATION_ENGINE': self.liquidation_engine.address.address,
                 'GEB_SURPLUS_AUCTION_HOUSE': self.surplus_auction_house.address.address,
                 'GEB_DEBT_AUCTION_HOUSE': self.debt_auction_house.address.address,
-                'GEB_STAKING_AUCTION_HOUSE': self.staked_token_auction_house.address.address,
+                #'GEB_STAKING_AUCTION_HOUSE': self.staked_token_auction_house.address.address,
                 'GEB_COIN': self.system_coin.address.address,
                 'GEB_COIN_JOIN': self.coin_join.address.address,
                 'GEB_PROT': self.prot.address.address if self.prot else None,
