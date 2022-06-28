@@ -1220,5 +1220,13 @@ class GebStaking(Contract):
         self.address = address
         self._contract = self._get_contract(web3, self.abi, address)
 
-    def auctionAncestorTokens(self) -> Transact:
+    def system_coins_to_request(self) -> Wad:
+        syscoins = self._contract.functions.systemCoinsToRequest().call()
+        return Wad(syscoins)
+
+    def tokens_to_auction(self) -> Wad:
+        tokens = self._contract.functions.tokens_to_auction().call()
+        return Wad(tokens)
+
+    def auction_ancestor_tokens(self) -> Transact:
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionAncestorTokens', [])
