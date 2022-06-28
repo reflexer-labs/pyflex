@@ -1229,8 +1229,12 @@ class GebStaking(Contract):
         return Wad(syscoins)
 
     def tokens_to_auction(self) -> Wad:
-        tokens = self._contract.functions.tokens_to_auction().call()
+        tokens = self._contract.functions.tokensToAuction().call()
         return Wad(tokens)
+
+    def max_concurrent_auctions(self) -> Wad:
+        max_concurrent_auctions = int(self._contract.functions.maxConcurrentAuctions().call())
+        return max_concurrent_auctions
 
     def auction_ancestor_tokens(self) -> Transact:
         return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionAncestorTokens', [])

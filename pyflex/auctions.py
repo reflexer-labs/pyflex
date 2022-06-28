@@ -1290,6 +1290,12 @@ class StakedTokenAuctionHouse(AuctionContract):
         # start_auction is called on GEB_STAKING
         raise NotImplemented()
 
+    def active_staked_token_auctions(self) -> int:
+        """Number of active auctions
+
+        """
+        return int(self._contract.functions.activeStakedTokenAuctions().call())
+
     def increase_bid_size(self, id: int, amount_to_buy: Wad, bid_amount: Rad) -> Transact:
         assert(isinstance(id, int))
         assert(isinstance(amount_to_buy, Wad))
