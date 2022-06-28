@@ -33,6 +33,7 @@ from pyflex.auth import DSGuard
 from pyflex.gf import LiquidationEngine, Collateral, CoinJoin, BasicCollateralJoin, CollateralType
 from pyflex.gf import TaxCollector, CoinSavingsAccount, OracleRelayer, RedemptionPriceSnap, SAFEEngine, AccountingEngine
 from pyflex.gf import GebETHKeeperFlashProxy, GebMCKeeperFlashProxy
+from pyflex.gf import GebStaking
 from pyflex.proxy import ProxyRegistry, GebProxyActions
 from pyflex.feed import DSValue
 from pyflex.gas import DefaultGasPrice
@@ -81,7 +82,8 @@ class GfDeployment:
 
     class Config:
         def __init__(self, pause: DSPause, safe_engine: SAFEEngine, accounting_engine: AccountingEngine, tax_collector: TaxCollector,
-                     liquidation_engine: LiquidationEngine, surplus_auction_house: PreSettlementSurplusAuctionHouse,
+                     liquidation_engine: LiquidationEngine, geb_staking: GebStaking, 
+                     surplus_auction_house: PreSettlementSurplusAuctionHouse,
                      debt_auction_house: DebtAuctionHouse, staked_token_auction_house: StakedTokenAuctionHouse,
                      coin_savings_acct: CoinSavingsAccount, system_coin: DSToken, coin_join: CoinJoin,
                      prot: DSToken, oracle_relayer: OracleRelayer, redemption_price_snap: RedemptionPriceSnap, esm: ESM,
@@ -94,6 +96,7 @@ class GfDeployment:
             self.accounting_engine = accounting_engine
             self.tax_collector = tax_collector
             self.liquidation_engine = liquidation_engine
+            self.geb_staking = geb_staking
             self.surplus_auction_house = surplus_auction_house
             self.debt_auction_house = debt_auction_house
             self.staked_token_auction_house = staked_token_auction_house
@@ -123,6 +126,10 @@ class GfDeployment:
             accounting_engine = AccountingEngine(web3, Address(conf['GEB_ACCOUNTING_ENGINE']))
             tax_collector = TaxCollector(web3, Address(conf['GEB_TAX_COLLECTOR']))
             liquidation_engine = LiquidationEngine(web3, Address(conf['GEB_LIQUIDATION_ENGINE']))
+            try:
+                geb_staking = GebStaking(web3, Address(conf['GEB_STAKING']))
+            except:
+                geb_staking = None
             system_coin = DSToken(web3, Address(conf['GEB_COIN']))
             system_coin_adapter = CoinJoin(web3, Address(conf['GEB_COIN_JOIN']))
             surplus_auction_house = PreSettlementSurplusAuctionHouse(web3, Address(conf['GEB_SURPLUS_AUCTION_HOUSE']))
@@ -221,7 +228,7 @@ class GfDeployment:
 
                 collaterals[collateral_type.name] = collateral
 
-            return GfDeployment.Config(pause, safe_engine, accounting_engine, tax_collector, liquidation_engine,
+            return GfDeployment.Config(pause, safe_engine, accounting_engine, tax_collector, liquidation_engine, geb_staking,
                                        surplus_auction_house, debt_auction_house, staked_token_auction_house,
                                        coin_savings_acct, system_coin, system_coin_adapter,
                                        prot, oracle_relayer, redemption_price_snap, esm, global_settlement, proxy_registry, proxy_actions,
@@ -292,6 +299,7 @@ class GfDeployment:
         self.accounting_engine = config.accounting_engine
         self.tax_collector = config.tax_collector
         self.liquidation_engine = config.liquidation_engine
+        self.geb_staking = config.geb_staking
         self.surplus_auction_house = config.surplus_auction_house
         self.debt_auction_house = config.debt_auction_house
         self.staked_token_auction_house = config.staked_token_auction_house
