@@ -40,7 +40,8 @@ class AuctionContract(Contract):
         if self.__class__ == AuctionContract:
             raise NotImplemented('Abstract class; please call EnglishCollateralAuctionHouse, \
                                  FixedDiscountCollateralAuctionHouse, IncreasingDiscountCollateralAuctionHouse, \
-                                 PreSettlementSurplusAuctionHouse, or DebtAuctionHouse')
+                                 PreSettlementSurplusAuctionHouse, DebtAuctionHouse' \
+                                 'or StakedTokenAuctionHouse')
 
         assert isinstance(web3, Web3)
         assert isinstance(address, Address)
@@ -1148,3 +1149,184 @@ class IncreasingDiscountCollateralAuctionHouse(AuctionContract):
 
     def __repr__(self):
         return f"IncreasingDiscountCollateralAuctionHouse('{self.address}')"
+
+
+
+class StakedTokenAuctionHouse(AuctionContract):
+    """A client for the `StakedTokenAuctionHouse` contract, used to interact with debt auctions.
+
+    You can find the source code of the `DebtAuctionHouse` contract here:
+    <https://github.com/reflexer-labs/geb-lender-first-resort/blob/master/src/auction/StakedTokenAuctionHouse.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `StakedTokenAuctionHouse` contract.
+
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/StakedTokenAuctionHouse.abi')
+    #bin = Contract._load_bin(__name__, 'abi/DebtAuctionHouse.bin')
+
+    class Bid:
+        def __init__(self, id: int, bid_amount: Rad, amount_to_sell: Wad, high_bidder: Address,
+                     bid_expiry: int, auction_deadline: int):
+            assert(isinstance(id, int))
+            assert(isinstance(bid_amount, Rad))
+            assert(isinstance(amount_to_sell, Wad))
+            assert(isinstance(high_bidder, Address))
+            assert(isinstance(bid_expiry, int))
+            assert(isinstance(auction_deadline, int))
+
+            self.id = id
+            self.bid_amount = bid_amount
+            self.amount_to_sell = amount_to_sell
+            self.high_bidder = high_bidder
+            self.bid_expiry = bid_expiry
+            self.auction_deadline = auction_deadline
+
+        def __repr__(self):
+            return f"StakedTokenAuctionHouse.Bid({pformat(vars(self))})"
+
+    class StartAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = args['id']
+            self.amount_to_sell = Wad(args['amountToSell'])
+            self.amount_to_bid = Rad(args['amountToBid'])
+            self.income_receiver = Address(args['incomeReceiver'])
+            self.auction_deadline = int(args['auctionDeadline'])
+            self.active_staked_token_auctions = int(args['activeStakedTokenAuctions'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"StakedTokenAuctionHouse.StartAuctionLog({pformat(vars(self))})"
+
+    class IncreaseBidSizeLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.high_bidder = Address(args['highBidder'])
+            self.amount_to_buy = Wad(args['amountToBuy'])
+            self.bid = Rad(args['bid'])
+            self.bid_expiry = int(args['bidExpiry'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"StakedTokenAuctionHouse.IncreaseBidSizeLog({pformat(vars(self))})"
+
+    class SettleAuctionLog:
+        def __init__(self, log):
+            args = log['args']
+            self.id = int(args['id'])
+            self.active_debt_auctions = int(args['id'])
+            self.block = log['blockNumber']
+            self.tx_hash = log['transactionHash'].hex()
+
+        def __repr__(self):
+            return f"StakedTokenAuctionHouse.SettleAuctionLog({pformat(vars(self))})"
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        # Set ABIs for event names that are not in AuctionContract
+        self.increase_bid_size_abi = None
+        for member in StakedTokenAuctionHouse.abi:
+            if not self.increase_bid_size_abi and member.get('name') == 'IncreaseBidSize':
+                self.increase_bid_size_abi = member
+
+        super(StakedTokenAuctionHouse, self).__init__(web3, address, StakedTokenAuctionHouse.abi, self.bids)
+
+    def bid_duration(self) -> int:
+        """Returns the bid lifetime.
+
+        Returns:
+            The bid lifetime (in seconds).
+        """
+        return int(self._contract.functions.bidDuration().call())
+
+    def bid_increase(self) -> Wad:
+        """Returns the percentage minimum bid increase.
+
+        Returns:
+            The percentage minimum bid increase.
+        """
+        return Wad(self._contract.functions.bidIncrease().call())
+
+    def min_bid_decrease(self) -> Wad:
+        """Returns the percentage minimum bid decrease. Used when restarting after no on bids.
+
+        Returns:
+            The percentage minimum bid increase.
+        """
+        return Wad(self._contract.functions.minBidDecrease().call())
+
+    def contract_enabled(self) -> bool:
+        return self._contract.functions.contractEnabled().call() > 0
+
+    def bids(self, id: int) -> Bid:
+        """Returns the auction details.
+
+        Args:
+            id: Auction identifier.
+
+        Returns:
+            The auction details.
+        """
+        assert(isinstance(id, int))
+
+        array = self._contract.functions.bids(id).call()
+
+        return StakedTokenAuctionHouse.Bid(id=id,
+                           bid_amount=Rad(array[0]),
+                           amount_to_sell=Wad(array[1]),
+                           high_bidder=Address(array[2]),
+                           bid_expiry=int(array[3]),
+                           auction_deadline=int(array[4]))
+
+    def start_auction(self, initial_bidder: Address, amount_to_sell: Wad, bid_amount: Wad) -> Transact:
+        # start_auction is called on GEB_STAKING
+        raise NotImplemented()
+
+    def active_staked_token_auctions(self) -> int:
+        """Number of active auctions
+
+        """
+        return int(self._contract.functions.activeStakedTokenAuctions().call())
+
+    def increase_bid_size(self, id: int, amount_to_buy: Wad, bid_amount: Rad) -> Transact:
+        assert(isinstance(id, int))
+        assert(isinstance(amount_to_buy, Wad))
+        assert(isinstance(bid_amount, Rad))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'increaseBidSize', [id, amount_to_buy.value, bid_amount.value])
+
+    def restart_auction(self, id: int) -> Transact:
+        """Resurrect an auction which expired without any bids."""
+        assert (isinstance(id, int))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'restartAuction', [id])
+
+    def terminate_auction_prematurely(self, id: int) -> Transact:
+        """While `disableContract`d, refund current bid to the bidder"""
+        assert (isinstance(id, int))
+
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'terminateAuctionPrematurely', [id])
+
+    def parse_event(self, event):
+        signature = Web3.toHex(event['topics'][0])
+        codec = ABICodec(default_registry)
+        if signature == "0x9102bd0b66dcb83f469f1122a583dc797657b114141460c59230fc1b41f48229":
+            event_data = get_event_data(codec, self.start_auction_abi, event)
+            return StakedTokenAuctionHouse.StartAuctionLog(event_data)
+        elif signature == "0xd87c815d5a67c2e130ad04b714d87a6fb69d5a6df0dbb0f1639cd9fe292201f9":
+            event_data = get_event_data(codec, self.increase_bid_size_abi, event)
+            return StakedTokenAuctionHouse.IncreaseBidSizeLog(event_data)
+        elif signature == "0xef063949eb6ef5abef19139d9c75a558424ffa759302cfe445f8d2d327376fe4":
+            event_data = get_event_data(codec, self.settle_auction_abi, event)
+            return StakedTokenAuctionHouse.SettleAuctionLog(event_data)
+
+    def __repr__(self):
+        return f"StakedTokenAuctionHouse('{self.address}')"

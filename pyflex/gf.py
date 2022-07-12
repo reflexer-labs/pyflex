@@ -1198,3 +1198,45 @@ class CoinSavingsAccount(Contract):
         return f"CoinSavingsAccount('{self.address}')"
 
 
+class GebStaking(Contract):
+    """A client for the `GebLenderFirstResortRewardsVested` contract, used to stake and auction staked protocol tokens.
+
+    You can find the source code of the `GebLenderFirstResortRewardsVested` contract here:
+    <https://github.com/reflexer-labs/geb-lender-first-resort/blob/master/src/GebLenderFirstResortRewardsVested.sol>.
+
+    Attributes:
+        web3: An instance of `Web` from `web3.py`.
+        address: Ethereum address of the `GebLenderFirstResortRewardsVested` contract.
+
+    """
+
+    abi = Contract._load_abi(__name__, 'abi/GebLenderFirstResortRewardsVested.abi')
+
+    def __init__(self, web3: Web3, address: Address):
+        assert isinstance(web3, Web3)
+        assert isinstance(address, Address)
+
+        self.web3 = web3
+        self.address = address
+        self._contract = self._get_contract(web3, self.abi, address)
+
+    def can_auction_tokens(self) -> bool:
+        return bool(self._contract.functions.canAuctionTokens().call())
+
+    def can_print_protocol_tokens(self) -> bool:
+        """
+        Returns true if this staking pool allows debt auction house to print tokens, False otherwise.
+        """
+        return bool(self._contract.functions.canPrintProtocolTokens().call())
+
+    def system_coins_to_request(self) -> Wad:
+        return Wad(self._contract.functions.systemCoinsToRequest().call())
+
+    def tokens_to_auction(self) -> Wad:
+        return Wad(self._contract.functions.tokensToAuction().call())
+
+    def max_concurrent_auctions(self) -> Wad:
+        return int(self._contract.functions.maxConcurrentAuctions().call())
+
+    def auction_ancestor_tokens(self) -> Transact:
+        return Transact(self, self.web3, self.abi, self.address, self._contract, 'auctionAncestorTokens', [])
